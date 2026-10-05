@@ -1,0 +1,132 @@
+{
+  "notice_external_id": "fixture-ommalning-solbacken",
+  "document_facit": "ommalning-solbacken/facit.json",
+  "draft": "anbudsutkast-malerifirman/anbudsutkast-malerifirman-i-matfors.pdf",
+  "scope": "De krav som utkastet är gjort för att pröva, inte samtliga krav i facit.",
+  "checks": [
+    {
+      "requirement_id": "K02",
+      "requirement_title": "Anbudet är skrivet på svenska",
+      "status": "uppfyllt",
+      "comment": "Anbudet anger att det är skrivet på svenska.",
+      "draft_quote": "Anbudet är skrivet på svenska och lämnas via e-Avrop.",
+      "draft_page": 2
+    },
+    {
+      "requirement_id": "K03",
+      "requirement_title": "Anbudet omfattar hela uppdraget",
+      "status": "uppfyllt",
+      "comment": "Anbudet omfattar hela uppdraget.",
+      "draft_quote": "Vi lämnar härmed anbud på hela uppdraget enligt avsnitt 4 i förfrågningsunderlaget.",
+      "draft_page": 2
+    },
+    {
+      "requirement_id": "K05",
+      "requirement_title": "Anbudets giltighetstid",
+      "status": "uppfyllt",
+      "comment": "Giltighetstiden stämmer med förfrågningsunderlaget.",
+      "draft_quote": "Anbudet är giltigt till och med den 7 februari 2027.",
+      "draft_page": 2
+    },
+    {
+      "requirement_id": "K06",
+      "requirement_title": "Priser i SEK exklusive moms i prisbilagan",
+      "status": "uppfyllt",
+      "comment": "Priserna är angivna i svenska kronor exklusive mervärdesskatt, och post C stämmer med A + 40 × B.",
+      "draft_quote": "Samtliga priser är angivna i svenska kronor exklusive mervärdesskatt.",
+      "draft_page": 4
+    },
+    {
+      "requirement_id": "K07",
+      "requirement_title": "Anbudet innehåller samtliga begärda bilagor",
+      "status": "saknas",
+      "comment": "Referensblanketten (bilaga 2) och försäkringsbeviset (bilaga 4) finns inte med bland bilagorna."
+    },
+    {
+      "requirement_id": "K10",
+      "requirement_title": "Underleverantörer anges i anbudet",
+      "status": "uppfyllt",
+      "comment": "Underleverantören för ställningar är angiven.",
+      "draft_quote": "Ställningar hyrs och monteras av underleverantören Ställningsbolaget i Mitt AB (fiktivt företag). Inga andra underleverantörer anlitas.",
+      "draft_page": 2
+    },
+    {
+      "requirement_id": "K11",
+      "requirement_title": "Ingen grund för uteslutning (sanningsförsäkran)",
+      "status": "uppfyllt",
+      "comment": "Sanningsförsäkran är undertecknad.",
+      "draft_quote": "Sanningsförsäkran är undertecknad, se avsnitt 6 i detta anbud.",
+      "draft_page": 2
+    },
+    {
+      "requirement_id": "K13",
+      "requirement_title": "Godkänd för F-skatt och inga skatteskulder",
+      "status": "uppfyllt",
+      "comment": "Anbudsgivaren uppger F-skatt; kommunen kontrollerar själv.",
+      "draft_quote": "Målerifirman i Matfors AB är registrerat i aktiebolagsregistret och godkänt för F-skatt. Vi har inga skulder hos Skatteverket eller Kronofogden.",
+      "draft_page": 2
+    },
+    {
+      "requirement_id": "K16",
+      "requirement_title": "Ansvarsförsäkring minst 5 miljoner kronor med försäkringsbevis",
+      "status": "obevisat",
+      "comment": "Anbudet svarar ja om ansvarsförsäkringen men försäkringsbeviset (bilaga 4) är inte bifogat.",
+      "draft_quote": "Ja. Företaget har en ansvarsförsäkring med ett försäkringsbelopp på 5 000 000 kronor per skadetillfälle.",
+      "draft_page": 2
+    },
+    {
+      "requirement_id": "K17",
+      "requirement_title": "Två referensuppdrag i offentlig miljö de senaste tre åren",
+      "status": "saknas",
+      "comment": "Inga referensuppdrag redovisas och referensblanketten (bilaga 2) saknas.",
+      "draft_quote": "Vi har målat många skolor och förskolor i regionen och lämnar gärna referenser om kommunen vill.",
+      "draft_page": 2
+    },
+    {
+      "requirement_id": "K18",
+      "requirement_title": "Systematiskt arbetsmiljöarbete med skriftliga rutiner",
+      "status": "uppfyllt",
+      "comment": "Systematiskt arbetsmiljöarbete och rutiner beskrivs.",
+      "draft_quote": "Vi bedriver ett systematiskt arbetsmiljöarbete och har skriftliga rutiner för riskbedömning, arbete på höjd och hantering av kemiska produkter. Rutinerna kan visas på begäran.",
+      "draft_page": 2
+    },
+    {
+      "requirement_id": "K44",
+      "requirement_title": "Genomförandebeskrivning på högst tre sidor",
+      "status": "uppfyllt",
+      "comment": "Genomförandebeskrivningen finns och behandlar de fyra delarna.",
+      "draft_quote": "Genomförandebeskrivningen omfattar två A4-sidor och följer de fyra delarna i avsnitt 5.3.",
+      "draft_page": 3
+    },
+    {
+      "requirement_id": "K45",
+      "requirement_title": "Avtalsvillkoren accepteras utan reservationer",
+      "status": "uppfyllt",
+      "comment": "Avtalsvillkoren accepteras utan reservationer.",
+      "draft_quote": "Vi accepterar avtalsvillkoren i avsnitt 6 utan reservationer.",
+      "draft_page": 2
+    }
+  ],
+  "attachments": [
+    {
+      "name": "Prisbilaga (bilaga 1)",
+      "status": "bifogad"
+    },
+    {
+      "name": "Referensblankett (bilaga 2)",
+      "status": "saknas"
+    },
+    {
+      "name": "Sanningsförsäkran (bilaga 3)",
+      "status": "bifogad"
+    },
+    {
+      "name": "Försäkringsbevis för ansvarsförsäkring (bilaga 4)",
+      "status": "saknas"
+    },
+    {
+      "name": "Genomförandebeskrivning",
+      "status": "bifogad"
+    }
+  ]
+}

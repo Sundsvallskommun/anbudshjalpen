@@ -1,0 +1,28 @@
+[
+  {
+    "org_number": "559900-0013",
+    "name": "Målerifirman i Matfors AB",
+    "description": "Vi är en målerifirma i Matfors med fem anställda. Vi målar invändigt och utvändigt, tapetserar och renoverar fasader åt privatpersoner, bostadsrättsföreningar och företag i Sundsvall och Timrå. Vi har inte lämnat anbud i en offentlig upphandling tidigare.",
+    "cpv_codes": ["45442100", "45442110", "45442180"],
+    "municipalities": ["Sundsvall", "Timrå"],
+    "employees": 5,
+    "annual_turnover_sek": 4800000,
+    "certifications": [],
+    "insurance": "Ansvarsförsäkring med försäkringsbelopp 5 000 000 kronor per skadetillfälle",
+    "public_references": "Underentreprenör vid ommålning av korridorer i en skola i Timrå 2025, värde cirka 180 000 kronor. Övriga uppdrag för bostadsrättsföreningar och privatpersoner.",
+    "is_fictitious": true
+  },
+  {
+    "org_number": "559900-0021",
+    "name": "Rena Rum i Sundsvall AB",
+    "description": "Städföretag i Sundsvall med åtta anställda. Vi utför lokalvård, storstädning och fönsterputs åt kontor, butiker och bostadsrättsföreningar. Vi använder miljömärkta rengöringsmedel och mikrofibermetoder.",
+    "cpv_codes": ["90911200", "90911300", "90919200"],
+    "municipalities": ["Sundsvall"],
+    "employees": 8,
+    "annual_turnover_sek": 3900000,
+    "certifications": [],
+    "insurance": "Ansvarsförsäkring med försäkringsbelopp 10 000 000 kronor per skadetillfälle",
+    "public_references": "Lokalvård som underleverantör i ett kommunalt kontorshus om cirka 1 200 kvadratmeter sedan 2024.",
+    "is_fictitious": true
+  }
+]

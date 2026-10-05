@@ -1,0 +1,459 @@
+"""The offline heuristic engine: deterministic output with verifiable quotes."""
+
+from __future__ import annotations
+
+import datetime as dt
+
+import pytest
+
+from anbudsklar.ai.engine import RuleContext
+from anbudsklar.ai.heuristic import HEURISTIC_PREFIX, HeuristicEngine, running_lines, split_sentences
+from anbudsklar.contracts import (
+    Checklist,
+    Citation,
+    CompanyProfile,
+    CpvCandidate,
+    NoticeContext,
+    PagedDocument,
+    RequiredAttachment,
+    Requirement,
+)
+from anbudsklar.documents.citations import verify_answer, verify_checklist, verify_review
+from anbudsklar.services.matching import prefilter_score
+
+NOTICE = NoticeContext(notice_id="n1", title="Ommålning av förskola", cpv_codes=["45442100"])
+
+# Fictitious procurement document (not real tender text).
+PAGES = [
+    "Administrativa föreskrifter\n"
+    "Upphandlingen genomförs med förenklat förfarande.\n"
+    "Frågor ska ställas senast 2026-10-20 i e-Avrop.\n"
+    "Anbud ska ha kommit in senast den 2 november 2026.\n"
+    "Anbudet ska vara bindande i 90 dagar.\n"
+    "Alternativa anbud godtas inte.\n"
+    "Kommunen ska publicera tilldelningsbeslutet i e-Avrop.",
+    "Kvalificering\n"
+    "Leverantören ska ha en ansvarsförsäkring om minst 5 000 000 kronor. Försäkringsbevis ska\n"
+    "bifogas anbudet.\n"
+    "- Leverantören ska redovisa två referensuppdrag på bilaga 3 Referensblankett.\n"
+    "- Leverantören ska vara registrerad för F-skatt, t.ex. enligt Skatteverkets intyg.",
+    "Utvärdering\nUtvärderingen sker med pris 70 % och kvalitet 30 %.\n"
+    "Avtalsvillkor\nVid försenad leverans har kommunen rätt till vite.\nMoms 25 % tillkommer.",
+]
+DOCUMENT = PagedDocument(filename="underlag.pdf", pages=PAGES)
+
+
+def test_split_sentences_keeps_abbreviations_and_headings_apart() -> None:
+    sentences = split_sentences(
+        "Rubrik\nDet här gäller, t.ex. Pris och kvalitet. Enligt 4 kap. 1 § LOU gäller detta."
+    )
+    assert sentences == [
+        "Rubrik",
+        "Det här gäller, t.ex. Pris och kvalitet.",
+        "Enligt 4 kap. 1 § LOU gäller detta.",
+    ]
+
+
+async def test_interpret_document_quotes_verify_on_the_cited_page() -> None:
+    checklist, run = await HeuristicEngine().interpret_document(NOTICE, DOCUMENT)
+    _, summary = verify_checklist(checklist, PAGES)
+    assert summary.citations_total > 0
+    assert summary.citations_verified == summary.citations_total
+    assert checklist.summary.startswith(HEURISTIC_PREFIX)
+    assert run.engine == "heuristic"
+
+
+async def test_interpret_document_finds_requirements_and_kinds() -> None:
+    checklist, _ = await HeuristicEngine().interpret_document(NOTICE, DOCUMENT)
+    by_quote = {requirement.citation.quote: requirement for requirement in checklist.requirements}
+    insurance = next(r for q, r in by_quote.items() if "ansvarsförsäkring" in q)
+    assert insurance.kind == "kvalificeringskrav"
+    assert insurance.citation.page == 2
+    references = next(r for q, r in by_quote.items() if "referensuppdrag" in q)
+    assert references.evidence == "Referensuppdrag, Referensblankett, Bilaga 3"
+    assert next(r for q, r in by_quote.items() if "vite" in q).kind == "avtalsvillkor"
+    assert not any("tilldelningsbeslutet" in quote for quote in by_quote)  # the buyer's own duty
+    assert any(quote == "Alternativa anbud godtas inte." for quote in by_quote)  # prohibitions count
+    assert [requirement.id for requirement in checklist.requirements][:2] == ["K1", "K2"]
+
+
+async def test_interpret_document_dates_weights_terms_and_procedure() -> None:
+    checklist, _ = await HeuristicEngine().interpret_document(NOTICE, DOCUMENT)
+    dates = {(item.kind, item.date) for item in checklist.dates}
+    assert ("fragestopp", dt.date(2026, 10, 20)) in dates
+    assert ("sista_anbudsdag", dt.date(2026, 11, 2)) in dates
+    assert ("anbudets_giltighet", None) in dates
+    weights = {item.name: item.weight_percent for item in checklist.evaluation}
+    assert weights == {"Pris": 70.0, "Kvalitet": 30.0}  # "Moms 25 %" is not a criterion
+    assert {attachment.name for attachment in checklist.attachments} >= {"Bilaga 3 Referensblankett"}
+    terms = {term.term: term.explanation for term in checklist.terms}
+    assert set(terms) >= {"förenklat förfarande", "F-skatt", "vite"}
+    # The term left LOU on 1 February 2022: it is explained as history, never given as the procedure.
+    assert "1 februari 2022" in terms["förenklat förfarande"]
+    assert checklist.procedure == "Upphandling under tröskelvärdena (19 kap. LOU)"
+    assert checklist.open_questions == []
+
+
+async def test_interpret_document_reports_what_it_could_not_find() -> None:
+    checklist, _ = await HeuristicEngine().interpret_document(
+        NOTICE, PagedDocument(filename="tom.txt", pages=["Ingen relevant text här."])
+    )
+    assert checklist.requirements == []
+    assert len(checklist.open_questions) == 3
+
+
+def _checklist() -> Checklist:
+    return Checklist(
+        summary="s",
+        requirements=[
+            Requirement(
+                id="K1",
+                kind="kvalificeringskrav",
+                title="Ansvarsförsäkring om minst 5 000 000 kronor",
+                plain_language="p",
+                evidence="Försäkringsbevis",
+                citation=Citation(
+                    page=2, quote="Leverantören ska ha en ansvarsförsäkring om minst 5 000 000 kronor."
+                ),
+            ),
+            Requirement(
+                id="K2",
+                kind="kvalificeringskrav",
+                title="Två referensuppdrag från offentlig verksamhet",
+                plain_language="p",
+                citation=Citation(page=2, quote="Leverantören ska redovisa två referensuppdrag på bilaga 3."),
+            ),
+            Requirement(
+                id="K3",
+                kind="skallkrav",
+                title="Prisbilagan ska fyllas i",
+                plain_language="p",
+                evidence="Prisbilaga",
+                citation=Citation(page=4, quote="Prisbilagan ska fyllas i."),
+            ),
+        ],
+        attachments=[
+            RequiredAttachment(name="Bilaga 3 Referensblankett", citation=Citation(page=2, quote="bilaga 3")),
+            RequiredAttachment(
+                name="Prisbilaga", citation=Citation(page=4, quote="Prisbilagan ska fyllas i.")
+            ),
+        ],
+    )
+
+
+async def test_review_draft_flags_missing_proof_and_missing_requirements() -> None:
+    draft_pages = [
+        "Anbud från Målerifirman i Matfors AB (fiktiv).\n"
+        "Vi har en ansvarsförsäkring om 5 000 000 kronor.\n"
+        "Prisbilagan är ifylld och bifogas som bilaga 1."
+    ]
+    review, _ = await HeuristicEngine().review_draft(
+        _checklist(), PagedDocument(filename="utkast.pdf", pages=draft_pages)
+    )
+    status = {check.requirement_id: check.status for check in review.checks}
+    assert status == {"K1": "obevisat", "K2": "saknas", "K3": "uppfyllt"}
+    attachments = {check.name: check.status for check in review.attachments}
+    assert attachments == {"Bilaga 3 Referensblankett": "saknas", "Prisbilaga": "oklart"}
+    verified = verify_review(review, draft_pages)
+    assert all(check.draft_check == "verified" for check in verified.checks if check.draft_quote)
+    assert review.summary.startswith(HEURISTIC_PREFIX)
+
+
+async def test_answer_question_cites_the_best_sentences() -> None:
+    answer, _ = await HeuristicEngine().answer_question(
+        NOTICE, DOCUMENT, "Hur stor ansvarsförsäkring krävs?", []
+    )
+    assert answer.found_in_document is True
+    assert answer.suggest_formal_question is False
+    assert answer.citations[0].page == 2
+    verified = verify_answer(answer, PAGES)
+    assert all(citation.check == "verified" for citation in verified.citations)
+
+
+async def test_answer_question_suggests_formal_question_when_not_found() -> None:
+    answer, _ = await HeuristicEngine().answer_question(
+        NOTICE, DOCUMENT, "Får vi använda underleverantörer?", []
+    )
+    assert answer.found_in_document is False
+    assert answer.suggest_formal_question is True
+    assert answer.citations == []
+    assert "e-Avrop" in answer.answer
+
+
+async def test_assess_match_uses_cpv_and_flags_unclear_requirements() -> None:
+    profile = CompanyProfile(name="Målerifirman (fiktiv)", description="Vi utför ommålning av förskolor.")
+    profile = profile.model_copy(update={"cpv_codes": ["45442110"]})
+    assessment, _ = await HeuristicEngine().assess_match(profile, NOTICE, _checklist())
+    assert assessment.fit == "passar_delvis"  # strong CPV match, but insurance and references are unclear
+    kinds = [reason.kind for reason in assessment.reasons]
+    assert kinds[0] == "styrka"
+    unclear = [reason for reason in assessment.reasons if reason.kind == "oklart"]
+    assert {reason.requirement_id for reason in unclear} == {"K1", "K2"}
+    assert unclear[0].citation is not None
+
+
+async def test_assess_match_without_overlap_does_not_fit() -> None:
+    profile = CompanyProfile(name="Städbolaget (fiktiv)", description="Lokalvård", cpv_codes=["90910000"])
+    assessment, _ = await HeuristicEngine().assess_match(profile, NOTICE, None)
+    assert assessment.fit == "passar_inte"
+    assert assessment.reasons[0].kind == "hinder"
+
+
+async def test_suggest_cpv_ranks_by_shared_words_and_skips_bad_codes() -> None:
+    candidates = [
+        CpvCandidate(code="45000000", label="Byggnadsarbete"),
+        CpvCandidate(code="45442100-8", label="Målning"),
+        CpvCandidate(code="4544", label="Målning och glasarbeten"),
+        CpvCandidate(code="45442110", label="Målning av byggnader"),
+    ]
+    result, _ = await HeuristicEngine().suggest_cpv("Vi utför målning av byggnader inomhus.", candidates)
+    # Ranked by shared words; ties keep the search order. Codes without eight digits are skipped.
+    assert [suggestion.code for suggestion in result.suggestions] == ["45442110", "45000000", "45442100"]
+    assert "målning" in result.suggestions[0].reason
+
+
+async def test_answer_rules_summarises_context() -> None:
+    context = [
+        RuleContext(
+            reference="LOU 4 kap. 1 §", title="Principer", text="Upphandlande myndigheter ska behandla …"
+        )
+    ]
+    answer, _ = await HeuristicEngine().answer_rules("Vad gäller?", None, context)
+    assert answer.answer.startswith(HEURISTIC_PREFIX)
+    assert answer.sources[0].reference == "LOU 4 kap. 1 §"
+    empty, _ = await HeuristicEngine().answer_rules("Vad gäller?", None, [])
+    assert empty.sources == []
+    assert "frågeportal" in empty.answer
+
+
+# --- Precision of tolka_underlag (sentences adapted from the fictitious fixtures) ---------
+
+HEADER = "Sundsvalls kommun – Ommålning av förskola (fiktiv) DEMO-0001"
+FOOTER = "FIKTIVT UNDERLAG – endast för test Sida {page} av 4"
+PRECISION_PAGES = [
+    f"{HEADER}\nInnehåll\n1 Inledning 2\nBilaga 2 Referensblankett 4\n{FOOTER.format(page=1)}",
+    f"{HEADER}\n1.6 Begrepp\n"
+    "Ska-krav Krav som måste vara uppfyllda för att ett anbud ska kunna antas.\n"
+    "3.4 Ansvarsförsäkring\n"
+    "Anbudsgivaren ska ha en ansvarsförsäkring på minst 5 000 000 kronor per skadetillfälle. "
+    "Försäkringsbevis ska\nbifogas anbudet (bilaga 4).\n"
+    "3.5 Referensuppdrag\n"
+    "Anbudsgivaren ska ha genomfört minst två uppdrag med målning i offentlig miljö. Varje uppdrag ska "
+    "ha haft ett\nvärde av minst 200 000 kronor. Uppdragen ska redovisas i referensblanketten (bilaga 2).\n"
+    "Kommunen kommer att utesluta en leverantör som inte har betalat skatter och socialförsäkringsavgifter.\n"
+    "Anbudet får förkastas om anbudsgivaren inte kan förklara det låga priset.\n"
+    f"{FOOTER.format(page=2)}",
+    f"{HEADER}\n4.2 Leverans\n"
+    "Varor som kräver kylförvaring ska transporteras i en obruten kylkedja med högst 8 °C.\n"
+    "Leverantören tillhandahåller en kundtjänst som köken når vardagar mellan klockan 06.00 och 15.00.\n"
+    "6.7 Vite vid försening\n"
+    "Om uppdraget inte är färdigställt den 13 augusti 2027 ska leverantören betala vite för varje påbörjad "
+    "vecka.\n"
+    f"{FOOTER.format(page=3)}",
+    f"{HEADER}\n6.8 Underleverantörer\n"
+    "Innan arbetet påbörjas ska leverantören lämna namn och kontaktuppgifter för underleverantörerna.\n"
+    "6.9 Arbetsrättsliga villkor\n"
+    "Leverantören ska tillförsäkra arbetstagarna lön enligt det centrala kollektivavtalet.\n"
+    "Leverantören ska på begäran visa att villkoren följs inom tio arbetsdagar.\n"
+    "7 Bilagor\nTabellen visar vilka handlingar som ska lämnas med anbudet.\n"
+    f"{FOOTER.format(page=4)}",
+]
+
+
+async def _requirements(pages: list[str]) -> list[Requirement]:
+    checklist, _ = await HeuristicEngine().interpret_document(
+        NOTICE, PagedDocument(filename="u.pdf", pages=pages)
+    )
+    verified, summary = verify_checklist(checklist, pages)
+    assert summary.citations_verified == summary.citations_total  # folding keeps every quote verbatim
+    return verified.requirements
+
+
+async def test_interpret_document_skips_headings_definitions_and_subordinate_clauses() -> None:
+    quotes = [requirement.citation.quote for requirement in await _requirements(PRECISION_PAGES)]
+    assert quotes == [
+        "Anbudsgivaren ska ha en ansvarsförsäkring på minst 5 000 000 kronor per skadetillfälle.",
+        "Anbudsgivaren ska ha genomfört minst två uppdrag med målning i offentlig miljö.",
+        "Varor som kräver kylförvaring ska transporteras i en obruten kylkedja med högst 8 °C.",
+        "Leverantören tillhandahåller en kundtjänst som köken når vardagar mellan klockan 06.00 och 15.00.",
+        "Om uppdraget inte är färdigställt den 13 augusti 2027 ska leverantören betala vite för varje "
+        "påbörjad vecka.",
+        "Innan arbetet påbörjas ska leverantören lämna namn och kontaktuppgifter för underleverantörerna.",
+        "Leverantören ska tillförsäkra arbetstagarna lön enligt det centrala kollektivavtalet.",
+    ]
+
+
+async def test_interpret_document_folds_elaborations_into_the_requirement() -> None:
+    requirements = await _requirements(PRECISION_PAGES)
+    insurance, references = requirements[0], requirements[1]
+    assert insurance.evidence == "Försäkringsbevis, Bilaga 4"
+    assert insurance.plain_language.endswith("Försäkringsbevis ska bifogas anbudet (bilaga 4).")
+    assert "Varje uppdrag ska ha haft" in references.plain_language
+    assert references.plain_language.endswith("Uppdragen ska redovisas i referensblanketten (bilaga 2).")
+    labour = requirements[-1]
+    assert labour.plain_language.endswith("på begäran visa att villkoren följs inom tio arbetsdagar.")
+
+
+def test_running_headers_and_numbered_headings_are_boundaries() -> None:
+    assert running_lines(PRECISION_PAGES) == frozenset(
+        {
+            "sundsvalls kommun – ommålning av förskola (fiktiv) demo-#",
+            "fiktivt underlag – endast för test sida # av #",
+        }
+    )
+    sentences = split_sentences(
+        "Avtalsstart 2027-02-01\n2.3 Frågor under anbudstiden\nFrågor ställs senast den 19 oktober 2026."
+    )
+    assert sentences == [
+        "Avtalsstart 2027-02-01",
+        "2.3 Frågor under anbudstiden",
+        "Frågor ställs senast den 19 oktober 2026.",
+    ]
+
+
+DATE_PAGES = [
+    "2.2 Tidsplan\nHändelse Datum\nSista dag för anmälan till platsbesök 2026-10-13\n"
+    "Sista dag för frågor 2026-10-30\nSista dag för kommunens svar på frågor 2026-11-03\n"
+    "Sista anbudsdag 2026-11-09 kl. 23.59\nAvtalsstart 2027-02-01\n"
+    "2.3 Frågor under anbudstiden\n"
+    "Sista dag för frågor är den 30 oktober 2026. Kommunen besvarar frågor som har kommit in i tid "
+    "senast den 3 november 2026, det vill säga senast sex dagar före sista anbudsdag.\n"
+    "Anmälan till platsbesöket görs via frågefunktionen i e-Avrop senast den 13 oktober 2026.\n"
+    "Frågor som kommer in efter frågestoppet, till exempel den 2 november 2026, besvaras inte.",
+    "Avtalet gäller från den 1 februari 2027 till och med den 31 januari 2029.\n"
+    "Om uppdraget inte är färdigställt för slutbesiktning den 13 augusti 2027 ska leverantören betala "
+    "vite för varje påbörjad vecka.\n"
+    "Den 25 oktober 2026 är sista dagen för frågor om platsbesöket.",
+]
+
+
+async def test_dates_take_their_kind_from_their_own_label() -> None:
+    checklist, _ = await HeuristicEngine().interpret_document(
+        NOTICE, PagedDocument(filename="u.pdf", pages=DATE_PAGES)
+    )
+    dates = [(item.kind, item.date) for item in checklist.dates]
+    by_kind: dict[str, list[dt.date | None]] = {}
+    for kind, date in dates:
+        by_kind.setdefault(kind, []).append(date)
+    assert by_kind["fragestopp"] == [dt.date(2026, 10, 30)]  # one question deadline, the real one
+    assert by_kind["sista_anbudsdag"] == [dt.date(2026, 11, 9)]
+    assert by_kind["avtalsstart"] == [dt.date(2027, 2, 1)]  # neither the contract end nor the penalty clause
+    assert set(by_kind["annat"]) >= {
+        dt.date(2026, 10, 13),  # site-visit registration through the question function
+        dt.date(2026, 11, 3),  # the buyer's answers
+        dt.date(2029, 1, 31),  # "till och med" is the contract end
+        dt.date(2027, 8, 13),  # the penalty clause's "påbörjad vecka" is no contract start
+    }
+    assert len(dates) == len(set(dates))
+
+
+async def test_a_label_after_the_date_counts_when_none_comes_before() -> None:
+    pages = ["Den 30 oktober 2026 är sista dagen för frågor."]
+    checklist, _ = await HeuristicEngine().interpret_document(
+        NOTICE, PagedDocument(filename="u.pdf", pages=pages)
+    )
+    assert [(item.kind, item.date) for item in checklist.dates] == [("fragestopp", dt.date(2026, 10, 30))]
+
+
+async def test_a_second_question_deadline_is_kept_as_another_date() -> None:
+    pages = ["Frågor ska ställas senast 2026-10-20.\nDen 25 oktober 2026 är sista dagen för frågor."]
+    checklist, _ = await HeuristicEngine().interpret_document(
+        NOTICE, PagedDocument(filename="u.pdf", pages=pages)
+    )
+    assert [(item.kind, item.date) for item in checklist.dates] == [
+        ("fragestopp", dt.date(2026, 10, 20)),
+        ("annat", dt.date(2026, 10, 25)),
+    ]
+
+
+async def test_current_procedure_names_win_over_the_repealed_ones() -> None:
+    pages = [
+        "Förfarandet motsvarar det som tidigare kallades förenklat förfarande.\n"
+        "Upphandlingen är ett öppet förfarande."
+    ]
+    checklist, _ = await HeuristicEngine().interpret_document(
+        NOTICE, PagedDocument(filename="u.pdf", pages=pages)
+    )
+    assert checklist.procedure == "Öppet förfarande"
+
+
+# --- bedom_matchning ---------------------------------------------------------------------
+
+PAINTER = CompanyProfile(
+    name="Målerifirman (fiktiv)",
+    description=(
+        "Vi är en målerifirma i Matfors med fem anställda. Vi målar invändigt och utvändigt, tapetserar och "
+        "renoverar fasader åt bostadsrättsföreningar och företag i Sundsvall och Timrå. Vi har inte lämnat "
+        "anbud i en offentlig upphandling tidigare."
+    ),
+    cpv_codes=["45442100", "45442110"],
+    municipalities=["Sundsvall", "Timrå"],
+)
+
+
+async def test_assess_match_ignores_procurement_words_and_place_names() -> None:
+    notice = NoticeContext(
+        notice_id="n2",
+        title="Påsar och säckar för matavfall (fiktiv)",
+        buyer="Timrå kommun, Ånge kommun",
+        description=(
+            "Upphandlingen är en gemensam länsupphandling för kommunerna Örnsköldsvik, Timrå, Sundsvall och "
+            "Ånge. Anbud lämnas i e-Avrop."
+        ),
+        cpv_codes=["18930000", "90510000"],
+    )
+    assessment, _ = await HeuristicEngine().assess_match(PAINTER, notice, None)
+    assert assessment.fit == "passar_inte"
+    assert [reason.kind for reason in assessment.reasons] == ["hinder"]
+    assert "ortnamn" in assessment.summary
+
+
+async def test_assess_match_needs_cpv_for_a_full_fit() -> None:
+    words_only = NoticeContext(
+        notice_id="n3",
+        title="Ommålning av fasader, invändig målning och tapetsering (fiktiv)",
+        description="Fasader och väggar målas utvändigt och invändigt.",
+    )
+    assessment, _ = await HeuristicEngine().assess_match(PAINTER, words_only, None)
+    assert assessment.fit == "passar_delvis"  # shared words, but no CPV codes to back them up
+
+    group = words_only.model_copy(update={"cpv_codes": ["45454100"]})  # same CPV group (454)
+    assessment, _ = await HeuristicEngine().assess_match(PAINTER, group, None)
+    assert assessment.fit == "passar"
+    assert [reason.kind for reason in assessment.reasons] == ["styrka", "styrka"]
+
+    conflict = words_only.model_copy(update={"cpv_codes": ["90910000"]})
+    assessment, _ = await HeuristicEngine().assess_match(PAINTER, conflict, None)
+    assert assessment.fit == "passar_delvis"  # capped: the CPV codes point elsewhere
+    assert assessment.reasons[0].kind == "hinder"
+
+
+async def test_assess_match_needs_two_words_against_the_cpv_codes() -> None:
+    notice = NoticeContext(
+        notice_id="n4", title="Restaurering av fasad på skola (fiktiv)", cpv_codes=["71000000"]
+    )
+    assessment, _ = await HeuristicEngine().assess_match(PAINTER, notice, None)
+    assert assessment.fit == "passar_inte"
+    assert assessment.reasons[0].kind == "hinder"
+
+
+@pytest.mark.parametrize(
+    ("profile_codes", "notice_codes"),
+    [
+        (["45000000"], ["45442110"]),  # a division on the profile covers the specific notice
+        (["45442100"], ["45000000"]),  # a division on the notice says too little
+        (["45400000"], ["45401000"]),  # shared zeros are not shared digits
+        (["45442100"], ["45111000"]),  # same division only
+        (["45442100", "90911200"], ["90911300"]),
+    ],
+)
+async def test_assess_match_reads_cpv_codes_like_the_matching_prefilter(
+    profile_codes: list[str], notice_codes: list[str]
+) -> None:
+    profile = PAINTER.model_copy(update={"cpv_codes": profile_codes})
+    notice = NoticeContext(notice_id="n5", title="Uppdrag (fiktiv)", cpv_codes=notice_codes)
+    assessment, _ = await HeuristicEngine().assess_match(profile, notice, None)
+    cpv_reasons = [reason for reason in assessment.reasons if "CPV" in reason.text]
+    near = any(reason.kind == "styrka" for reason in cpv_reasons)
+    # The engine calls the codes near exactly when matching's prefilter would admit them on CPV alone.
+    assert near is (prefilter_score(profile_codes, notice_codes, None) is not None)

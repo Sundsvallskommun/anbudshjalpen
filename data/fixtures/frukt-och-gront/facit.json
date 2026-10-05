@@ -1,0 +1,198 @@
+[
+  {
+    "id": "K01",
+    "kind": "skallkrav",
+    "page": 2,
+    "quote_fragment": "Anbud ska lämnas elektroniskt via e-Avrop senast sista anbudsdag.",
+    "title": "Anbud lämnas via e-Avrop senast sista anbudsdag"
+  },
+  {
+    "id": "K02",
+    "kind": "skallkrav",
+    "page": 2,
+    "quote_fragment": "Anbudet ska vara skrivet på svenska.",
+    "title": "Anbudet är skrivet på svenska"
+  },
+  {
+    "id": "K03",
+    "kind": "skallkrav",
+    "page": 2,
+    "quote_fragment": "Anbudet ska vara giltigt till och med den 31 januari 2027.",
+    "title": "Anbudets giltighetstid"
+  },
+  {
+    "id": "K04",
+    "kind": "skallkrav",
+    "page": 3,
+    "quote_fragment": "Anbudsgivaren ska lämna en egen försäkran i form av ett europeiskt enhetligt upphandlingsdokument (ESPD) enligt 15 kap. 1 § LOU.",
+    "title": "Egen försäkran i ESPD"
+  },
+  {
+    "id": "K05",
+    "kind": "skallkrav",
+    "page": 3,
+    "quote_fragment": "Anbudsgivaren ska lämna pris för samtliga 20 artiklar i varukorgen (bilaga 1), i svenska kronor exklusive mervärdesskatt och inklusive leverans.",
+    "title": "Pris för samtliga artiklar i varukorgen"
+  },
+  {
+    "id": "K06",
+    "kind": "kvalificeringskrav",
+    "page": 4,
+    "quote_fragment": "Anbudsgivaren ska vara registrerad i aktiebolagsregistret, handelsregistret eller föreningsregistret eller i motsvarande register i etableringslandet.",
+    "title": "Registrerad i bolags-, handels- eller föreningsregister"
+  },
+  {
+    "id": "K07",
+    "kind": "kvalificeringskrav",
+    "page": 4,
+    "quote_fragment": "Anbudsgivaren ska ha haft en årsomsättning på minst 5 000 000 kronor under det senaste avslutade räkenskapsåret.",
+    "title": "Årsomsättning minst 5 miljoner kronor"
+  },
+  {
+    "id": "K08",
+    "kind": "kvalificeringskrav",
+    "page": 4,
+    "quote_fragment": "Anbudsgivaren ska vara registrerad som livsmedelsföretagare hos behörig kontrollmyndighet för den verksamhet som ramavtalet avser.",
+    "title": "Registrerad livsmedelsföretagare"
+  },
+  {
+    "id": "K09",
+    "kind": "kvalificeringskrav",
+    "page": 4,
+    "quote_fragment": "Anbudsgivaren ska ha ett dokumenterat system för egenkontroll som bygger på principerna i HACCP och omfattar mottagning, lagring och transport.",
+    "title": "Egenkontrollsystem enligt HACCP"
+  },
+  {
+    "id": "K10",
+    "kind": "kvalificeringskrav",
+    "page": 4,
+    "quote_fragment": "Anbudsgivaren ska under de senaste tre åren ha levererat frukt och grönsaker till minst två offentliga kunder med vardera minst 20 leveransadresser.",
+    "title": "Två offentliga referenskunder"
+  },
+  {
+    "id": "K11",
+    "kind": "krav_pa_uppdraget",
+    "page": 5,
+    "quote_fragment": "Frukt och grönsaker ska minst uppfylla kraven för klass I enligt EU:s handelsnormer när en sådan norm finns för produkten.",
+    "title": "Klass I enligt EU:s handelsnormer"
+  },
+  {
+    "id": "K12",
+    "kind": "krav_pa_uppdraget",
+    "page": 5,
+    "quote_fragment": "Varje produkt ska vara märkt med ursprungsland på förpackning eller följesedel.",
+    "title": "Ursprungsmärkning"
+  },
+  {
+    "id": "K13",
+    "kind": "krav_pa_uppdraget",
+    "page": 5,
+    "quote_fragment": "Leverantören ska kunna erbjuda ekologiskt odlade alternativ till minst 10 av de 20 artiklarna i varukorgen.",
+    "title": "Ekologiska alternativ till minst 10 artiklar"
+  },
+  {
+    "id": "K14",
+    "kind": "krav_pa_uppdraget",
+    "page": 5,
+    "quote_fragment": "Leverantören ska erbjuda beställning via en webbutik eller ett e-handelssystem där köken ser kommunens avtalade sortiment och priser.",
+    "title": "Beställning via webbutik eller e-handel"
+  },
+  {
+    "id": "K15",
+    "kind": "krav_pa_uppdraget",
+    "page": 5,
+    "quote_fragment": "Leverans ska ske till varje kök minst två gånger per vecka, på dagar som kommunen bestämmer, mellan klockan 06.00 och 10.00.",
+    "title": "Leverans två gånger per vecka kl. 06.00–10.00"
+  },
+  {
+    "id": "K16",
+    "kind": "krav_pa_uppdraget",
+    "page": 5,
+    "quote_fragment": "Beställningar som görs senast klockan 12.00 ska levereras nästa leveransdag.",
+    "title": "Beställning före kl. 12.00 levereras nästa leveransdag"
+  },
+  {
+    "id": "K17",
+    "kind": "krav_pa_uppdraget",
+    "page": 5,
+    "quote_fragment": "Varor som kräver kylförvaring ska transporteras i en obruten kylkedja med högst 8 °C.",
+    "title": "Obruten kylkedja högst 8 °C"
+  },
+  {
+    "id": "K18",
+    "kind": "krav_pa_uppdraget",
+    "page": 5,
+    "quote_fragment": "Fordon som används för leveranser ska uppfylla lägst utsläppsklass Euro 6 eller drivas med förnybart drivmedel.",
+    "title": "Fordon Euro 6 eller förnybart drivmedel"
+  },
+  {
+    "id": "K19",
+    "kind": "krav_pa_uppdraget",
+    "page": 5,
+    "quote_fragment": "Reklamerade varor ska ersättas senast nästa leveransdag utan extra kostnad för kommunen.",
+    "title": "Reklamerade varor ersätts nästa leveransdag"
+  },
+  {
+    "id": "K20",
+    "kind": "krav_pa_uppdraget",
+    "page": 5,
+    "quote_fragment": "Leverantören ska vid en återkallelse kunna spåra varje levererat parti till odlare eller packeri inom fyra timmar.",
+    "title": "Spårbarhet inom fyra timmar"
+  },
+  {
+    "id": "K21",
+    "kind": "krav_pa_uppdraget",
+    "page": 5,
+    "quote_fragment": "Leverantören redovisar varje kvartal statistik över levererade artiklar, volymer och andel ekologiska produkter per kök.",
+    "title": "Kvartalsvis statistik per kök"
+  },
+  {
+    "id": "K22",
+    "kind": "krav_pa_uppdraget",
+    "page": 5,
+    "quote_fragment": "Leverantören ska erbjuda ett sortiment på minst 150 artiklar frukt och grönsaker och ge en fast rabatt i procent på listpriset för artiklar som inte ingår i",
+    "title": "Sortiment på minst 150 artiklar med fast rabatt"
+  },
+  {
+    "id": "K23",
+    "kind": "krav_pa_uppdraget",
+    "page": 5,
+    "quote_fragment": "Leverantören tillhandahåller en kundtjänst som köken når per telefon och e-post vardagar mellan klockan 06.00 och 15.00.",
+    "title": "Kundtjänst vardagar kl. 06.00–15.00"
+  },
+  {
+    "id": "K24",
+    "kind": "avtalsvillkor",
+    "page": 6,
+    "quote_fragment": "Leverantören ska skicka en prislista med de justerade priserna till kommunen senast 30 dagar innan de nya priserna börjar gälla.",
+    "title": "Prislista 30 dagar före prisjustering"
+  },
+  {
+    "id": "K25",
+    "kind": "avtalsvillkor",
+    "page": 6,
+    "quote_fragment": "Leverantören ska säkerställa att produkter som odlas utanför EU produceras under förhållanden som är förenliga med ILO:s kärnkonventioner, och på kommunens",
+    "title": "Produktion förenlig med ILO:s kärnkonventioner"
+  },
+  {
+    "id": "K26",
+    "kind": "avtalsvillkor",
+    "page": 6,
+    "quote_fragment": "Leverantören ska skicka fakturor elektroniskt per kök och leverans enligt lagen (2018:1277) om elektroniska fakturor till följd av offentlig upphandling.",
+    "title": "Elektronisk faktura per kök och leverans"
+  },
+  {
+    "id": "K27",
+    "kind": "avtalsvillkor",
+    "page": 6,
+    "quote_fragment": "Om en leverans uteblir eller är mer än två timmar försenad ska leverantören betala vite med 500 kronor per kök och tillfälle.",
+    "title": "Vite vid utebliven eller försenad leverans"
+  },
+  {
+    "id": "K28",
+    "kind": "avtalsvillkor",
+    "page": 6,
+    "quote_fragment": "Leverantören ska delta i uppföljningsmöten med kommunen minst två gånger per år och redovisa leveransprecision och reklamationer.",
+    "title": "Uppföljningsmöten två gånger per år"
+  }
+]

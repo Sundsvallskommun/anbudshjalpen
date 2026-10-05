@@ -1,0 +1,129 @@
+# Anbudsklar test environment on Dokploy: app (API, MCP server and SPA), worker, a one-shot
+# migration, Postgres and Mailpit.
+#
+# Dokploy deploys this file from Git (compose path: deploy/dokploy/docker-compose.anbudsklar.yml)
+# and writes its Environment tab to .env next to this file, which fills the ${...} values below.
+# Start from anbudsklar.env.example. Domains are added in Dokploy (service anbudsklar-app,
+# port 3001), so no host ports are published here. Service names are unique because Dokploy
+# puts routed services from several stacks on one shared network.
+#
+# Every variable the app reads is listed explicitly; a variable that is not listed never
+# reaches the container. See deploy/dokploy/README.md and docs/operations.md.
+
+x-anbudsklar-image: &anbudsklar-image
+  build:
+    context: ../..
+    dockerfile: Dockerfile
+  image: anbudsklar:dokploy
+  pull_policy: build
+
+x-anbudsklar-env: &anbudsklar-env
+  ENVIRONMENT: production
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  DATABASE_URL: postgresql+asyncpg://anbudsklar:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@anbudsklar-db:5432/anbudsklar
+  DOCUMENTS_DIR: /data/documents
+  ENEO_ASSISTANTS_FILE: /app/var/eneo-assistants.json
+  PUBLIC_URL: ${PUBLIC_URL:?Set PUBLIC_URL to the https origin of the app}
+  SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET (openssl rand -hex 32)}
+  COOKIE_SECURE: "true"
+  AI_ENGINE: ${AI_ENGINE:-heuristic}
+  AI_MAX_RETRIES: ${AI_MAX_RETRIES:-2}
+  AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-180}
+  ENEO_BACKEND_URL: ${ENEO_BACKEND_URL:-}
+  ENEO_API_KEY: ${ENEO_API_KEY:-}
+  ENEO_API_KEY_HEADER_NAME: ${ENEO_API_KEY_HEADER_NAME:-X-API-Key}
+  OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  OPENAI_MODEL: ${OPENAI_MODEL:-}
+  MCP_ENABLED: ${MCP_ENABLED:-true}
+  MCP_API_KEYS: ${MCP_API_KEYS:-[]}
+  MCP_MAX_OUTPUT_CHARS: ${MCP_MAX_OUTPUT_CHARS:-16000}
+  MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-[]}
+  DEMO_BUYER_ENABLED: ${DEMO_BUYER_ENABLED:-}
+  SMTP_HOST: anbudsklar-mail
+  SMTP_PORT: "1025"
+  MAIL_FROM: ${MAIL_FROM:-Anbudsklar <noreply@anbudsklar.local>}
+  ORGANIZATION_NAME: ${ORGANIZATION_NAME:-Sundsvalls kommun}
+  SHOW_ORGANIZATION: ${SHOW_ORGANIZATION:-true}
+
+services:
+  anbudsklar-migrate:
+    <<: *anbudsklar-image
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      <<: *anbudsklar-env
+      SCHEDULER_ENABLED: "false"
+    healthcheck:
+      disable: true
+    restart: "no"
+    depends_on:
+      anbudsklar-db:
+        condition: service_healthy
+
+  anbudsklar-app:
+    <<: *anbudsklar-image
+    restart: unless-stopped
+    environment:
+      <<: *anbudsklar-env
+      SCHEDULER_ENABLED: "false"
+    expose:
+      - "3001"
+    volumes:
+      - anbudsklar_documents:/data/documents
+      - anbudsklar_var:/app/var
+    depends_on:
+      anbudsklar-db:
+        condition: service_healthy
+      anbudsklar-migrate:
+        condition: service_completed_successfully
+
+  anbudsklar-worker:
+    <<: *anbudsklar-image
+    command: ["anbudsklar", "worker"]
+    restart: unless-stopped
+    environment:
+      <<: *anbudsklar-env
+      SCHEDULER_ENABLED: "true"
+    # The image's HEALTHCHECK probes the web server on port 3001, which the worker does not run.
+    healthcheck:
+      disable: true
+    volumes:
+      - anbudsklar_documents:/data/documents
+      - anbudsklar_var:/app/var
+    depends_on:
+      anbudsklar-db:
+        condition: service_healthy
+      anbudsklar-migrate:
+        condition: service_completed_successfully
+
+  anbudsklar-db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: anbudsklar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: anbudsklar
+    volumes:
+      - anbudsklar_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U anbudsklar -d anbudsklar"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Catches every e-mail; nothing leaves the server. Give the web UI a domain in Dokploy
+  # (port 8025) only if people outside the server need to read the demo mail. The image has
+  # its own health check (mailpit readyz), which works with UI authentication.
+  anbudsklar-mail:
+    image: axllent/mailpit:v1.27
+    restart: unless-stopped
+    environment:
+      MP_UI_AUTH: ${MAILPIT_UI_AUTH:?Set MAILPIT_UI_AUTH to user:password for the Mailpit web UI}
+    expose:
+      - "1025"
+      - "8025"
+
+volumes:
+  anbudsklar_db:
+  anbudsklar_documents:
+  anbudsklar_var:

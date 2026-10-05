@@ -1,0 +1,357 @@
+{
+  "schema_version": 1,
+  "reference_date": "2026-10-05",
+  "timezone": "Europe/Stockholm",
+  "note": "Alla upphandlingar, dokument, företag, personer och avtal är fiktiva och tagna fram för att demonstrera Anbudsklar. Datum anges som antal dagar från reference_date.",
+  "notices": [
+    {
+      "external_id": "fixture-ommalning-solbacken",
+      "title": "Ommålning av Solbackens förskola, Matfors",
+      "buyer": "Sundsvalls kommun",
+      "description": "Fiktiv upphandling för demonstration. Utvändig ommålning av fasader, fönster och dörrar samt invändig målning av lekrum och korridor på en förskola i ett plan i Matfors. Annonserad upphandling under tröskelvärdena enligt 19 kap. LOU. Utvärdering: pris 70 %, kvalitet 30 %.",
+      "procedure": "Annonserad upphandling under tröskelvärdena enligt 19 kap. LOU",
+      "cpv_codes": [
+        "45442100",
+        "45442110",
+        "45442180"
+      ],
+      "place": "Matfors, Sundsvalls kommun",
+      "estimated_value_sek": 900000,
+      "reference_number": "DEMO-2026-0147",
+      "notice_type": "contract",
+      "status": "open",
+      "published": {
+        "offset_days": -4,
+        "time": "08:00"
+      },
+      "deadline": {
+        "offset_days": 35,
+        "time": "23:59"
+      },
+      "key_dates": [
+        {
+          "name": "annons",
+          "kind": "annat",
+          "label": "Annonsering i e-Avrop",
+          "offset_days": -4,
+          "date": "2026-10-01"
+        },
+        {
+          "name": "platsbesok_anmalan",
+          "kind": "annat",
+          "label": "Sista dag för anmälan till platsbesök",
+          "offset_days": 8,
+          "date": "2026-10-13"
+        },
+        {
+          "name": "platsbesok",
+          "kind": "annat",
+          "label": "Frivilligt platsbesök",
+          "offset_days": 10,
+          "date": "2026-10-15"
+        },
+        {
+          "name": "fragestopp",
+          "kind": "fragestopp",
+          "label": "Sista dag för frågor",
+          "offset_days": 25,
+          "date": "2026-10-30"
+        },
+        {
+          "name": "svar",
+          "kind": "annat",
+          "label": "Sista dag för kommunens svar på frågor",
+          "offset_days": 29,
+          "date": "2026-11-03"
+        },
+        {
+          "name": "sista_anbudsdag",
+          "kind": "sista_anbudsdag",
+          "label": "Sista anbudsdag",
+          "offset_days": 35,
+          "date": "2026-11-09"
+        },
+        {
+          "name": "tilldelning",
+          "kind": "tilldelning",
+          "label": "Planerat tilldelningsbeslut",
+          "offset_days": 46,
+          "date": "2026-11-20"
+        },
+        {
+          "name": "kontrakt",
+          "kind": "avtalsstart",
+          "label": "Planerat kontraktstecknande",
+          "offset_days": 63,
+          "date": "2026-12-07"
+        },
+        {
+          "name": "giltighet",
+          "kind": "anbudets_giltighet",
+          "label": "Anbudet ska vara giltigt till och med",
+          "offset_days": 125,
+          "date": "2027-02-07"
+        },
+        {
+          "name": "utvandig_start",
+          "kind": "annat",
+          "label": "Utvändig målning, start",
+          "offset_days": 224,
+          "date": "2027-05-17"
+        },
+        {
+          "name": "utvandig_slut",
+          "kind": "annat",
+          "label": "Utvändig målning, klar",
+          "offset_days": 263,
+          "date": "2027-06-25"
+        },
+        {
+          "name": "invandig_start",
+          "kind": "annat",
+          "label": "Invändig målning under sommarstängning, start",
+          "offset_days": 280,
+          "date": "2027-07-12"
+        },
+        {
+          "name": "invandig_slut",
+          "kind": "annat",
+          "label": "Invändig målning under sommarstängning, klar",
+          "offset_days": 305,
+          "date": "2027-08-06"
+        },
+        {
+          "name": "fardigt",
+          "kind": "annat",
+          "label": "Uppdraget färdigställt för slutbesiktning",
+          "offset_days": 312,
+          "date": "2027-08-13"
+        }
+      ],
+      "documents": [
+        {
+          "path": "ommalning-solbacken/forfragningsunderlag-ommalning-solbackens-forskola.pdf",
+          "filename": "forfragningsunderlag-ommalning-solbackens-forskola.pdf",
+          "mimetype": "application/pdf",
+          "page_count": 17,
+          "sha256": "add4081b24b9be4e3a9826ec689efa99ed720b265382f233c3919b26626379c8",
+          "facit": "ommalning-solbacken/facit.json",
+          "facit_items": 53
+        }
+      ]
+    },
+    {
+      "external_id": "fixture-stadtjanster-forskolor",
+      "title": "Städtjänster för kommunens förskolor",
+      "buyer": "Sundsvalls kommun",
+      "description": "Fiktiv upphandling för demonstration. Daglig lokalvård, storstädning och fönsterputs för tolv kommunala förskolor med sammanlagt cirka 9 200 kvadratmeter. Öppet förfarande. Avtalstid två år med möjlighet till förlängning två gånger ett år. Utvärdering: pris 60 %, kvalitet 40 %.",
+      "procedure": "Öppet förfarande (6 kap. 2 § LOU)",
+      "cpv_codes": [
+        "90911200",
+        "90919300",
+        "90911300"
+      ],
+      "place": "Sundsvalls kommun",
+      "estimated_value_sek": 13600000,
+      "reference_number": "DEMO-2026-0139",
+      "notice_type": "contract",
+      "status": "open",
+      "published": {
+        "offset_days": -14,
+        "time": "08:00"
+      },
+      "deadline": {
+        "offset_days": 24,
+        "time": "23:59"
+      },
+      "key_dates": [
+        {
+          "name": "annons",
+          "kind": "annat",
+          "label": "Annonsering i e-Avrop och TED",
+          "offset_days": -14,
+          "date": "2026-09-21"
+        },
+        {
+          "name": "fragestopp",
+          "kind": "fragestopp",
+          "label": "Sista dag för frågor",
+          "offset_days": 14,
+          "date": "2026-10-19"
+        },
+        {
+          "name": "svar",
+          "kind": "annat",
+          "label": "Sista dag för kommunens svar på frågor",
+          "offset_days": 18,
+          "date": "2026-10-23"
+        },
+        {
+          "name": "sista_anbudsdag",
+          "kind": "sista_anbudsdag",
+          "label": "Sista anbudsdag",
+          "offset_days": 24,
+          "date": "2026-10-29"
+        },
+        {
+          "name": "tilldelning",
+          "kind": "tilldelning",
+          "label": "Planerat tilldelningsbeslut",
+          "offset_days": 45,
+          "date": "2026-11-19"
+        },
+        {
+          "name": "giltighet",
+          "kind": "anbudets_giltighet",
+          "label": "Anbudet ska vara giltigt till och med",
+          "offset_days": 177,
+          "date": "2027-03-31"
+        },
+        {
+          "name": "avtalsstart",
+          "kind": "avtalsstart",
+          "label": "Avtalsstart",
+          "offset_days": 119,
+          "date": "2027-02-01"
+        },
+        {
+          "name": "avtalsslut",
+          "kind": "annat",
+          "label": "Avtalet löper ut (utan förlängning)",
+          "offset_days": 849,
+          "date": "2029-01-31"
+        }
+      ],
+      "documents": [
+        {
+          "path": "stadtjanster-forskolor/forfragningsunderlag-stadtjanster-forskolor.pdf",
+          "filename": "forfragningsunderlag-stadtjanster-forskolor.pdf",
+          "mimetype": "application/pdf",
+          "page_count": 9,
+          "sha256": "bd97c050e68b70c0a720703e69e70859c69e2edfe562a85d6ce5db7895ca3ebd",
+          "facit": "stadtjanster-forskolor/facit.json",
+          "facit_items": 30
+        }
+      ]
+    },
+    {
+      "external_id": "fixture-frukt-och-gront",
+      "title": "Livsmedel – frukt och grönt",
+      "buyer": "Sundsvalls kommun",
+      "description": "Fiktiv upphandling för demonstration. Ramavtal med en leverantör för frukt och grönsaker till cirka 45 kök i förskolor, skolor och äldreboenden. Öppet förfarande. Utvärdering på lägsta pris för en varukorg med 20 artiklar.",
+      "procedure": "Öppet förfarande (6 kap. 2 § LOU), ramavtal med en leverantör",
+      "cpv_codes": [
+        "03221000",
+        "03222000",
+        "15300000"
+      ],
+      "place": "Sundsvalls kommun",
+      "estimated_value_sek": 12800000,
+      "reference_number": "DEMO-2026-0128",
+      "notice_type": "contract",
+      "status": "open",
+      "published": {
+        "offset_days": -20,
+        "time": "08:00"
+      },
+      "deadline": {
+        "offset_days": 17,
+        "time": "23:59"
+      },
+      "key_dates": [
+        {
+          "name": "annons",
+          "kind": "annat",
+          "label": "Annonsering i e-Avrop och TED",
+          "offset_days": -20,
+          "date": "2026-09-15"
+        },
+        {
+          "name": "fragestopp",
+          "kind": "fragestopp",
+          "label": "Sista dag för frågor",
+          "offset_days": 7,
+          "date": "2026-10-12"
+        },
+        {
+          "name": "sista_anbudsdag",
+          "kind": "sista_anbudsdag",
+          "label": "Sista anbudsdag",
+          "offset_days": 17,
+          "date": "2026-10-22"
+        },
+        {
+          "name": "tilldelning",
+          "kind": "tilldelning",
+          "label": "Planerat tilldelningsbeslut",
+          "offset_days": 31,
+          "date": "2026-11-05"
+        },
+        {
+          "name": "giltighet",
+          "kind": "anbudets_giltighet",
+          "label": "Anbudet ska vara giltigt till och med",
+          "offset_days": 118,
+          "date": "2027-01-31"
+        },
+        {
+          "name": "avtalsstart",
+          "kind": "avtalsstart",
+          "label": "Ramavtalet börjar gälla",
+          "offset_days": 178,
+          "date": "2027-04-01"
+        },
+        {
+          "name": "avtalsslut",
+          "kind": "annat",
+          "label": "Ramavtalet löper ut (utan förlängning)",
+          "offset_days": 908,
+          "date": "2029-03-31"
+        }
+      ],
+      "documents": [
+        {
+          "path": "frukt-och-gront/forfragningsunderlag-livsmedel-frukt-och-gront.pdf",
+          "filename": "forfragningsunderlag-livsmedel-frukt-och-gront.pdf",
+          "mimetype": "application/pdf",
+          "page_count": 8,
+          "sha256": "abe3a01e9851ba23f7b21de5f89f49780a355d64de5851a556cccb62b4fdfcee",
+          "facit": "frukt-och-gront/facit.json",
+          "facit_items": 28
+        }
+      ]
+    }
+  ],
+  "tender_drafts": [
+    {
+      "path": "anbudsutkast-malerifirman/anbudsutkast-malerifirman-i-matfors.pdf",
+      "filename": "anbudsutkast-malerifirman-i-matfors.pdf",
+      "mimetype": "application/pdf",
+      "page_count": 4,
+      "sha256": "b3350516ec067129d27129b91812aa9a27f7982c05bb0c668916e1330c3ef8b9",
+      "notice_external_id": "fixture-ommalning-solbacken",
+      "expected_review": "anbudsutkast-malerifirman/expected-review.json"
+    }
+  ],
+  "agreements": {
+    "path": "agreements.csv",
+    "rows": 26
+  },
+  "companies": {
+    "path": "companies.json"
+  },
+  "personas": [
+    {
+      "role": "foretagare",
+      "name": "Anna Berg",
+      "email": "anna.berg@malerifirman-matfors.example",
+      "company_org_number": "559900-0013"
+    },
+    {
+      "role": "inkopare",
+      "name": "Lars Holm",
+      "email": "lars.holm@inkop.kommun.example",
+      "company_org_number": null
+    }
+  ]
+}

@@ -1,0 +1,179 @@
+# Eneo test instance for the Anbudsklar PoC on Dokploy.
+#
+# Derived from eneo-ai/eneo docs/deployment/docker-compose.yml at tag v2.2.0-rc.6 (2026-10-02):
+# - Traefik is removed; Dokploy's Traefik routes the domains (see deploy/dokploy/README.md).
+# - Services get an eneo- prefix, so they cannot clash with other stacks on Dokploy's shared
+#   network, and no container_name or host ports are set.
+# - Settings come from Dokploy's Environment tab (written to .env next to this file) instead
+#   of env_*.env files. Start from eneo-test.env.example.
+# - Optional S3-compatible object storage is left out; Eneo then keeps files in PostgreSQL.
+#
+# The backend image for 2.2.0-rc.6 exists on ghcr.io, but the frontend image stops at
+# 2.2.0-rc.4 (checked 2026-10-05). Move both to 2.2.0 once it is released. Eneo publishes
+# linux/amd64 images only.
+
+x-eneo-backend-image: &eneo-backend-image
+  image: ghcr.io/eneo-ai/eneo-backend:${ENEO_BACKEND_VERSION:-2.2.0-rc.6}
+  platform: linux/amd64
+
+x-eneo-backend-env: &eneo-backend-env
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: ${ENEO_POSTGRES_PASSWORD:?Set ENEO_POSTGRES_PASSWORD}
+  POSTGRES_HOST: eneo-db
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: eneo
+  REDIS_HOST: eneo-redis
+  REDIS_PORT: "6379"
+  REDIS_PASSWORD: ${ENEO_REDIS_PASSWORD:?Set ENEO_REDIS_PASSWORD}
+  API_PREFIX: /api/v1
+  API_KEY_LENGTH: "64"
+  API_KEY_HEADER_NAME: X-API-Key
+  API_KEY_HASH_SECRET: ${ENEO_API_KEY_HASH_SECRET:?Set ENEO_API_KEY_HASH_SECRET}
+  JWT_AUDIENCE: "*"
+  JWT_ISSUER: ENEO
+  JWT_EXPIRY_TIME: "1440"
+  JWT_ALGORITHM: HS256
+  JWT_SECRET: ${ENEO_JWT_SECRET:?Set ENEO_JWT_SECRET}
+  JWT_TOKEN_PREFIX: Bearer
+  URL_SIGNING_KEY: ${ENEO_URL_SIGNING_KEY:?Set ENEO_URL_SIGNING_KEY}
+  PUBLIC_ORIGIN: ${ENEO_PUBLIC_URL:?Set ENEO_PUBLIC_URL}
+  ENCRYPTION_KEY: ${ENEO_ENCRYPTION_KEY:?Set ENEO_ENCRYPTION_KEY}
+  INTERNAL_MCP_BASE_URL: http://localhost:8000
+  DEFAULT_TENANT_NAME: ${ENEO_TENANT_NAME:-Anbudsklar test}
+  DEFAULT_TENANT_QUOTA_LIMIT: "10737418240"  # 10 GiB; init_db skips the tenant without it
+  DEFAULT_USER_NAME: ${ENEO_ADMIN_NAME:-Anbudsklar admin}
+  DEFAULT_USER_EMAIL: ${ENEO_ADMIN_EMAIL:?Set ENEO_ADMIN_EMAIL}
+  DEFAULT_USER_PASSWORD: ${ENEO_ADMIN_PASSWORD:?Set ENEO_ADMIN_PASSWORD}
+  USING_ACCESS_MANAGEMENT: "true"
+  USING_CRAWL: "true"
+  OBEY_ROBOTS: "true"
+  LOGLEVEL: INFO
+  JSON_LOGS: "true"
+  OTEL_SERVICE_NAME: eneo
+  OTEL_DEPLOYMENT_ENVIRONMENT: test
+
+services:
+  eneo-frontend:
+    image: ghcr.io/eneo-ai/eneo-frontend:${ENEO_FRONTEND_VERSION:-2.2.0-rc.4}
+    platform: linux/amd64
+    restart: unless-stopped
+    environment:
+      ENEO_BACKEND_URL: ${ENEO_PUBLIC_URL:?Set ENEO_PUBLIC_URL}
+      ENEO_BACKEND_SERVER_URL: http://eneo-backend:8000
+      PUBLIC_ENEO_BACKEND_URL: ${ENEO_PUBLIC_URL:?Set ENEO_PUBLIC_URL}
+      ORIGIN: ${ENEO_PUBLIC_URL:?Set ENEO_PUBLIC_URL}
+      PUBLIC_ORIGIN: ${ENEO_PUBLIC_URL:?Set ENEO_PUBLIC_URL}
+      JWT_SECRET: ${ENEO_JWT_SECRET:?Set ENEO_JWT_SECRET}
+      FEDERATION_PER_TENANT_ENABLED: "false"
+      NODE_ENV: production
+      LOGLEVEL: INFO
+    expose:
+      - "3000"
+    depends_on:
+      - eneo-backend
+
+  eneo-backend:
+    <<: *eneo-backend-image
+    restart: unless-stopped
+    environment:
+      <<: *eneo-backend-env
+    expose:
+      - "8000"
+    volumes:
+      - eneo_backend_data:/app/data
+      - eneo_temp_files:/tmp
+    networks:
+      - default
+      - eneo-data
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/healthz', timeout=5)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    depends_on:
+      eneo-db:
+        condition: service_healthy
+      eneo-redis:
+        condition: service_healthy
+      eneo-db-init:
+        condition: service_completed_successfully
+
+  eneo-worker:
+    <<: *eneo-backend-image
+    restart: unless-stopped
+    environment:
+      <<: *eneo-backend-env
+      RUN_AS_WORKER: "true"
+    volumes:
+      - eneo_backend_data:/app/data
+      - eneo_temp_files:/tmp
+    networks:
+      - default
+      - eneo-data
+    depends_on:
+      - eneo-backend
+
+  eneo-db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${ENEO_POSTGRES_PASSWORD:?Set ENEO_POSTGRES_PASSWORD}
+      POSTGRES_DB: eneo
+    volumes:
+      - eneo_postgres_data:/var/lib/postgresql/data
+    networks:
+      - eneo-data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  eneo-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${ENEO_REDIS_PASSWORD:?Set ENEO_REDIS_PASSWORD}
+    command:
+      - sh
+      - -c
+      - exec redis-server --requirepass "$$REDIS_PASSWORD"
+    volumes:
+      - eneo_redis_data:/data
+    networks:
+      - eneo-data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Runs migrations and creates the tenant and the first Owner user (DEFAULT_USER_*).
+  eneo-db-init:
+    <<: *eneo-backend-image
+    command: ["python", "init_db.py"]
+    environment:
+      <<: *eneo-backend-env
+    networks:
+      - eneo-data
+    depends_on:
+      eneo-db:
+        condition: service_healthy
+      eneo-redis:
+        condition: service_healthy
+    restart: "no"
+
+networks:
+  # No internet egress; only the backend, the worker and db-init reach PostgreSQL and Redis.
+  eneo-data:
+    internal: true
+
+volumes:
+  eneo_postgres_data:
+  eneo_redis_data:
+  eneo_backend_data:
+  eneo_temp_files:

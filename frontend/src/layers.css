@@ -1,0 +1,2 @@
+/* Cascade order for the design system. Import first: the reset, Astryx's components, then the theme. */
+@layer reset, astryx-base, astryx-theme;

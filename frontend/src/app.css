@@ -1,0 +1,49 @@
+/* What the page rests on, in the reset layer (after Astryx's reset, below its components): beyond the app,
+   such as a phone's overscroll, the page shows the design system's own colours. */
+@layer reset {
+  html,
+  body {
+    background: var(--color-background-body);
+    color: var(--color-text-primary);
+    min-height: 100vh;
+  }
+}
+
+/* The bar scrolls away with the page. Stuck to the top together with the demo notice it would take a large
+   part of a phone's height and could hide the focused control under it (WCAG 2.4.11). Unlayered, so it wins
+   over the design system's layered styles. */
+.astryx-app-shell-header {
+  position: static;
+}
+
+/* A page's heading takes the focus after navigation so a screen reader starts there; it is not a control. */
+[data-page-heading]:focus {
+  outline: none;
+}
+
+/* A list that keeps the focus while an option is highlighted outlines itself: a tint alone is no focus
+   indicator (WCAG 2.4.7). */
+[role="listbox"]:focus-visible {
+  outline: var(--focus-outline-width) var(--focus-outline-style) var(--focus-outline-color);
+  outline-offset: calc(var(--focus-outline-width) * -1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+  /* Spinners stand still; the text beside them says that something is loading. */
+  .astryx-spinner circle,
+  .astryx-progress-bar-fill {
+    animation: none;
+  }
+}
+
+/* Forced colours remove a button's fill, and Astryx draws buttons without a border: give the edge back. */
+@media (forced-colors: active) {
+  .astryx-button {
+    border: 1px solid ButtonText;
+  }
+}

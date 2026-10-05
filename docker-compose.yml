@@ -1,0 +1,103 @@
+# Local development stack for the Anbudsklar PoC.
+#
+#   docker compose up -d db mailpit        # services the backend and tests need
+#   docker compose up --build              # everything, app on http://127.0.0.1:3501
+#
+# The app and worker use the same image. The AI engine is chosen with AI_ENGINE
+# (heuristic works offline; eneo and openai need the variables in .env).
+#
+# Inside a container, localhost is the container itself. A service on the host, such as
+# a local Eneo on port 8123, is reached as host.docker.internal (ENEO_BACKEND_URL=
+# http://host.docker.internal:8123). extra_hosts makes that name resolve on Linux too.
+
+name: anbudsklar
+
+x-host-gateway: &host-gateway
+  - "host.docker.internal:host-gateway"
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql+asyncpg://anbudsklar:anbudsklar@db:5432/anbudsklar
+  DOCUMENTS_DIR: /data/documents
+  SMTP_HOST: mailpit
+  SMTP_PORT: "1025"
+  PUBLIC_URL: http://127.0.0.1:3501
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: anbudsklar
+      POSTGRES_PASSWORD: anbudsklar
+      POSTGRES_DB: anbudsklar
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U anbudsklar"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "127.0.0.1:8025:8025"  # web UI
+      - "127.0.0.1:1025:1025"  # SMTP
+
+  migrate:
+    image: anbudsklar:local  # built by the app service
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    extra_hosts: *host-gateway
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      <<: *app-env
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    build: .
+    image: anbudsklar:local
+    extra_hosts: *host-gateway
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      <<: *app-env
+      SCHEDULER_ENABLED: "false"
+    ports:
+      - "127.0.0.1:3501:3001"
+    volumes:
+      - documents:/data/documents
+      - ./var:/app/var
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    image: anbudsklar:local  # built by the app service
+    command: ["anbudsklar", "worker"]
+    extra_hosts: *host-gateway
+    healthcheck:
+      disable: true  # the worker serves no HTTP; the image healthcheck is for the app
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      <<: *app-env
+    volumes:
+      - documents:/data/documents
+      - ./var:/app/var
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      app:
+        condition: service_healthy
+
+volumes:
+  db_data:
+  documents:

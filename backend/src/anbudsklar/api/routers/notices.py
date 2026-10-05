@@ -1,0 +1,151 @@
+"""Notices, their documents, questions, draft review and deadline reminders."""
+
+from __future__ import annotations
+
+import uuid
+from typing import Annotated
+from urllib.parse import quote
+
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response, status
+
+from anbudsklar.api.deps import (
+    AiSlotsDep,
+    EngineDep,
+    SessionDep,
+    SettingsDep,
+    UserDep,
+    ViewerDep,
+    require_company_user,
+)
+from anbudsklar.api.limits import rate_limited
+from anbudsklar.api.schemas import (
+    AnswerView,
+    NoticeDetail,
+    NoticeList,
+    NoticeStatus,
+    PageView,
+    QuestionRequest,
+    ReminderRequest,
+    ReminderView,
+    ReviewView,
+)
+from anbudsklar.api.uploads import UPLOAD_OPENAPI, read_upload
+from anbudsklar.documents.store import read_file
+from anbudsklar.services import notices, questions, reminders, review
+from anbudsklar.services.cpv import normalize_cpv_prefixes
+from anbudsklar.services.dates import utcnow
+
+router = APIRouter(tags=["notices"])
+
+
+@router.get("/notices")
+async def list_notices(
+    session: SessionDep,
+    viewer: ViewerDep,
+    q: Annotated[str | None, Query(max_length=200, description="Fritext")] = None,
+    notice_status: Annotated[NoticeStatus | None, Query(alias="status")] = None,
+    cpv: Annotated[
+        list[str] | None, Query(description="CPV-prefix, 2–8 siffror; upprepa eller kommaseparera")
+    ] = None,
+    source: Annotated[str | None, Query(max_length=32)] = None,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> NoticeList:
+    return await notices.list_notices(
+        session,
+        viewer,
+        text=q.strip() if q else None,
+        status=notice_status,
+        cpv_prefixes=normalize_cpv_prefixes(cpv or []),
+        source=source,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/notices/{notice_id}")
+async def get_notice(notice_id: uuid.UUID, session: SessionDep, viewer: ViewerDep) -> NoticeDetail:
+    return await notices.notice_detail(session, notice_id, viewer)
+
+
+@router.get("/notices/{notice_id}/documents/{document_id}/pages/{page}")
+async def get_page(
+    notice_id: uuid.UUID, document_id: uuid.UUID, page: Annotated[int, Path(ge=1)], session: SessionDep
+) -> PageView:
+    return await notices.page_view(session, notice_id, document_id, page)
+
+
+@router.get("/documents/{document_id}/file")
+async def get_document_file(document_id: uuid.UUID, session: SessionDep) -> Response:
+    """The original file. Procurement documents are public, so no sign-in is needed."""
+
+    document = await notices.get_document(session, document_id)
+    try:
+        data = await read_file(document)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Filen saknas i lagringen."
+        ) from exc
+    return Response(
+        content=data,
+        media_type=document.mimetype,
+        headers={"Content-Disposition": _inline(document.filename), "Cache-Control": "private, max-age=3600"},
+    )
+
+
+@router.post("/notices/{notice_id}/questions", dependencies=[Depends(rate_limited("questions"))])
+async def ask_question(
+    notice_id: uuid.UUID,
+    body: QuestionRequest,
+    session: SessionDep,
+    engine: EngineDep,
+    viewer: ViewerDep,
+    settings: SettingsDep,
+    slots: AiSlotsDep,
+) -> AnswerView:
+    async with slots.hold():
+        answer = await questions.ask_question(
+            session, engine, notice_id, body, viewer, eavrop_url=settings.eavrop_base_url
+        )
+    await session.commit()
+    return answer
+
+
+@router.post(
+    "/notices/{notice_id}/review",
+    dependencies=[Depends(rate_limited("review")), Depends(require_company_user)],
+    openapi_extra=UPLOAD_OPENAPI,
+)
+async def review_draft(
+    notice_id: uuid.UUID, request: Request, session: SessionDep, engine: EngineDep, slots: AiSlotsDep
+) -> ReviewView:
+    """The draft is read into memory, reviewed and dropped. It is never stored or logged.
+
+    The AI slot is taken after the upload has arrived, so a slow upload never holds one.
+    """
+
+    upload = await read_upload(
+        request,
+        max_bytes=review.MAX_DRAFT_BYTES,
+        too_large_message="Utkastet är för stort. Den största tillåtna storleken är 20 MB.",
+    )
+    async with slots.hold():
+        return await review.review_draft(
+            session, engine, notice_id, filename=upload.filename, data=upload.data
+        )
+
+
+@router.post("/notices/{notice_id}/reminders", status_code=status.HTTP_201_CREATED)
+async def create_reminder(
+    notice_id: uuid.UUID, body: ReminderRequest, session: SessionDep, user: UserDep
+) -> ReminderView:
+    reminder = await reminders.create_reminder(session, user.id, notice_id, body, utcnow())
+    await session.commit()
+    return reminder
+
+
+def _inline(filename: str) -> str:
+    """Content-Disposition with an ASCII fallback and the exact UTF-8 name (RFC 6266)."""
+
+    fallback = filename.encode("ascii", "replace").decode("ascii").replace('"', "")
+    return f"inline; filename=\"{fallback}\"; filename*=UTF-8''{quote(filename)}"

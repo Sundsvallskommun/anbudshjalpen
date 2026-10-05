@@ -1,0 +1,7 @@
+[
+  {"id": "K01", "kind": "skallkrav", "page": 1, "quote_fragment": "Anbudet ska vara skrivet på svenska", "title": "Anbudet på svenska"},
+  {"id": "K02", "kind": "kvalificeringskrav", "page": 2, "quote_fragment": "ska vara registrerad för F-skatt", "title": "Registrerad för F-skatt"},
+  {"id": "K03", "kind": "kvalificeringskrav", "page": 2, "quote_fragment": "ansvarsförsäkring om minst 5 000 000 kronor", "title": "Ansvarsförsäkring om minst 5 miljoner kronor"},
+  {"id": "K04", "kind": "kvalificeringskrav", "page": 2, "quote_fragment": "två referensuppdrag från offentlig verksamhet", "title": "Två referensuppdrag"},
+  {"id": "K05", "kind": "avtalsvillkor", "page": 3, "quote_fragment": "har kommunen rätt till vite", "title": "Vite vid försenad leverans"}
+]

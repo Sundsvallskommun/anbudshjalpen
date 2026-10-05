@@ -1,0 +1,24 @@
+/* A term in running text that opens its explanation: it reads as part of the sentence, marked by a dotted
+   underline, and shows the design system's focus ring. Inline in a sentence, it is exempt from the target
+   size minimum (WCAG 2.5.8). */
+.term {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline dotted;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.2em;
+  cursor: help;
+}
+
+.term:hover {
+  color: var(--color-text-accent);
+}
+
+.term:focus-visible {
+  outline: var(--focus-outline-width) var(--focus-outline-style) var(--focus-outline-color);
+  outline-offset: var(--focus-outline-offset);
+}

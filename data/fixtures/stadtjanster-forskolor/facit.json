@@ -1,0 +1,212 @@
+[
+  {
+    "id": "K01",
+    "kind": "skallkrav",
+    "page": 4,
+    "quote_fragment": "Anbud ska lämnas elektroniskt via e-Avrop senast sista anbudsdag.",
+    "title": "Anbud lämnas via e-Avrop senast sista anbudsdag"
+  },
+  {
+    "id": "K02",
+    "kind": "skallkrav",
+    "page": 4,
+    "quote_fragment": "Anbudet ska vara skrivet på svenska.",
+    "title": "Anbudet är skrivet på svenska"
+  },
+  {
+    "id": "K03",
+    "kind": "skallkrav",
+    "page": 4,
+    "quote_fragment": "Anbudet ska vara giltigt till och med den 31 mars 2027.",
+    "title": "Anbudets giltighetstid"
+  },
+  {
+    "id": "K04",
+    "kind": "skallkrav",
+    "page": 4,
+    "quote_fragment": "Anbud ska omfatta samtliga tolv förskolor i avsnitt 1.2.",
+    "title": "Anbudet omfattar samtliga tolv förskolor"
+  },
+  {
+    "id": "K05",
+    "kind": "skallkrav",
+    "page": 4,
+    "quote_fragment": "Anbudsgivaren ska lämna en egen försäkran i form av ett europeiskt enhetligt upphandlingsdokument (ESPD) enligt 15 kap. 1 § LOU.",
+    "title": "Egen försäkran i ESPD"
+  },
+  {
+    "id": "K06",
+    "kind": "skallkrav",
+    "page": 4,
+    "quote_fragment": "Priser ska anges i svenska kronor exklusive mervärdesskatt i prisbilagan (bilaga 1).",
+    "title": "Priser i SEK exklusive moms i prisbilagan"
+  },
+  {
+    "id": "K07",
+    "kind": "kvalificeringskrav",
+    "page": 5,
+    "quote_fragment": "Anbudsgivaren ska vara registrerad i aktiebolagsregistret, handelsregistret eller föreningsregistret eller i motsvarande register i etableringslandet",
+    "title": "Registrerad i bolags-, handels- eller föreningsregister"
+  },
+  {
+    "id": "K08",
+    "kind": "kvalificeringskrav",
+    "page": 5,
+    "quote_fragment": "Anbudsgivaren ska ha haft en årsomsättning på minst 3 000 000 kronor under det senaste avslutade räkenskapsåret (14 kap. 3 § LOU).",
+    "title": "Årsomsättning minst 3 miljoner kronor"
+  },
+  {
+    "id": "K09",
+    "kind": "kvalificeringskrav",
+    "page": 5,
+    "quote_fragment": "Anbudsgivaren ska ha en ansvarsförsäkring med ett försäkringsbelopp på minst 10 000 000 kronor per skadetillfälle.",
+    "title": "Ansvarsförsäkring minst 10 miljoner kronor"
+  },
+  {
+    "id": "K10",
+    "kind": "kvalificeringskrav",
+    "page": 5,
+    "quote_fragment": "Anbudsgivaren ska under de senaste tre åren ha utfört minst två uppdrag med lokalvård i förskola eller skola, vart och ett med en städyta på minst 1 500",
+    "title": "Två referensuppdrag med lokalvård i förskola eller skola"
+  },
+  {
+    "id": "K11",
+    "kind": "kvalificeringskrav",
+    "page": 5,
+    "quote_fragment": "Anbudsgivaren ska ha dokumenterade rutiner för kvalitetsledning och miljöledning, eller vara certifierad enligt ISO 9001 och ISO 14001 eller motsvarande.",
+    "title": "Rutiner eller certifiering för kvalitet och miljö"
+  },
+  {
+    "id": "K12",
+    "kind": "krav_pa_uppdraget",
+    "page": 6,
+    "quote_fragment": "Städningen ska hålla kvalitetsnivå 4 i toaletter och skötrum och kvalitetsnivå 3 i övriga utrymmen, bedömt enligt INSTA 800.",
+    "title": "Städkvalitet enligt INSTA 800"
+  },
+  {
+    "id": "K13",
+    "kind": "krav_pa_uppdraget",
+    "page": 6,
+    "quote_fragment": "Daglig städning ska utföras vardagar efter förskolornas stängning, tidigast klockan 17.30, och vara klar senast klockan 06.00 nästa morgon.",
+    "title": "Daglig städning efter stängning"
+  },
+  {
+    "id": "K14",
+    "kind": "krav_pa_uppdraget",
+    "page": 6,
+    "quote_fragment": "Storstädning ska utföras två gånger per år, under förskolornas sommarstängning och under jullovet, enligt en plan som leverantören tar fram tillsammans med",
+    "title": "Storstädning två gånger per år"
+  },
+  {
+    "id": "K15",
+    "kind": "krav_pa_uppdraget",
+    "page": 6,
+    "quote_fragment": "Fönsterputs ska utföras invändigt och utvändigt en gång per år, under perioden april till juni.",
+    "title": "Fönsterputs en gång per år"
+  },
+  {
+    "id": "K16",
+    "kind": "krav_pa_uppdraget",
+    "page": 6,
+    "quote_fragment": "Rengöringsmedel ska vara märkta med Svanen eller EU Ecolabel eller uppfylla motsvarande krav.",
+    "title": "Miljömärkta rengöringsmedel med kontrollerad dosering"
+  },
+  {
+    "id": "K17",
+    "kind": "krav_pa_uppdraget",
+    "page": 6,
+    "quote_fragment": "Leverantören ska använda mikrofiberbaserade metoder för golv och ytor.",
+    "title": "Mikrofiberbaserade metoder"
+  },
+  {
+    "id": "K18",
+    "kind": "krav_pa_uppdraget",
+    "page": 6,
+    "quote_fragment": "Leverantören håller med städutrustning, maskiner och städmaterial.",
+    "title": "Leverantören håller med utrustning och städmaterial"
+  },
+  {
+    "id": "K19",
+    "kind": "krav_pa_uppdraget",
+    "page": 6,
+    "quote_fragment": "All personal som utför städningen ska ha genomgått utbildning i lokalvård och kunna kommunicera med förskolans personal på svenska.",
+    "title": "Utbildad personal som kommunicerar på svenska"
+  },
+  {
+    "id": "K20",
+    "kind": "krav_pa_uppdraget",
+    "page": 6,
+    "quote_fragment": "Leverantören ska utse en objektsansvarig kontaktperson som kan nås vardagar klockan 07.00 till 17.00 och som svarar på frågor från förskolorna inom en",
+    "title": "Objektsansvarig kontaktperson"
+  },
+  {
+    "id": "K21",
+    "kind": "krav_pa_uppdraget",
+    "page": 6,
+    "quote_fragment": "Nycklar och passerkort ska kvitteras och förvaras inlåsta.",
+    "title": "Hantering av nycklar och passerkort"
+  },
+  {
+    "id": "K22",
+    "kind": "krav_pa_uppdraget",
+    "page": 6,
+    "quote_fragment": "Brister som förskolan anmäler ska åtgärdas senast nästa arbetsdag.",
+    "title": "Anmälda brister åtgärdas nästa arbetsdag"
+  },
+  {
+    "id": "K23",
+    "kind": "krav_pa_uppdraget",
+    "page": 6,
+    "quote_fragment": "Leverantören ska utföra egenkontroll minst en gång per månad på varje förskola och dokumentera resultatet så att kommunen kan ta del av det.",
+    "title": "Månatlig egenkontroll per förskola"
+  },
+  {
+    "id": "K24",
+    "kind": "krav_pa_uppdraget",
+    "page": 6,
+    "quote_fragment": "Leverantören ska delta i uppföljningsmöten med kommunen en gång per kvartal.",
+    "title": "Uppföljningsmöten varje kvartal"
+  },
+  {
+    "id": "K25",
+    "kind": "skallkrav",
+    "page": 7,
+    "quote_fragment": "Anbudsgivaren ska bifoga en arbetsplan på högst fyra A4-sidor som beskriver hur städningen införs på förskolorna under de tre första månaderna.",
+    "title": "Arbetsplan för införandet, högst fyra sidor"
+  },
+  {
+    "id": "K26",
+    "kind": "avtalsvillkor",
+    "page": 8,
+    "quote_fragment": "Leverantören ska under hela avtalstiden tillförsäkra arbetstagare som utför arbete enligt avtalet villkor om lön, semester och arbetstid enligt 17 kap. 2 §",
+    "title": "Arbetsrättsliga villkor om lön, semester och arbetstid"
+  },
+  {
+    "id": "K27",
+    "kind": "avtalsvillkor",
+    "page": 8,
+    "quote_fragment": "Leverantören ska innan avtalet börjar gälla lämna namn och kontaktuppgifter för de underleverantörer som ska anlitas och meddela kommunen varje ändring under",
+    "title": "Uppgifter om underleverantörer"
+  },
+  {
+    "id": "K28",
+    "kind": "avtalsvillkor",
+    "page": 8,
+    "quote_fragment": "Om leverantören inte åtgärdar en anmäld brist inom den tid som anges i avsnitt 4.6 ska leverantören betala vite med 1 000 kronor per brist och tillfälle.",
+    "title": "Vite vid brister som inte åtgärdas i tid"
+  },
+  {
+    "id": "K29",
+    "kind": "avtalsvillkor",
+    "page": 8,
+    "quote_fragment": "Leverantören ska fakturera månadsvis i efterskott med elektronisk faktura enligt lagen (2018:1277) om elektroniska fakturor till följd av offentlig upphandling.",
+    "title": "Elektronisk faktura månadsvis i efterskott"
+  },
+  {
+    "id": "K30",
+    "kind": "avtalsvillkor",
+    "page": 8,
+    "quote_fragment": "Leverantören förbinder sig att personalen iakttar tystnadsplikt om förhållanden som rör barn, vårdnadshavare och personal och som de får kännedom om i arbetet.",
+    "title": "Tystnadsplikt för personalen"
+  }
+]

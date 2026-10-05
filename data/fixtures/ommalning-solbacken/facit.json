@@ -1,0 +1,373 @@
+[
+  {
+    "id": "K01",
+    "kind": "skallkrav",
+    "page": 5,
+    "quote_fragment": "Anbud ska lämnas elektroniskt via e-Avrop senast sista anbudsdag.",
+    "title": "Anbud lämnas via e-Avrop senast sista anbudsdag"
+  },
+  {
+    "id": "K02",
+    "kind": "skallkrav",
+    "page": 5,
+    "quote_fragment": "Anbudet ska vara skrivet på svenska.",
+    "title": "Anbudet är skrivet på svenska"
+  },
+  {
+    "id": "K03",
+    "kind": "skallkrav",
+    "page": 5,
+    "quote_fragment": "Anbudet ska omfatta hela uppdraget enligt avsnitt 4.",
+    "title": "Anbudet omfattar hela uppdraget"
+  },
+  {
+    "id": "K04",
+    "kind": "skallkrav",
+    "page": 5,
+    "quote_fragment": "Alternativa anbud godtas inte.",
+    "title": "Inga alternativa anbud"
+  },
+  {
+    "id": "K05",
+    "kind": "skallkrav",
+    "page": 5,
+    "quote_fragment": "Anbudet ska vara giltigt till och med den 7 februari 2027.",
+    "title": "Anbudets giltighetstid"
+  },
+  {
+    "id": "K06",
+    "kind": "skallkrav",
+    "page": 5,
+    "quote_fragment": "Priser ska anges i svenska kronor exklusive mervärdesskatt i prisbilagan (bilaga 1).",
+    "title": "Priser i SEK exklusive moms i prisbilagan"
+  },
+  {
+    "id": "K07",
+    "kind": "skallkrav",
+    "page": 5,
+    "quote_fragment": "Anbudet ska innehålla samtliga bilagor som enligt avsnitt 7 ska lämnas med anbudet.",
+    "title": "Anbudet innehåller samtliga begärda bilagor"
+  },
+  {
+    "id": "K08",
+    "kind": "skallkrav",
+    "page": 5,
+    "quote_fragment": "Vid anbud i grupp ska anbudet ange vilken av leverantörerna som är kommunens kontaktpart och att samtliga leverantörer i gruppen tar solidariskt ansvar för",
+    "title": "Anbud i grupp: kontaktpart och solidariskt ansvar"
+  },
+  {
+    "id": "K09",
+    "kind": "skallkrav",
+    "page": 5,
+    "quote_fragment": "Om anbudsgivaren åberopar ett annat företags kapacitet för att uppfylla kraven i avsnitt 3 ska anbudsgivaren bifoga ett åtagande från det företaget som visar",
+    "title": "Åtagande vid åberopad kapacitet"
+  },
+  {
+    "id": "K10",
+    "kind": "skallkrav",
+    "page": 5,
+    "quote_fragment": "Anbudsgivaren ska i anbudet ange vilka underleverantörer som kommer att utföra delar av uppdraget, till exempel ställningsarbeten.",
+    "title": "Underleverantörer anges i anbudet"
+  },
+  {
+    "id": "K11",
+    "kind": "kvalificeringskrav",
+    "page": 7,
+    "quote_fragment": "Anbudsgivaren ska intyga att det inte finns grund för uteslutning genom att underteckna sanningsförsäkran (bilaga 3) och lämna den med anbudet.",
+    "title": "Ingen grund för uteslutning (sanningsförsäkran)"
+  },
+  {
+    "id": "K12",
+    "kind": "kvalificeringskrav",
+    "page": 7,
+    "quote_fragment": "Anbudsgivaren ska vara registrerad i aktiebolagsregistret, handelsregistret eller föreningsregistret hos Bolagsverket, eller i motsvarande register i det land",
+    "title": "Registrerad i bolags-, handels- eller föreningsregister"
+  },
+  {
+    "id": "K13",
+    "kind": "kvalificeringskrav",
+    "page": 7,
+    "quote_fragment": "Anbudsgivaren ska vara godkänd för F-skatt och ha fullgjort sina skyldigheter att betala skatter och socialförsäkringsavgifter.",
+    "title": "Godkänd för F-skatt och inga skatteskulder"
+  },
+  {
+    "id": "K14",
+    "kind": "kvalificeringskrav",
+    "page": 7,
+    "quote_fragment": "Anbudsgivare som är etablerade i ett annat land ska bifoga intyg från behörig myndighet i etableringslandet som visar att kraven ovan är uppfyllda.",
+    "title": "Intyg för anbudsgivare etablerade utomlands"
+  },
+  {
+    "id": "K15",
+    "kind": "kvalificeringskrav",
+    "page": 7,
+    "quote_fragment": "Anbudsgivaren ska ha en så stabil ekonomi att uppdraget kan genomföras under hela kontraktstiden.",
+    "title": "Ekonomisk stabilitet, lägst riskklass 3"
+  },
+  {
+    "id": "K16",
+    "kind": "kvalificeringskrav",
+    "page": 7,
+    "quote_fragment": "med ett försäkringsbelopp på minst 5 000 000 kronor per skadetillfälle",
+    "title": "Ansvarsförsäkring minst 5 miljoner kronor med försäkringsbevis"
+  },
+  {
+    "id": "K17",
+    "kind": "kvalificeringskrav",
+    "page": 8,
+    "quote_fragment": "ha genomfört minst två uppdrag med målning i offentlig miljö",
+    "title": "Två referensuppdrag i offentlig miljö de senaste tre åren"
+  },
+  {
+    "id": "K18",
+    "kind": "kvalificeringskrav",
+    "page": 8,
+    "quote_fragment": "Anbudsgivaren ska bedriva ett systematiskt arbetsmiljöarbete enligt arbetsmiljölagen (1977:1160) och Arbetsmiljöverkets föreskrifter.",
+    "title": "Systematiskt arbetsmiljöarbete med skriftliga rutiner"
+  },
+  {
+    "id": "K19",
+    "kind": "krav_pa_uppdraget",
+    "page": 9,
+    "quote_fragment": "Fasader, vindskivor och takfotsbrädor ska tvättas, skrapas fria från löst sittande färg och grundas på trärena partier innan de färdigstryks två gånger.",
+    "title": "Underarbete och två färdigstrykningar på fasaden"
+  },
+  {
+    "id": "K20",
+    "kind": "krav_pa_uppdraget",
+    "page": 9,
+    "quote_fragment": "Fasaden ska målas med linoljefärg eller en annan färgtyp som är förenlig med den befintliga färgen.",
+    "title": "Färgtyp och kulör på fasaden"
+  },
+  {
+    "id": "K21",
+    "kind": "krav_pa_uppdraget",
+    "page": 9,
+    "quote_fragment": "Fönsterbågar, karmar och ytterdörrar ska skrapas och slipas, kittas om där kittet har släppt och målas två gånger med en färg som är avsedd för utvändiga",
+    "title": "Målning av fönster och ytterdörrar"
+  },
+  {
+    "id": "K22",
+    "kind": "krav_pa_uppdraget",
+    "page": 9,
+    "quote_fragment": "Leverantören byter ut upp till 15 löpmeter skadad träpanel inom det fasta anbudspriset.",
+    "title": "Byte av skadad träpanel ingår upp till 15 löpmeter"
+  },
+  {
+    "id": "K23",
+    "kind": "krav_pa_uppdraget",
+    "page": 9,
+    "quote_fragment": "Väggar i fyra lekrum, korridoren och två kapprum ska lagas, spacklas och slipas där det behövs och därefter målas två gånger.",
+    "title": "Invändiga väggar lagas och målas två gånger"
+  },
+  {
+    "id": "K24",
+    "kind": "krav_pa_uppdraget",
+    "page": 9,
+    "quote_fragment": "Invändigt ska vattenburen väggfärg med glans 7 och våtnötningsklass 1 enligt standarden SS-EN 13300 användas, så att väggarna tål upprepad rengöring.",
+    "title": "Vattenburen väggfärg, glans 7, våtnötningsklass 1"
+  },
+  {
+    "id": "K25",
+    "kind": "krav_pa_uppdraget",
+    "page": 9,
+    "quote_fragment": "Innertaket i korridoren ska målas två gånger med vit takfärg.",
+    "title": "Målning av innertak i korridoren"
+  },
+  {
+    "id": "K26",
+    "kind": "krav_pa_uppdraget",
+    "page": 9,
+    "quote_fragment": "Golv, inredning, fast utrustning och elinstallationer ska skyddstäckas eller maskeras innan arbetet påbörjas.",
+    "title": "Skyddstäckning invändigt"
+  },
+  {
+    "id": "K27",
+    "kind": "krav_pa_uppdraget",
+    "page": 9,
+    "quote_fragment": "Färger, spackel och andra kemiska produkter ska vara registrerade i Byggvarubedömningen och lägst ha bedömningen Accepteras.",
+    "title": "Produkter bedömda i Byggvarubedömningen, lägst Accepteras"
+  },
+  {
+    "id": "K28",
+    "kind": "krav_pa_uppdraget",
+    "page": 10,
+    "quote_fragment": "Leverantören ska före arbetets start lämna en förteckning över de produkter som kommer att användas, med säkerhetsdatablad.",
+    "title": "Produktförteckning med säkerhetsdatablad före start"
+  },
+  {
+    "id": "K29",
+    "kind": "krav_pa_uppdraget",
+    "page": 10,
+    "quote_fragment": "Leverantören ansvarar för att färgrester, förpackningar och annat avfall sorteras och tas om hand enligt gällande regler.",
+    "title": "Sortering och omhändertagande av avfall"
+  },
+  {
+    "id": "K30",
+    "kind": "krav_pa_uppdraget",
+    "page": 10,
+    "quote_fragment": "Arbetsområdet ska vara inhägnat med byggstängsel som är minst 1,8 meter högt, så att barn inte kan ta sig in.",
+    "title": "Byggstängsel minst 1,8 meter runt arbetsområdet"
+  },
+  {
+    "id": "K31",
+    "kind": "krav_pa_uppdraget",
+    "page": 10,
+    "quote_fragment": "Ställningar ska vara låsta eller avspärrade efter arbetstid så att ingen kan klättra upp på dem.",
+    "title": "Ställningar låses eller spärras av efter arbetstid"
+  },
+  {
+    "id": "K32",
+    "kind": "krav_pa_uppdraget",
+    "page": 10,
+    "quote_fragment": "Arbete som bullrar eller dammar, till exempel skrapning och slipning, får inte utföras under barnens vila mellan klockan 12.00 och 13.30.",
+    "title": "Inget bullrande arbete under barnens vila"
+  },
+  {
+    "id": "K33",
+    "kind": "krav_pa_uppdraget",
+    "page": 10,
+    "quote_fragment": "Fordon får köras in på förskolans gård endast före klockan 07.00 eller efter klockan 17.30, när inga barn är ute.",
+    "title": "Fordon på gården endast utanför barnens tider"
+  },
+  {
+    "id": "K34",
+    "kind": "krav_pa_uppdraget",
+    "page": 10,
+    "quote_fragment": "Leverantörens personal ska bära synlig id-handling med foto och anmäla sig till förskolans personal vid ankomst.",
+    "title": "Synlig id-handling och anmälan vid ankomst"
+  },
+  {
+    "id": "K35",
+    "kind": "krav_pa_uppdraget",
+    "page": 10,
+    "quote_fragment": "Leverantören ska åta sig uppdraget som byggarbetsmiljösamordnare för utförandet (BAS-U)",
+    "title": "Leverantören är BAS-U och håller arbetsmiljöplanen aktuell"
+  },
+  {
+    "id": "K36",
+    "kind": "krav_pa_uppdraget",
+    "page": 10,
+    "quote_fragment": "Leverantören ska utse en arbetsledare med minst fem års erfarenhet av yrkesmässig målning.",
+    "title": "Arbetsledare med minst fem års erfarenhet"
+  },
+  {
+    "id": "K37",
+    "kind": "krav_pa_uppdraget",
+    "page": 10,
+    "quote_fragment": "Den utvändiga målningen ska utföras under perioden 17 maj till 25 juni 2027.",
+    "title": "Tidsperiod för utvändig målning"
+  },
+  {
+    "id": "K38",
+    "kind": "krav_pa_uppdraget",
+    "page": 10,
+    "quote_fragment": "Den invändiga målningen ska utföras under förskolans sommarstängning, 12 juli till 6 augusti 2027, då lokalerna är tomma.",
+    "title": "Invändig målning under sommarstängningen"
+  },
+  {
+    "id": "K39",
+    "kind": "krav_pa_uppdraget",
+    "page": 10,
+    "quote_fragment": "Hela uppdraget ska vara färdigställt och klart för slutbesiktning senast den 13 augusti 2027.",
+    "title": "Färdigställande senast angivet datum"
+  },
+  {
+    "id": "K40",
+    "kind": "krav_pa_uppdraget",
+    "page": 10,
+    "quote_fragment": "Leverantören ska senast två veckor före arbetets start lämna en detaljerad tidplan med etapper till kommunens projektledare.",
+    "title": "Detaljerad tidplan två veckor före start"
+  },
+  {
+    "id": "K41",
+    "kind": "krav_pa_uppdraget",
+    "page": 10,
+    "quote_fragment": "Leverantören ska utföra egenkontroller enligt en egen kontrollplan och lämna signerade egenkontroller till kommunen senast vid slutbesiktningen.",
+    "title": "Egenkontroller enligt kontrollplan"
+  },
+  {
+    "id": "K42",
+    "kind": "krav_pa_uppdraget",
+    "page": 10,
+    "quote_fragment": "Fel som noteras vid slutbesiktningen ska vara åtgärdade inom 30 dagar efter besiktningen.",
+    "title": "Fel från slutbesiktning åtgärdas inom 30 dagar"
+  },
+  {
+    "id": "K43",
+    "kind": "krav_pa_uppdraget",
+    "page": 10,
+    "quote_fragment": "Efter slutbesiktningen ska leverantören lämna en färgsättningsförteckning med produktnamn och kulör för varje yta, så att kommunen kan underhålla ytorna.",
+    "title": "Färgsättningsförteckning efter slutbesiktning"
+  },
+  {
+    "id": "K44",
+    "kind": "skallkrav",
+    "page": 11,
+    "quote_fragment": "Anbudsgivaren ska bifoga en genomförandebeskrivning på högst tre A4-sidor som beskriver hur uppdraget kommer att genomföras.",
+    "title": "Genomförandebeskrivning på högst tre sidor"
+  },
+  {
+    "id": "K45",
+    "kind": "skallkrav",
+    "page": 13,
+    "quote_fragment": "Anbudsgivaren ska i anbudet bekräfta att avtalsvillkoren i detta avsnitt accepteras utan reservationer.",
+    "title": "Avtalsvillkoren accepteras utan reservationer"
+  },
+  {
+    "id": "K46",
+    "kind": "avtalsvillkor",
+    "page": 13,
+    "quote_fragment": "Det fasta priset ska gälla under hela kontraktstiden och får inte indexregleras.",
+    "title": "Fast pris utan indexreglering"
+  },
+  {
+    "id": "K47",
+    "kind": "avtalsvillkor",
+    "page": 13,
+    "quote_fragment": "Leverantören ska skicka fakturor elektroniskt i formatet Peppol BIS Billing 3, enligt lagen (2018:1277) om elektroniska fakturor till följd av offentlig",
+    "title": "Elektronisk faktura i Peppol BIS Billing 3"
+  },
+  {
+    "id": "K48",
+    "kind": "avtalsvillkor",
+    "page": 13,
+    "quote_fragment": "Tilläggsarbeten får utföras endast efter skriftlig beställning från kommunens projektledare.",
+    "title": "Tilläggsarbeten endast efter skriftlig beställning"
+  },
+  {
+    "id": "K49",
+    "kind": "avtalsvillkor",
+    "page": 13,
+    "quote_fragment": "Leverantören ska under hela kontraktstiden ha den ansvarsförsäkring som anges i avsnitt 3.4 och på begäran visa ett giltigt försäkringsbevis.",
+    "title": "Ansvarsförsäkring under hela kontraktstiden"
+  },
+  {
+    "id": "K50",
+    "kind": "avtalsvillkor",
+    "page": 13,
+    "quote_fragment": "Under garantitiden ska leverantören utan kostnad för kommunen åtgärda fel",
+    "title": "Fem års garanti med åtgärd inom 30 dagar"
+  },
+  {
+    "id": "K51",
+    "kind": "avtalsvillkor",
+    "page": 13,
+    "quote_fragment": "ska leverantören betala vite med 0,5 procent av det fasta priset",
+    "title": "Vite 0,5 procent per påbörjad vecka vid försening"
+  },
+  {
+    "id": "K52",
+    "kind": "avtalsvillkor",
+    "page": 13,
+    "quote_fragment": "Innan arbetet påbörjas ska leverantören lämna namn och kontaktuppgifter",
+    "title": "Uppgifter om underleverantörer före start"
+  },
+  {
+    "id": "K53",
+    "kind": "avtalsvillkor",
+    "page": 14,
+    "quote_fragment": "Leverantören ska tillförsäkra de arbetstagare som utför uppdraget lön, semester och arbetstid som minst motsvarar de lägsta nivåerna i det centrala",
+    "title": "Lön, semester och arbetstid enligt centralt kollektivavtal"
+  }
+]

@@ -15,3 +15,12 @@ coverage/
 # Misc
 .DS_Store
 *.log
+var/*
+!var/.gitkeep
+# A relative DOCUMENTS_DIR or ENEO_ASSISTANTS_FILE resolved from backend/
+backend/var/
+reports/
+
+# Recorded third-party documents for the ingestion tests stay local (see backend/tests/data/ingest/README.md)
+backend/tests/data/ingest/*
+!backend/tests/data/ingest/README.md
