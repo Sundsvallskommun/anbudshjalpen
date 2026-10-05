@@ -9,7 +9,7 @@ queries can be scoped per company.
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Any, ClassVar
 
 from sqlalchemy import (
@@ -37,6 +37,24 @@ class Base(DeclarativeBase):
 
 def _uuid_pk() -> Mapped[uuid.UUID]:
     return mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
+def _changed_at() -> Mapped[datetime]:
+    """When a row last changed, set by the application clock.
+
+    Freshness checks (e.g. matching) compare these with other application-set times.
+    The database clock (`now()` is the transaction start, and Postgres may run on another
+    clock) would make such comparisons depend on timing, so it is only the fallback for
+    rows inserted outside the ORM.
+    """
+
+    return mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, server_default=func.now()
+    )
 
 
 def _created_at() -> Mapped[datetime]:
@@ -90,9 +108,7 @@ class Notice(Base):
         ),
     )
     created_at: Mapped[datetime] = _created_at()
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
+    updated_at: Mapped[datetime] = _changed_at()
 
     documents: Mapped[list[Document]] = relationship(back_populates="notice")
     checklists: Mapped[list[ChecklistRecord]] = relationship(back_populates="notice")
@@ -278,9 +294,7 @@ class Company(Base):
     public_references: Mapped[str | None] = mapped_column(Text)
     is_fictitious: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = _created_at()
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
-    )
+    updated_at: Mapped[datetime] = _changed_at()
 
 
 class User(Base):
@@ -316,7 +330,9 @@ class MatchRecord(Base):
     dismissed: Mapped[bool] = mapped_column(Boolean, default=False)
     stale: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # every user has been told
-    created_at: Mapped[datetime] = _created_at()
+    created_at: Mapped[datetime] = mapped_column(  # when assessed; compared with _changed_at() values
+        DateTime(timezone=True), default=_utcnow, server_default=func.now(), nullable=False
+    )
 
 
 class MatchNotification(Base):
