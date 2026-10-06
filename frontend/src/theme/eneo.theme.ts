@@ -8,6 +8,23 @@ const focusRing = {
 const rowFocusRing = {...focusRing, outlineOffset: 'calc(var(--focus-outline-width) * -1)'};
 const TOUCH = '44px';
 
+// Structural widths and bar heights of the frame (docs/design.md, "Ramen"). Widths are the one
+// place raw px belongs; everything inside them uses the spacing scale. Bespoke CSS reads them as var(--layout-*).
+// The workspace is inköp's review table (1 344 px): on that page the frame's content line follows it (app.css).
+const LAYOUT_TOKENS = {
+  '--layout-container': '1152px',
+  '--layout-workspace': '1344px',
+  '--layout-main': '760px',
+  '--layout-rail': '360px',
+  '--layout-form': '640px',
+  '--height-top-nav': '64px',
+  '--height-step-bar': '52px',
+};
+// The page's content line inside a full-width surface: at least the 16 px gutter, else centred on the container.
+const CONTENT_INLINE = 'max(var(--spacing-4), calc((100% - var(--layout-container)) / 2))';
+// The 2 px accent line under the chosen navigation item and the chosen step, instead of a grey pill.
+const CHOSEN_LINE = 'inset 0 -2px 0 var(--color-accent)';
+
 export const eneoTheme = defineTheme({
   name: 'eneo',
   color: {accent: ['#004595', '#52B1FF'], neutralStyle: 'neutral', contrast: 'standard'},
@@ -30,7 +47,62 @@ export const eneoTheme = defineTheme({
     // A control's edge is 2.8:1 on the page and on a muted fill in light mode; 3:1 is the floor (WCAG 1.4.11).
     '--color-border-emphasized': ['#85868F', '#626972'],
   },
+  localTokens: LAYOUT_TOKENS,
   components: {
+    // The page rests on the body grey and what the user acts on sits on white cards (direction.md, section 5): the
+    // "section" shell paints its surface white everywhere, so its root takes the body colour and only the header
+    // (demo strip and top bar, with the divider below) keeps the surface. The shell is as tall as the page instead of
+    // a whole screen: the site's foot follows it outside the main region (ModuleShell), and on a short page it would
+    // otherwise wait below the first screen. The page beyond it is the same body grey (app.css).
+    'app-shell': {'variant:section': {backgroundColor: 'var(--color-background-body)', minHeight: 'auto'}},
+    // The top bar follows the page container (1 152 px) and is 64 px high; its items reach the bar's lower edge so the
+    // chosen item's accent line sits on it.
+    'top-nav': {
+      base: {
+        minHeight: 'var(--height-top-nav)',
+        paddingBlock: '0',
+        paddingInline: CONTENT_INLINE,
+      },
+    },
+    // The brand stands apart from the navigation: 16 px from the bar's own gap plus 24 px.
+    'top-nav-heading': {base: {marginInlineEnd: 'var(--spacing-6)'}},
+    // The chosen item has accent text in semibold and a 2 px accent line below, instead of a grey pill (the accent
+    // means "you are here or can click"); hovering any item still tints it.
+    'top-nav-item': {
+      base: {
+        minHeight: 'var(--height-top-nav)',
+        borderRadius: '0',
+        color: 'var(--color-text-primary)',
+      },
+      selected: {
+        color: 'var(--color-text-accent)',
+        fontWeight: 'var(--font-weight-semibold)',
+        backgroundColor: 'transparent',
+        boxShadow: CHOSEN_LINE,
+      },
+    },
+    // A tab keeps no grey pressed background once it has been chosen: the accent line says it is chosen, and a
+    // lingering tint after a tap read as a second state.
+    tab: {
+      selected: {
+        '--color-overlay-hover': 'transparent',
+        '--color-overlay-pressed': 'transparent',
+      },
+    },
+    // The demo strip is the one full-width info banner: one neutral line on the surface with an edge below, not an
+    // info-blue block (blue means clickable). Its content follows the page container.
+    banner: {
+      'container:section+status:info': {
+        backgroundColor: 'var(--color-background-surface)',
+        borderBlockEnd: '1px solid var(--color-border)',
+        alignItems: 'center',
+        paddingBlock: 'var(--spacing-1-5)',
+        paddingInline: CONTENT_INLINE,
+        minHeight: 'var(--spacing-9)',
+      },
+    },
+    // Cards have 20 px padding (16 on a phone), a 1 px border and 12 px corners, and no shadow.
+    card: {base: {padding: 'var(--spacing-5)'}},
     // A word with no break point (an e-mail address as a name, a long compound) wraps instead of reaching past a
     // 320 px screen: Astryx breaks words only when it truncates.
     // A phase's heading takes focus when its view appears (usePhaseHeading) but is no control: the browser counts that
@@ -57,6 +129,15 @@ export const eneoTheme = defineTheme({
     },
     // The control is the slider's target (the track is 4 px, the thumb 20): the gate's 24 px, and 44 px below.
     'slider-control': {base: {minBlockSize: '24px'}},
+    // A segmented control's track is the neutral tint. In dark mode, on a card, it lifts the surface so far that an
+    // unselected label in the secondary colour is 4.3:1 (WCAG 1.4.3 asks 4.5). A fainter tint in dark mode keeps the
+    // track visible and the label at 5:1; light mode keeps the design system's tint.
+    'segmented-control': {
+      base: {
+        backgroundColor:
+          'light-dark(var(--color-neutral), color-mix(in srgb, var(--color-text-primary) 15%, transparent))',
+      },
+    },
     // A row of chips wraps instead of reaching past a 320 px screen: the group is one inline line.
     'toggle-button-group': {base: {flexWrap: 'wrap'}},
     // A dialog opens on its title (the title takes focus, which gives it no outline): where focus is on it, as on
@@ -75,9 +156,34 @@ export const eneoTheme = defineTheme({
     'avatar-fallback': {base: {color: 'var(--color-text-primary)'}},
     // The trigger is one line of 13 px text, 19 px tall: the gate's 24 px (WCAG 2.5.8).
     'collapsible-trigger': {base: {minHeight: '24px'}},
+    // The reader's own question in a thread is on the accent's tint (direction.md, section 4 "Steg 2 Fråga"), not the
+    // neutral grey, with the corner toward the asker tucked in (radii 12 12 4 12, the end-end corner, so it
+    // follows the reading direction) instead of the round chat radius. The answer is a card, so the assistant's
+    // bubble keeps the default.
+    'chat-message-bubble': {
+      'sender:user+variant:filled': {
+        backgroundColor: 'var(--color-accent-muted)',
+        color: 'var(--color-text-primary)',
+        borderRadius: 'var(--radius-container)',
+        borderEndEndRadius: 'var(--radius-inner)',
+      },
+    },
   },
   adaptations: {
     rules: [
+      {
+        // A phone's top bar is 56 px with the main choices on a 44 px row below; the step bar is 48 px; cards pad 16 px;
+        // the h1 steps down to 23 px.
+        when: {width: {below: 'sm'}},
+        value: {
+          localTokens: {'--height-top-nav': '56px', '--height-step-bar': '48px'},
+          components: {
+            card: {base: {padding: 'var(--spacing-4)'}},
+            // The page's h1 is 23/32 on a phone, so a long notice title leaves the steps on the first screen.
+            heading: {'level:1': {fontSize: 'var(--font-size-xl)', lineHeight: 'var(--text-heading-2-leading)'}},
+          },
+        },
+      },
       {
         when: {pointer: 'coarse'},
         value: {
@@ -90,6 +196,11 @@ export const eneoTheme = defineTheme({
             'slider-control': {base: {minBlockSize: TOUCH}},
             'collapsible-trigger': {base: {minHeight: TOUCH}},
             'radio-list-item': {base: {minHeight: TOUCH}},
+            // Menu rows (the account menu) and list rows are 44 px for a finger.
+            item: {base: {minHeight: TOUCH}},
+            // A token is a label, not a target: it keeps its 24 px height on a touch screen instead of following the
+            // 44 px element size (a removable chip's remove button reaches 44 px through its own pseudo-element).
+            token: {base: {minHeight: 'var(--spacing-6)'}},
           },
         },
       },

@@ -74,6 +74,19 @@ Efter nya fixturer i `data/fixtures` (till exempel efter `git pull`): kör `make
 repots `data/`. Ett ersatt underlag tolkas på nytt av worker (eller `anbudsklar interpret --pending`), och inköparen
 måste granska och publicera den nya checklistan.
 
+## Webbappen
+
+Logga in i demon på `/logga-in`: "Fortsätt som Anna" är företagaren, som landar på Start, och "Fortsätt som Lars" är
+inköparen, som landar på Inköp › Att granska. Inköparens jobb finns på sidan Drift i kontomenyn.
+
+Webbappen ligger i `frontend/`. Reglerna för koden står i `frontend/AGENTS.md` (engelska), och designsystemet med
+principerna, sidornas uppbyggnad, de delade komponenterna och reglerna för text i [Design](design.md). Från `frontend/`:
+
+```bash
+npm run astryx -- component <Namn>   # props och exempel för en Astryx-komponent
+npm run theme:build                  # bygger om temat efter en ändring i src/theme/eneo.theme.ts
+```
+
 ## Kommandon
 
 Kommandot `anbudsklar` körs från `backend/` med `uv run anbudsklar …`, eller direkt i containern.
@@ -92,12 +105,15 @@ Kommandot `anbudsklar` körs från `backend/` med `uv run anbudsklar …`, eller
 
 ## AI-motor lokalt
 
-`AI_ENGINE=heuristic` fungerar utan nätverk och är standard. För en riktig modell:
+`AI_ENGINE=heuristic` fungerar utan nätverk och är standard. Webbappen kallar den regelbaserad: texterna har inget
+prefix, och motorn står i fältet `engine` och i ursprungsraden ([AI-uppgifterna](ai-tasks.md#den-heuristiska-motorn)).
+För en riktig modell:
 
 - **Eneo:** sätt `ENEO_BACKEND_URL` och `ENEO_API_KEY_HEADER_NAME` och kör `uv run anbudsklar eneo provision` från
   `backend/` enligt [Eneo-integration](eneo-integration.md#sätta-upp-anbudsklar-eneo-provision). Kommandot skriver
   `ENEO_API_KEY` till repots `.env`, som både `make dev-api` och Compose-stacken läser. Sätt sedan `AI_ENGINE=eneo`.
-  En nyckel som har läckt byts direkt med `--rotate-key`.
+  En nyckel som har läckt byts direkt med `--rotate-key`. Kör kommandot igen efter varje ändring i
+  `backend/src/anbudsklar/ai/prompts/`, senast efter ändringen 2026-10-05.
 - **Eneo på den egna datorn:** med `make up` körs appen i en container, där `localhost` är containern själv. Sätt då
   `ENEO_BACKEND_URL=http://host.docker.internal:8123` i `.env`. `localhost:8123` fungerar bara för `make dev-api`. Alla
   steg, och ett röktest, står i [Lokalt Eneo](eneo-integration.md#lokalt-eneo).

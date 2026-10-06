@@ -1,0 +1,33 @@
+/* A group of jobs on a card: its heading in the card's inset, then rows edge to edge with a divider between them.
+   Tokens only. */
+.head {
+  padding-block: var(--spacing-5) var(--spacing-3);
+  padding-inline: var(--spacing-5);
+  border-block-end: var(--border-width) solid var(--color-border);
+}
+
+.row {
+  padding-block: var(--spacing-4);
+  padding-inline: var(--spacing-5);
+}
+
+.main {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+/* "Kör nu" keeps its one line beside a long job name. */
+.run {
+  flex: none;
+}
+
+.row + .row {
+  border-block-start: var(--border-width) solid var(--color-border);
+}
+
+@media (max-width: 639px) {
+  .head,
+  .row {
+    padding-inline: var(--spacing-4);
+  }
+}

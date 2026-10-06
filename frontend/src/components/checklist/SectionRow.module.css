@@ -1,0 +1,63 @@
+/* Rows edge to edge in a section card (attachments, dates, terms): the card's inset on both sides, at least 48 px high,
+   and a divider between rows, like the requirement rows (direction.md, section 4 "Steg 1 Krav"). The date column has a
+   fixed width so the texts line up. Tokens only. */
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A row runs edge to edge with a straight divider: the design system rounds an item's corners, which bends the line
+   (RequirementRow squares its own). */
+.row {
+  min-block-size: var(--spacing-12);
+  padding-inline: var(--spacing-5);
+  border-radius: var(--radius-none);
+}
+
+.row + .row {
+  border-block-start: var(--border-width) solid var(--color-border);
+}
+
+/* A row in a list that already sits on the card's inset (inside a nested disclosure). */
+.flush {
+  padding-inline: 0;
+}
+
+.date {
+  inline-size: calc(var(--spacing-10) * 3);
+  flex: none;
+}
+
+/* The heading of a part of a section ("Före anbudet", "Bara i vissa fall"), on the card's inset. */
+.subheading {
+  padding-inline: var(--spacing-5);
+  padding-block: var(--spacing-3) var(--spacing-1);
+}
+
+.subheading + .list,
+.list + .subheading {
+  border-block-start: var(--border-width) solid var(--color-border);
+}
+
+.nested {
+  padding-inline: var(--spacing-5);
+  padding-block: var(--spacing-2);
+  border-block-start: var(--border-width) solid var(--color-border);
+}
+
+@media (max-width: 639px) {
+  .row,
+  .subheading,
+  .nested {
+    padding-inline: var(--spacing-4);
+  }
+
+  .flush {
+    padding-inline: 0;
+  }
+
+  .date {
+    inline-size: calc(var(--spacing-12) * 2);
+  }
+}

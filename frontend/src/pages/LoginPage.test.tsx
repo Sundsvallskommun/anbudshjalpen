@@ -1,24 +1,68 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
-import { companyUser, noticeList, session } from "../test/fixtures";
-import { baseRoutes, mockApi, renderApp } from "../test/render";
-import { safeReturnPath } from "./LoginPage";
+import type { UserView } from "../api/types";
+import { renderWithProviders } from "../components/ui/testing";
+import { buyerUser, companyUser, config, session } from "../test/fixtures";
+import { mockApi, renderApp, type MockRoute } from "../test/render";
+import LoginPage, { safeReturnPath } from "./LoginPage";
+import { personaIdentity } from "./login/personas";
+
+// The fixture's personas are named as the backend names them (services/personas.py): "Anna Berg, Målerifirman i
+// Matfors AB" and "Lars Holm, inköpare", with the role in a sentence as the description.
+function routes(user: UserView | null, loginAs: UserView = companyUser): MockRoute[] {
+  return [
+    { method: "GET", path: "/api/config", body: config },
+    { method: "GET", path: "/api/session", body: session(user) },
+    { method: "POST", path: "/api/session/login", body: session(loginAs) },
+  ];
+}
 
 describe("LoginPage", () => {
-  it("is labelled as a demo and logs in with a persona", async () => {
-    const calls = mockApi([
-      ...baseRoutes(null),
-      { method: "POST", path: "/api/session/login", body: session(companyUser) },
-      { method: "GET", path: "/api/notices", body: noticeList },
-    ]);
-    renderApp("/logga-in?till=%2F");
+  it("offers the two roles as cards with who they are, what they can do and where they land", async () => {
+    mockApi(routes(null));
+    renderApp("/logga-in");
 
-    expect(await screen.findByRole("heading", { level: 1, name: "Logga in (demo)" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Logga in som Anna Berg" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Välj vem du är i demon" })).toBeInTheDocument();
+    expect(screen.getByText("Ingen riktig inloggning. I tjänsten loggar företag in med e-legitimation.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 2, name: "Anna Berg" })).toBeInTheDocument();
+    expect(screen.getByText("Målerifirman i Matfors AB")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Lars Holm" })).toBeInTheDocument();
+    expect(screen.getByText("Inköp, Sundsvalls kommun")).toBeInTheDocument();
+    expect(screen.getByText("Du kommer till: Start")).toBeInTheDocument();
+    expect(screen.getByText("Du kommer till: Att granska")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Fortsätt som Anna, företagare" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Fortsätt som Lars, inköpare" })).toBeInTheDocument();
+    expect(screen.getAllByText(config.demo_notice)).toHaveLength(1);
+  });
 
-    expect(await screen.findByRole("heading", { level: 1, name: "Upphandlingar" })).toBeInTheDocument();
+  it("logs in as the chosen role and lands on its start", async () => {
+    const calls = mockApi(routes(null));
+    renderWithProviders(<LoginPage />, { path: "/logga-in" });
+
+    await userEvent.click(await screen.findByRole("button", { name: "Fortsätt som Anna, företagare" }));
+
+    expect(await screen.findByTestId("location")).toHaveTextContent(/^\/start$/);
     expect(calls.find((call) => call.path === "/api/session/login")?.body).toEqual({ persona: "foretagare" });
+  });
+
+  it("goes back to the page that asked for the login", async () => {
+    mockApi([...routes(null, buyerUser), { method: "POST", path: "/api/rules/ask", body: {} }]);
+    renderApp(`/logga-in?till=${encodeURIComponent("/regelhjalpen")}`);
+
+    expect(await screen.findAllByText("Du kommer tillbaka till sidan du var på.")).toHaveLength(2);
+    await userEvent.click(screen.getByRole("button", { name: "Fortsätt som Lars, inköpare" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Regelhjälpen" })).toBeInTheDocument();
+  });
+
+  it("marks the role the user is logged in as now", async () => {
+    mockApi(routes(companyUser));
+    renderApp("/logga-in");
+
+    // The card's own button is the first thing in the card, so its parent is Anna's card.
+    const annaCard = (await screen.findByRole("button", { name: "Fortsätt som Anna, företagare" })).parentElement;
+    expect(within(annaCard as HTMLElement).getByText("Inloggad nu")).toBeInTheDocument();
+    expect(screen.getAllByText("Inloggad nu")).toHaveLength(1);
   });
 
   it("only returns to paths inside the app", () => {
@@ -27,5 +71,22 @@ describe("LoginPage", () => {
     expect(safeReturnPath("https://evil.example")).toBeNull();
     expect(safeReturnPath("/logga-in")).toBeNull();
     expect(safeReturnPath(null)).toBeNull();
+  });
+});
+
+describe("personaIdentity", () => {
+  it("reads the name and the organisation from the backend's label", () => {
+    const [company, buyer] = session(null).personas;
+    expect(personaIdentity(company!, "Sundsvalls kommun")).toEqual({
+      name: "Anna Berg",
+      firstName: "Anna",
+      organization: "Målerifirman i Matfors AB",
+    });
+    expect(personaIdentity(buyer!, "Sundsvalls kommun")).toEqual({
+      name: "Lars Holm",
+      firstName: "Lars",
+      organization: "Inköp, Sundsvalls kommun",
+    });
+    expect(personaIdentity({ key: "foretagare", label: "Anna Berg", description: "" }, undefined).organization).toBeNull();
   });
 });

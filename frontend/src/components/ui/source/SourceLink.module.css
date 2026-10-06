@@ -1,0 +1,16 @@
+/* The hit area of a source link that stands alone at the end of a row: 24 px high with a mouse and 44 px with a
+   finger (WCAG 2.5.8 and the project's touch rule), without growing the text. Inline in a sentence it is exempt and
+   gets no class. Tokens only. */
+.target {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--spacing-6);
+}
+
+@media (pointer: coarse) {
+  .target {
+    min-block-size: var(--spacing-11);
+    min-inline-size: var(--spacing-11);
+    justify-content: flex-end;
+  }
+}

@@ -1,165 +1,126 @@
-import { Button } from "@astryxdesign/core/Button";
-import { Heading } from "@astryxdesign/core/Heading";
-import { HStack } from "@astryxdesign/core/HStack";
-import { Link } from "@astryxdesign/core/Link";
-import { Text } from "@astryxdesign/core/Text";
-import { TextArea } from "@astryxdesign/core/TextArea";
-import { VStack } from "@astryxdesign/core/VStack";
-import { useState, type FormEvent } from "react";
-import { useAskRules } from "../api/queries";
-import type { RuleSource, RulesView } from "../api/types";
-import { Row, RowList } from "../components/RowList";
+import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import { ErrorNotice } from "../components/states";
-import { engineLabel } from "../lib/labels";
 import { Page } from "../shell/Page";
+import { RulesComposer } from "./rules/RulesComposer";
+import { MAX_QUESTION_LENGTH, QUESTION_PARAM, questionError } from "./rules/rulesAnswer";
+import { RulesRail } from "./rules/RulesRail";
+import { RulesSuggestions } from "./rules/RulesSuggestions";
+import { RulesThread } from "./rules/RulesThread";
+import { useRulesConversation } from "./rules/useRulesConversation";
 
-const EXAMPLES = [
-  "Vad är avtalsspärr?",
-  "Vad är skillnaden mellan skallkrav och utvärderingskriterier?",
-  "Får vi lämna anbud tillsammans med ett annat företag?",
-  "Vad gäller för upphandlingar under tröskelvärdena?",
-];
-const MAX_LENGTH = 2000;
+/**
+ * "/regelhjalpen?fraga=…" asks the question on arrival (Start links its examples here) and then leaves the address,
+ * so a reload does not ask it again. A question too short or too long is put in the field instead.
+ */
+function useLinkedQuestion(onQuestion: (question: string) => void) {
+  const [params, setParams] = useSearchParams();
+  const linked = params.get(QUESTION_PARAM);
+  const handled = useRef(false);
 
-interface Turn {
-  question: string;
-  view: RulesView;
-}
-
-function SourceItem({ source }: { source: RuleSource }) {
-  const text = source.reference ? `${source.reference}: ${source.title}` : source.title;
-  return source.url ? (
-    <Link href={source.url} isExternalLink>
-      {text}
-    </Link>
-  ) : (
-    <Text>{text}</Text>
-  );
-}
-
-function RulesAnswerItem({ turn }: { turn: Turn }) {
-  const { answer, engine } = turn.view;
-  return (
-    <VStack gap={3}>
-      <VStack gap={1}>
-        <Text type="supporting">Din fråga</Text>
-        <Heading level={3}>{turn.question}</Heading>
-      </VStack>
-      <VStack gap={2}>
-        {answer.answer
-          .split(/\n\s*\n/u)
-          .filter((paragraph) => paragraph.trim())
-          .map((paragraph, index) => (
-            <Text as="p" key={index}>
-              {paragraph.trim()}
-            </Text>
-          ))}
-      </VStack>
-      {answer.sources.length > 0 ? (
-        <VStack gap={1}>
-          <Text weight="semibold">Källor</Text>
-          <VStack as="ul" role="list" gap={1} aria-label="Källor">
-            {answer.sources.map((source, index) => (
-              <li key={index}>
-                <SourceItem source={source} />
-              </li>
-            ))}
-          </VStack>
-        </VStack>
-      ) : (
-        <Text color="secondary">Svaret har ingen källa. Kontrollera det innan du förlitar dig på det.</Text>
-      )}
-      <Text type="supporting">{`AI-genererat svar (${engineLabel(engine)}). Det är allmän vägledning, inte juridisk rådgivning.`}</Text>
-    </VStack>
-  );
-}
-
-/** General questions about procurement rules (LOU, guidance, local rules), answered with sources. */
-export default function RulesPage() {
-  const [question, setQuestion] = useState("");
-  const [turns, setTurns] = useState<Turn[]>([]);
-  const ask = useAskRules();
-  const sessionId = turns[0]?.view.answer.session_id ?? null;
-
-  const send = (text: string) => {
-    const trimmed = text.trim();
-    if (trimmed.length < 3 || ask.isPending) return;
-    setQuestion(trimmed);
-    ask.mutate(
-      { question: trimmed, session_id: sessionId },
-      {
-        onSuccess: (view) => {
-          setTurns((previous) => [{ question: trimmed, view }, ...previous]);
-          setQuestion("");
-        },
+  useEffect(() => {
+    if (linked === null || handled.current) return;
+    handled.current = true;
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete(QUESTION_PARAM);
+        return next;
       },
+      { replace: true },
     );
+    onQuestion(linked);
+  }, [linked]);
+}
+
+/**
+ * Regelhjälpen (direction.md, section 4): general questions about procurement rules as a calm conversation, like
+ * the Fråga step. Every answer opens with its provenance line and ends with the paragraphs it rests on, each a card
+ * with the law's own words and a link to the whole paragraph. Open to everyone; nothing is stored.
+ */
+export default function RulesPage() {
+  const conversation = useRulesConversation();
+  const [draft, setDraft] = useState("");
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState("");
+  const [answeredId, setAnsweredId] = useState<number | null>(null);
+  const textArea = useRef<HTMLTextAreaElement>(null);
+
+  const ask = (question: string) => {
+    setAnnouncement("Letar efter ett svar …");
+    conversation.send(question.trim(), {
+      onAnswer: (turn) => {
+        setAnsweredId(turn.id);
+        setAnnouncement(`Regelhjälpen har svarat på ”${turn.question}”.`);
+      },
+      onError: (_error, question) => {
+        // The question is not lost: it is back in the field, below the message that says what went wrong.
+        setDraft(question);
+        setAnnouncement("");
+      },
+    });
   };
 
-  const onSubmit = (event: FormEvent) => {
-    event.preventDefault();
-    send(question);
+  const submitDraft = () => {
+    const error = questionError(draft);
+    setFieldError(error);
+    if (error) {
+      textArea.current?.focus();
+      return;
+    }
+    if (conversation.isPending) return;
+    ask(draft);
+    setDraft("");
+  };
+
+  const changeDraft = (value: string) => {
+    setDraft(value);
+    if (fieldError) setFieldError(questionError(value));
   };
 
   const startOver = () => {
-    setTurns([]);
-    setQuestion("");
-    ask.reset();
+    conversation.reset();
+    setDraft("");
+    setFieldError(null);
+    setAnsweredId(null);
+    setAnnouncement("Frågorna är borttagna. Du kan börja om med en ny fråga.");
+    textArea.current?.focus();
   };
 
-  const tooLong = question.length > MAX_LENGTH;
+  useLinkedQuestion((question) => {
+    if (questionError(question) === null) ask(question);
+    else setDraft(question.slice(0, MAX_QUESTION_LENGTH));
+  });
+
+  const hasConversation = conversation.turns.length > 0;
   return (
     <Page
       title="Regelhjälpen"
-      width={760}
-      intro="Fråga om upphandlingsregler, till exempel lagen om offentlig upphandling (LOU), vägledningar och kommunens egna regler. Svaren hänvisar till källan. Frågor om en viss upphandling ställer du på upphandlingens sida."
+      intro="Ställ frågor om reglerna för offentlig upphandling. Varje svar visar vilka paragrafer i lagen det bygger på."
+      rail={<RulesRail />}
+      railLabel="Om Regelhjälpen"
     >
-      <form onSubmit={onSubmit} aria-label="Ställ en fråga till Regelhjälpen">
-        <VStack gap={3}>
-          <TextArea
-            label="Din fråga"
-            value={question}
-            onChange={setQuestion}
-            rows={3}
-            maxLength={MAX_LENGTH}
-            status={tooLong ? { type: "error", message: `Frågan får vara högst ${MAX_LENGTH} tecken.` } : undefined}
-          />
-          <HStack gap={2} vAlign="center" wrap="wrap">
-            <Button
-              type="submit"
-              label="Fråga"
-              variant="primary"
-              isLoading={ask.isPending}
-              isDisabled={question.trim().length < 3 || tooLong}
-            />
-            {turns.length > 0 && <Button label="Ny fråga från början" variant="ghost" onClick={startOver} />}
-            {ask.isPending && <Text color="secondary">Letar i regler och vägledningar …</Text>}
-          </HStack>
-        </VStack>
-      </form>
-      {turns.length === 0 && !ask.isPending && (
-        <VStack gap={2}>
-          <Text weight="semibold">Exempel på frågor</Text>
-          <HStack gap={2} wrap="wrap">
-            {EXAMPLES.map((example) => (
-              <Button key={example} label={example} size="sm" onClick={() => send(example)} />
-            ))}
-          </HStack>
-        </VStack>
-      )}
-      {ask.isError && <ErrorNotice title="Frågan kunde inte besvaras" error={ask.error} />}
-      <Text role="status" type="supporting">
-        {turns[0] ? `Svaret på frågan ”${turns[0].question}” visas överst.` : ""}
-      </Text>
-      {turns.length > 0 && (
-        <RowList label="Frågor och svar">
-          {turns.map((turn, index) => (
-            <Row key={turns.length - index}>
-              <RulesAnswerItem turn={turn} />
-            </Row>
-          ))}
-        </RowList>
-      )}
+      {hasConversation && <RulesThread turns={conversation.turns} answeredId={answeredId} />}
+      {conversation.error !== null && <ErrorNotice title="Frågan kunde inte besvaras" error={conversation.error} />}
+      <RulesSuggestions
+        asked={conversation.turns.map((turn) => turn.question)}
+        onAsk={(question) => {
+          if (!conversation.isPending) ask(question);
+        }}
+      />
+      <RulesComposer
+        value={draft}
+        onChange={changeDraft}
+        onSubmit={submitDraft}
+        error={fieldError}
+        isPending={conversation.isPending}
+        onStartOver={hasConversation ? startOver : undefined}
+        textAreaRef={textArea}
+      />
+      <VisuallyHidden as="div" role="status">
+        {announcement}
+      </VisuallyHidden>
     </Page>
   );
 }

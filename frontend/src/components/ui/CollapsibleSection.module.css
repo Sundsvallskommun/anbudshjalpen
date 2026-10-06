@@ -1,0 +1,96 @@
+/* A section whose heading is the disclosure button (direction.md, section 6): the button sits inside the heading
+   element, which the design system's Collapsible cannot do, so screen-reader users still navigate the page by its
+   headings. The section is a card; its rows run edge to edge. Bespoke surface; tokens only.
+   A link to the section lands a row's distance below the top. Under the notice page's sticky step bar the page's
+   scroll padding (app.css) already clears the bar, and this margin adds to it. */
+.section {
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-container);
+  background: var(--color-background-card);
+  scroll-margin-block-start: var(--spacing-4);
+}
+
+.heading {
+  margin: 0;
+  font: inherit;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  inline-size: 100%;
+  min-block-size: var(--size-element-lg);
+  margin: 0;
+  padding-block: var(--spacing-4) var(--spacing-1);
+  padding-inline: var(--spacing-5);
+  border: 0;
+  border-radius: var(--radius-container) var(--radius-container) 0 0;
+  background: none;
+  color: var(--color-text-primary);
+  font-family: inherit;
+  font-size: var(--text-heading-3-size);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--text-heading-3-leading);
+  text-align: start;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .trigger:hover {
+    background: var(--color-overlay-hover);
+  }
+}
+
+.trigger:focus-visible {
+  outline: var(--focus-outline-width) var(--focus-outline-style) var(--focus-outline-color);
+  outline-offset: calc(var(--focus-outline-width) * -1);
+}
+
+.title {
+  flex: 0 1 auto;
+}
+
+.chevron {
+  margin-inline-start: auto;
+  color: var(--color-icon-secondary);
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.trigger[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
+}
+
+.helper {
+  padding-inline: var(--spacing-5);
+  padding-block-end: var(--spacing-3);
+}
+
+.content {
+  border-block-start: var(--border-width) solid var(--color-border);
+}
+
+.content[hidden] {
+  display: none;
+}
+
+.padded {
+  padding: var(--spacing-5);
+}
+
+@media (max-width: 639px) {
+  .trigger,
+  .helper {
+    padding-inline: var(--spacing-4);
+  }
+
+  .padded {
+    padding: var(--spacing-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}

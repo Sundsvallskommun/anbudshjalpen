@@ -47,3 +47,17 @@
     border: 1px solid ButtonText;
   }
 }
+
+/* The notice page's step bar sticks to the top: the page keeps a focused control clear of it when it scrolls one
+   into view (WCAG 2.4.11). The bar is the theme's height (52 px, 48 on a phone) or a pixel more on a phone, so a
+   focused control and its ring stay clear of it. An anchor's own scroll margin adds to this, so keep those small. */
+html:has([data-step-nav]) {
+  scroll-padding-block-start: calc(var(--height-step-bar, var(--spacing-12)) + var(--spacing-2));
+}
+
+/* Inköp's review table is wider than the page container (a Page of width 1344, --layout-workspace in the theme): on
+   that page the demo strip, the top bar and the foot follow it, so the frame's content line meets the workspace's
+   edges (docs/design.md, "Ramen"). The shell holds no state; the page says its width in the markup. */
+[data-astryx-theme]:has([data-page-width="1344"]) {
+  --layout-container: var(--layout-workspace);
+}

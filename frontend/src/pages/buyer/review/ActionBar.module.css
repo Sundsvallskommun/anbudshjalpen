@@ -1,0 +1,46 @@
+/* The decision at the end of the review (direction.md, section 4 "Sticky åtgärdsrad längst ned"): a bar on the surface,
+   docked to the bottom of the window across the workspace while the list scrolls, as high as a large button and its
+   insets (72 px). On a phone it is the last block instead: a fixed bar would take a large part of the
+   screen and could hide the focus (WCAG 2.4.11). Bespoke surface; tokens only. */
+.bar {
+  z-index: 2;
+  min-block-size: calc(var(--size-element-lg) + var(--spacing-3) * 2);
+  padding-block: var(--spacing-3);
+  padding-inline: var(--spacing-5);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-container);
+  background: var(--color-background-surface);
+}
+
+.state {
+  flex: 1 1 calc(var(--spacing-12) * 5);
+  min-inline-size: 0;
+  max-inline-size: calc(var(--spacing-12) * 12);
+}
+
+/* The progress beside the save status, as in the artboard: a short bar with its count above it. */
+.progress {
+  inline-size: calc(var(--spacing-12) * 5);
+  max-inline-size: 100%;
+}
+
+@media (min-width: 640px) {
+  .bar {
+    position: sticky;
+    inset-block-end: 0;
+    border-end-start-radius: 0;
+    border-end-end-radius: 0;
+    box-shadow: var(--shadow-high);
+  }
+
+  /* A control the keyboard moves to is scrolled clear of the bar, never under it. */
+  :global(html):has(.bar) {
+    scroll-padding-block-end: calc(var(--size-element-lg) + var(--spacing-3) * 2 + var(--spacing-4));
+  }
+}
+
+@media (max-width: 639px) {
+  .bar {
+    padding-inline: var(--spacing-4);
+  }
+}

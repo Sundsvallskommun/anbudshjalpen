@@ -5,9 +5,10 @@ Syfte: Beskriva vad PoC:n ska visa, för vem, i vilken ordning vi bygger och hur
 Läs detta när: Du planerar arbetet, förbereder en demo eller ska avgöra vad som får mockas.
 
 Hör ihop med: [Arkitektur](architecture.md), [Öppna frågor](open-questions.md), [Bakgrund](background.md),
-[Kvalitetstest](quality-test.md)
+[Kvalitetstest](quality-test.md), [Design](design.md)
 
-> **Under arbete.** Beslut 0002–0007 gäller. Hur man kör PoC:n står i [Utveckling](development.md).
+> **Under arbete.** Beslut 0002–0007 gäller. Hur man kör PoC:n står i [Utveckling](development.md), och hur
+> gränssnittet är uppbyggt i [Design](design.md).
 
 ## Mål
 
@@ -20,25 +21,33 @@ Resan följer underlagets påhittade målerifirma i Matfors, som har fem anstäl
 loggar man in som Anna Berg på firman ([beslut 0007](decisions/0007-poc-login-persona-picker.md)).
 
 1. **Profil:** firman beskriver sig i klartext, och Anbudsklar föreslår CPV-koder med förklaring.
-2. **Bevakning:** träffar markeras som passar, passar delvis eller passar inte, med skäl och källa. Där syns också
-   kommande upphandlingar utifrån avtalskatalogen.
-3. **Träff:** ett mejl som visas i Mailpit.
-4. **Checklista:** skallkrav, bilagor, utvärdering och datum, där varje punkt länkar till sidan i underlaget och
-   termerna förklaras vid klick. "Påminn mig före <datum>" finns på checklistans första daterade rad för frågestopp
-   och för sista anbudsdag, alltså de datum som påminnelsen gäller. I annonsens sidhuvud finns samma knapp för sista
-   anbudsdag, med datumet ur den publicerade checklistan eller annars annonsens. Knappen visas aldrig för ett datum
-   som har passerat eller för en checklista som inte är publicerad.
-5. **Frågor:** svar med citat. Om underlaget inte ger svar föreslår Anbudsklar att firman ställer frågan formellt i
-   e-Avrop före frågestoppet och skapar en påminnelse, när den publicerade checklistan anger ett frågestopp som inte
-   har passerat.
-6. **Granskning:** firman laddar upp ett utkast och ser krav för krav vad som saknas eller är obevisat. Inget sparas.
-7. **Inlämning:** sker i e-Avrop. Anbudsklar visar en sista kontroll.
+2. **Start:** träffarna visas som kort, markerade Verkar passa eller Passar delvis, med högst tre skäl och källan
+   ("s. 5"). Övriga träffar ligger i en stängd lista, "Verkar inte passa (n)", under korten. Överst står nästa frist
+   med Påminn mig, och under träffarna kommande upphandlingar utifrån avtalskatalogen. Gamla adressen /bevakning leder
+   hit.
+3. **Träff:** ett mejl som visas i Mailpit, med länk till upphandlingen och till Start.
+4. **Krav:** upphandlingens sida har fyra steg, 1 Krav, 2 Fråga, 3 Granska och 4 Lämna in. Steg 1 visar skallkrav,
+   kvalificeringskrav, bilagor, utvärdering och datum, där varje punkt länkar till sidan i underlaget ("s. 5") och
+   termerna förklaras vid klick. "Påminn mig" finns vid sista anbudsdag och sista dag för frågor i sidhuvudet, och på
+   checklistans första daterade rad för frågestopp och för sista anbudsdag, alltså de datum som påminnelsen gäller.
+   Sidhuvudets knapp för sista anbudsdag använder datumet ur den publicerade checklistan, eller annars annonsens.
+   Knappen visas bara för en öppen upphandling och aldrig för ett datum som har passerat, och för frågestoppet bara när
+   checklistan är publicerad.
+5. **Fråga:** svar med citat, med slutsatsen först. Om underlaget inte ger svar föreslår Anbudsklar att firman ställer
+   frågan formellt i e-Avrop före frågestoppet och skapar en påminnelse, när den publicerade checklistan anger ett
+   frågestopp som inte har passerat.
+6. **Granska:** firman laddar upp ett utkast och får först ett besked, till exempel hur många saker som behöver
+   åtgärdas, och sedan kraven grupperade som Måste åtgärdas, Kontrollera själv och Ser bra ut. Inget sparas.
+7. **Lämna in:** sker i e-Avrop. Steg 4 är en sista kontroll att bocka av, där det som granskningen bedömde som "Ser
+   bra ut" redan är förbockat, och en länk till e-Avrop.
 8. **Tilldelning:** Anbudsklar förklarar beslutet och vad avtalsspärren innebär.
 
-Regelhjälpen svarar på allmänna frågor om upphandling med hänvisning till LOU och vägledningar.
+Regelhjälpen svarar på allmänna frågor om upphandling med hänvisning till LOU och vägledningar. Varje paragraf som
+svaret bygger på visas med lagens egna ord.
 
-Inköparens vy (demopersonen Lars Holm) visar att inköparen granskar och godkänner checklistan innan den publiceras,
-plus sammanställda frågor och kommande upphandlingar.
+Inköparens vy (demopersonen Lars Holm) har två flikar: Att granska, där inköparen granskar, rättar, godkänner och
+publicerar checklistan innan företagen ser den, och Företagens frågor med de sammanställda frågorna. Jobben finns på
+sidan Drift i kontomenyn.
 
 ## Plan
 
@@ -47,7 +56,7 @@ plus sammanställda frågor och kommande upphandlingar.
    [Kvalitetstest](quality-test.md).
 2. **En tunn version genom hela kedjan.** Annonser från TED, ett underlag som blir en checklista med kontrollerade
    citat och en vy i React med Astryx.
-3. **Resten av resan:** bevakning och matchning, frågor, granskning, inköparens vy med godkännande, Regelhjälpen och
+3. **Resten av resan:** matchning och Start, frågor, granskning, inköparens vy med godkännande, Regelhjälpen och
    kommande upphandlingar.
 4. **Testmiljö:** Anbudsklar och en Eneo-testinstans i Dokploy, så att verksamheten och panelen kan prova.
 

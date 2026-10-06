@@ -1,0 +1,5 @@
+/* The header's disclosure panels stay mounted while closed, so the buttons' aria-controls always point at them; a
+   stack's own display would otherwise win over the hidden attribute. Tokens only. */
+.panel[hidden] {
+  display: none;
+}

@@ -1,9 +1,13 @@
-/** Swedish words for the contract's codes. One place, so a status reads the same on every page. */
+/**
+ * Swedish words for the contract's codes. One place, so a status reads the same on every page. The words follow the
+ * copy rules (direction.md, section 7): they say what the reader should do, not what the engine did, and the
+ * company's view never uses "språkmodell", "verifierat", "obevisat" or "styrka".
+ */
 import type {
   AttachmentCheck,
   CheckStatus,
   ChecklistStatus,
-  CitationCheck,
+  Citation,
   DateKind,
   Fit,
   JobName,
@@ -11,7 +15,9 @@ import type {
   NoticeStatus,
   ReminderKind,
   RequirementKind,
+  VerificationSummary,
 } from "../api/types";
+import { formatNumber } from "./format";
 
 export const NOTICE_STATUS: Record<NoticeStatus, string> = {
   open: "Öppen för anbud",
@@ -28,11 +34,15 @@ export const CHECKLIST_STATUS: Record<ChecklistStatus, string> = {
   rejected: "Avvisad",
 };
 
+/** The engine compares CPV codes and words, not the requirements, so a fit "seems" right: never a green "Passar". */
 export const FIT: Record<Fit, string> = {
-  passar: "Passar",
+  passar: "Verkar passa",
   passar_delvis: "Passar delvis",
-  passar_inte: "Passar inte",
+  passar_inte: "Verkar inte passa",
 };
+
+/** The token on a notice with a published checklist ("Checklista finns" before the redesign). */
+export const PUBLISHED_CHECKLIST = "Granskad checklista";
 
 export const REQUIREMENT_KINDS: { kind: RequirementKind; label: string; description: string }[] = [
   {
@@ -66,23 +76,43 @@ export const DATE_KIND: Record<DateKind, string> = {
   annat: "Datum",
 };
 
+/**
+ * A draft review's verdict per requirement. The rule-based engine looks for words, so "saknas" becomes "Hittades
+ * inte": it claims no more than the engine knows.
+ */
 export const CHECK_STATUS: Record<CheckStatus, string> = {
-  uppfyllt: "Uppfyllt",
-  obevisat: "Obevisat",
-  saknas: "Saknas",
-  oklart: "Oklart",
+  uppfyllt: "Ser bra ut",
+  obevisat: "Bevis saknas",
+  saknas: "Hittades inte",
+  oklart: "Kontrollera själv",
+};
+
+/** The review's groups, by what the reader does first (direction.md, section 2). */
+export const CHECK_GROUP: Record<CheckStatus, string> = {
+  saknas: "Måste åtgärdas",
+  obevisat: "Måste åtgärdas",
+  oklart: "Kontrollera själv",
+  uppfyllt: "Ser bra ut",
 };
 
 export const ATTACHMENT_STATUS: Record<AttachmentCheck["status"], string> = {
   bifogad: "Bifogad",
-  saknas: "Saknas",
-  oklart: "Oklart",
+  saknas: "Hittades inte",
+  oklart: "Kontrollera själv",
 };
 
+/** A fit reason's kind as a short lead-in on its row ("Kontrollera själv: …"). */
 export const REASON_KIND: Record<MatchReason["kind"], string> = {
-  styrka: "Styrka",
-  hinder: "Hinder",
-  oklart: "Oklart",
+  styrka: "Talar för",
+  hinder: "Kan stoppa er",
+  oklart: "Kontrollera själv",
+};
+
+/** A heading over the reasons of one kind. */
+export const REASON_HEADING: Record<MatchReason["kind"], string> = {
+  styrka: "Därför verkar den passa",
+  hinder: "Det här kan stoppa er",
+  oklart: "Kontrollera själv",
 };
 
 export const REMINDER_KIND: Record<ReminderKind, string> = {
@@ -120,18 +150,90 @@ export function sourceLabel(source: string): string {
 }
 
 const ENGINES: Record<string, string> = {
-  heuristic: "regelbaserad sammanställning utan språkmodell",
-  eneo: "Eneo",
-  openai: "språkmodell",
+  heuristic: "regelbaserad motor",
+  eneo: "AI via Eneo",
+  openai: "AI",
 };
 
+/** The engine in the reader's words, as a short noun phrase: "regelbaserad motor", "AI via Eneo" or "AI". */
 export function engineLabel(engine: string): string {
-  return ENGINES[engine] ?? engine;
+  return ENGINES[engine] ?? "AI";
 }
 
-/** How a citation was verified against the document, in the words every citation chip uses. */
-export function citationStatus(check: CitationCheck | null): string {
-  if (check === "verified") return "Verifierat citat";
-  if (check === "moved") return "Hittat på annan sida";
-  return "Kunde inte kontrolleras";
+const ENGINE_SUMMARIES: Record<string, string> = {
+  heuristic:
+    "Motorn i demon just nu är regelbaserad: den letar efter ord och mönster i underlaget med fasta regler, utan AI-modell.",
+  eneo: "Motorn i demon just nu är AI via Eneo, Sundsvalls kommuns AI-plattform.",
+  openai: "Motorn i demon just nu är en AI-modell som läser underlaget som text.",
+};
+
+/** Which engine the demo runs, in one sentence ("Om demon och AI"). */
+export function engineSummary(engine: string): string {
+  return ENGINE_SUMMARIES[engine] ?? ENGINE_SUMMARIES.openai!;
 }
+
+/**
+ * What automatic content rests on: the procurement documents (checklists, answers, fit and draft reviews) or the law
+ * (Regelhjälpen's paragraphs of LOU). It decides how "Hur togs det här fram?" explains the engine and the sources.
+ */
+export type ProvenanceBasis = "document" | "law";
+
+const ENGINE_DESCRIPTIONS: Record<ProvenanceBasis, Record<string, string>> = {
+  document: {
+    heuristic:
+      "Det här togs fram regelbaserat: Anbudsklar letar efter ord och mönster i underlaget med fasta regler. Ingen AI-modell tolkar texten.",
+    eneo: "Det här togs fram med AI via Eneo, Sundsvalls kommuns AI-plattform. Underlaget skickas som text till Eneo och sparas inte där efter svaret.",
+    openai: "Det här togs fram med en AI-modell som läser underlaget som text.",
+  },
+  law: {
+    heuristic:
+      "Det här togs fram regelbaserat: Regelhjälpen letar upp paragrafer i lagen om offentlig upphandling (LOU) som innehåller orden i din fråga. Ingen AI-modell tolkar frågan.",
+    eneo: "Svaret togs fram med AI via Eneo, Sundsvalls kommuns AI-plattform, utifrån lagen om offentlig upphandling.",
+    openai: "Svaret togs fram med en AI-modell utifrån lagen om offentlig upphandling.",
+  },
+};
+
+/** One or two sentences on how the engine works, for "Hur togs det här fram?"; `basis` is what it worked from. */
+export function engineDescription(engine: string, basis: ProvenanceBasis = "document"): string {
+  const descriptions = ENGINE_DESCRIPTIONS[basis];
+  return descriptions[engine] ?? descriptions.openai!;
+}
+
+/** The page a citation opens on: where verification found the quote, else the page the AI gave. */
+export function citationPage(citation: Pick<Citation, "check" | "page" | "found_page">): number {
+  return citation.check === "moved" && citation.found_page ? citation.found_page : citation.page;
+}
+
+/**
+ * The one line per view that says how the sources held up: "Alla 86 källhänvisningar hittades i underlaget". Only
+ * deviations get words: quotes found on another page than the AI gave, and quotes that were not found. Null when
+ * there is nothing to check.
+ */
+export function verificationText(summary: VerificationSummary): string | null {
+  const total = summary.citations_total;
+  if (total <= 0) return null;
+  const found = summary.citations_verified + summary.citations_moved;
+  const moved = summary.citations_moved;
+  const missing = summary.citations_unverified;
+  const noun = total === 1 ? "källhänvisning" : "källhänvisningar";
+  const lead =
+    found === total
+      ? total === 1
+        ? "Källhänvisningen hittades i underlaget"
+        : `Alla ${formatNumber(total)} ${noun} hittades i underlaget`
+      : `${formatNumber(found)} av ${formatNumber(total)} ${noun} hittades i underlaget`;
+  const parts = [lead];
+  if (moved > 0) parts.push(`${formatNumber(moved)} på en annan sida än AI:n angav`);
+  if (missing > 0) parts.push(`${formatNumber(missing)} hittades inte och behöver kontrolleras`);
+  return parts.join(" · ");
+}
+
+/** The four steps of a notice page, in order, with the values `?flik=` has always used. */
+export const STEPS = [
+  { value: "checklista", label: "Krav", number: 1 },
+  { value: "fraga", label: "Fråga", number: 2 },
+  { value: "granska", label: "Granska", number: 3 },
+  { value: "inlamning", label: "Lämna in", number: 4 },
+] as const;
+
+export type StepValue = (typeof STEPS)[number]["value"];

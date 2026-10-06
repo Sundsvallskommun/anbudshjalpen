@@ -1,55 +1,70 @@
+import { Button } from "@astryxdesign/core/Button";
+import { Card } from "@astryxdesign/core/Card";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Link } from "@astryxdesign/core/Link";
 import { useParams } from "react-router";
+import { ApiError } from "../../api/client";
 import { useNotice, useSession } from "../../api/queries";
-import type { NoticeDetail, UserView } from "../../api/types";
-import { CitationViewerProvider } from "../../components/citations/CitationViewer";
+import type { NoticeDetail } from "../../api/types";
 import { ErrorNotice, Loading } from "../../components/states";
-import { UrlTabs, type TabSpec } from "../../components/UrlTabs";
+import { useSourceDeepLink } from "../../components/ui/source/SourceDialogProvider";
 import { Page } from "../../shell/Page";
-import { ChecklistTab } from "./ChecklistTab";
-import { DocumentsTab } from "./DocumentsTab";
-import { AwardExplanation, MatchSummary, NoticeFacts } from "./NoticeHeader";
-import { QuestionTab } from "./QuestionTab";
-import { ReviewTab } from "./ReviewTab";
-import { SubmissionTab } from "./SubmissionTab";
+import { NoticeHeader, NoticeIntro } from "./header/NoticeHeader";
+import { NoChecklist } from "./NoChecklist";
+import { NoticeSteps } from "./steps/NoticeSteps";
 
-function NoticeTabs({ notice, user }: { notice: NoticeDetail; user: UserView | null }) {
-  const tabs: TabSpec[] = [
-    { value: "checklista", label: "Checklista", render: () => <ChecklistTab notice={notice} user={user} /> },
-    { value: "fraga", label: "Fråga underlaget", render: () => <QuestionTab notice={notice} /> },
-    { value: "granska", label: "Granska utkast", render: () => <ReviewTab notice={notice} user={user} /> },
-    { value: "underlag", label: "Underlag", render: () => <DocumentsTab notice={notice} user={user} /> },
-    { value: "inlamning", label: "Inför inlämning", render: () => <SubmissionTab notice={notice} /> },
-  ];
-  return <UrlTabs tabs={tabs} idPrefix="flik" />;
+const BREADCRUMBS = [{ label: "Upphandlingar", href: "/upphandlingar" }] as const;
+
+function NoticeView({ notice }: { notice: NoticeDetail }) {
+  const session = useSession();
+  const user = session.data?.user ?? null;
+  return (
+    <Page title={notice.title} breadcrumbs={BREADCRUMBS} intro={<NoticeIntro notice={notice} />}>
+      <NoticeHeader notice={notice} user={user} />
+      {notice.checklist ? (
+        <NoticeSteps notice={notice} view={notice.checklist} user={user} />
+      ) : (
+        <NoChecklist notice={notice} user={user} />
+      )}
+    </Page>
+  );
 }
 
+/**
+ * A notice (direction.md, section 4 "Upphandlingens sida"): the header every step shares, then the four steps, or,
+ * without a checklist, why there is none and what can be done anyway. `?citat=` or `?flik=underlag` in the address
+ * opens the source dialog once the notice has loaded.
+ */
 export default function NoticePage() {
   const { id = "" } = useParams();
   const notice = useNotice(id);
-  const session = useSession();
-  const user = session.data?.user ?? null;
+  useSourceDeepLink(notice.data);
 
   if (notice.isPending) return <Loading label="Hämtar upphandlingen …" />;
   if (notice.isError) {
+    // A notice that is not there is no failure to retry: say what may have happened and lead back to the list.
+    if (notice.error instanceof ApiError && notice.error.status === 404) {
+      return (
+        <Page title="Upphandlingen finns inte" breadcrumbs={BREADCRUMBS}>
+          <Card>
+            <EmptyState
+              headingLevel={2}
+              title="Ingen upphandling på den här adressen"
+              description="Den kan ha tagits bort, eller så är länken fel. Alla upphandlingar finns i listan."
+              actions={<Button label="Till alla upphandlingar" href="/upphandlingar" />}
+            />
+          </Card>
+        </Page>
+      );
+    }
     return (
-      <Page title="Upphandlingen kunde inte visas">
+      <Page title="Upphandlingen kunde inte visas" breadcrumbs={BREADCRUMBS}>
         <ErrorNotice title="Upphandlingen kunde inte hämtas" error={notice.error} onRetry={() => notice.refetch()} />
-        <Link href="/" isStandalone>
+        <Link href="/upphandlingar" isStandalone>
           Till alla upphandlingar
         </Link>
       </Page>
     );
   }
-
-  const detail = notice.data;
-  return (
-    <CitationViewerProvider noticeId={detail.id} documents={detail.documents}>
-      <Page title={detail.title} intro={<NoticeFacts notice={detail} />}>
-        {detail.status === "awarded" && <AwardExplanation />}
-        <MatchSummary notice={detail} />
-        <NoticeTabs notice={detail} user={user} />
-      </Page>
-    </CitationViewerProvider>
-  );
+  return <NoticeView notice={notice.data} />;
 }

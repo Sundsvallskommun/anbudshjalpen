@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
+  calendarDateOf,
+  calendarDaysUntil,
+  daysInWords,
   daysUntil,
   formatCalendarDate,
+  formatClock,
+  formatLongDate,
+  formatSekShort,
+  formatShortDate,
+  isClosingSoon,
+  isDateOnly,
+  isPassed,
+  relativeDays,
+  timeOfDay,
   formatDateTime,
   formatMonthRange,
   plural,
@@ -65,5 +77,55 @@ describe("text helpers", () => {
 
   it("splits a comma-separated field", () => {
     expect(splitList(" Sundsvall, Timrå ,, ")).toEqual(["Sundsvall", "Timrå"]);
+  });
+});
+
+describe("the copy rules' short forms", () => {
+  const now = new Date("2026-10-05T10:00:00+02:00");
+
+  it("writes dates short in lists and long in running text, with the year only when asked or not this year", () => {
+    expect(formatShortDate("2026-11-09T23:59:00+01:00", "auto", now)).toBe("9 nov");
+    expect(formatShortDate("2026-11-09", "always", now)).toBe("9 nov 2026");
+    expect(formatShortDate("2027-06-25", "auto", now)).toBe("25 jun 2027");
+    expect(formatLongDate("2026-10-30", "always", now)).toBe("30 oktober 2026");
+    expect(formatLongDate("2026-10-30", "never", now)).toBe("30 oktober");
+  });
+
+  it("gives a time only to a deadline that has one of its own", () => {
+    expect(formatClock("2026-11-09T23:59:00+01:00")).toBe("kl. 23:59");
+    expect(formatClock("2026-10-07T08:00:00+02:00")).toBe("kl. 08:00");
+    // Date-only deadlines: a calendar date, midnight, or the end of the day as the backend sends them.
+    expect(formatClock("2026-10-30")).toBeNull();
+    expect(formatClock("2026-10-30T00:00:00+01:00")).toBeNull();
+    expect(timeOfDay("2026-10-16T23:59:59+02:00")).toBeNull();
+  });
+
+  it("says how far away a deadline is, the whole day counting for a date", () => {
+    expect(relativeDays("2026-11-09T23:59:00+01:00", now)).toBe("om 35 dagar");
+    expect(relativeDays("2026-10-05", now)).toBe("i dag");
+    expect(relativeDays("2026-10-06", now)).toBe("i morgon");
+    expect(relativeDays("2026-10-04", now)).toBe("passerat");
+    // A timestamp passes at its moment, a date at the end of its day.
+    expect(relativeDays("2026-10-05T09:00:00+02:00", now)).toBe("passerat");
+    expect(relativeDays("2026-10-05T23:00:00+02:00", now)).toBe("i dag");
+    expect(calendarDaysUntil("2026-10-30", now)).toBe(25);
+  });
+
+  it("calls a deadline seven days away or closer that is still open closing soon", () => {
+    expect(isClosingSoon("2026-10-12", now)).toBe(true);
+    expect(isClosingSoon("2026-10-13", now)).toBe(false);
+    expect(isClosingSoon("2026-10-04", now)).toBe(false);
+    expect(isPassed("2026-10-04", now)).toBe(true);
+  });
+
+  it("writes amounts short beside a figure, and counts of days in words in running text", () => {
+    expect(formatSekShort(5_000_000)).toBe("5 mnkr");
+    expect(formatSekShort(2_500_000)).toBe("2,5 mnkr");
+    expect(formatSekShort(900_000)).toBe("900 000 kr");
+    expect(daysInWords(2)).toBe("två dagar");
+    expect(daysInWords(1)).toBe("en dag");
+    expect(daysInWords(14)).toBe("14 dagar");
+    expect(isDateOnly("2026-10-30")).toBe(true);
+    expect(calendarDateOf("2026-10-29T23:00:00Z")).toBe("2026-10-30");
   });
 });

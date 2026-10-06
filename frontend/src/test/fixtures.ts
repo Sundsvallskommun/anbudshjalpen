@@ -5,11 +5,15 @@
 import type {
   AnswerView,
   AppConfig,
+  ChecklistAdminItem,
   ChecklistView,
+  MatchView,
+  NoticeBuyers,
   NoticeDetail,
   NoticeList,
   NoticeSummary,
   PageView,
+  Persona,
   ReminderView,
   ReviewView,
   SessionView,
@@ -44,9 +48,18 @@ export const buyerUser: UserView = {
   company: null,
 };
 
-const personas = [
-  { key: "foretagare" as const, label: "Anna Berg", description: "Målerifirman i Matfors AB" },
-  { key: "inkopare" as const, label: "Lars Holm", description: "Inköp, Sundsvalls kommun" },
+/** The personas as the backend names them (services/personas.py): "Name, company" and the role in a sentence. */
+const personas: Persona[] = [
+  {
+    key: "foretagare",
+    label: "Anna Berg, Målerifirman i Matfors AB",
+    description: "Företagare som letar efter upphandlingar, ställer frågor och granskar sitt anbudsutkast.",
+  },
+  {
+    key: "inkopare",
+    label: "Lars Holm, inköpare",
+    description: "Inköpare som granskar, godkänner och publicerar checklistor.",
+  },
 ];
 
 export function session(user: UserView | null): SessionView {
@@ -57,18 +70,36 @@ export const noticeSummary: NoticeSummary = {
   id: NOTICE_ID,
   title: "Ommålning av Solbackens förskola, Matfors",
   buyer: "Sundsvalls kommun",
+  reference_number: "DEMO-2026-0147",
   source: "fixture",
   status: "open",
   published_at: "2026-09-21T08:00:00+02:00",
   deadline_at: "2026-10-26T23:59:00+01:00",
+  // The published checklist's frågestopp (2026-10-16) as the end of that day.
+  question_deadline: "2026-10-16T23:59:59+02:00",
   cpv_codes: ["45442100"],
+  cpv_label: "Målning",
   has_documents: true,
   checklist_status: "published",
   is_fictitious: true,
   fit: "passar_delvis",
 };
 
-export const noticeList: NoticeList = { items: [noticeSummary], total: 1 };
+export const noticeList: NoticeList = {
+  items: [noticeSummary],
+  total: 1,
+  counts: { open: 1, planned: 0, all: 1 },
+  sort: "deadline",
+};
+
+/** The list's buyer choices: a joint procurement counts for each of its buyers. */
+export const noticeBuyers: NoticeBuyers = {
+  items: [
+    { name: "Sundsvalls kommun", count: 12 },
+    { name: "MittSverige Vatten & Avfall AB", count: 3 },
+    { name: "Timrå kommun", count: 2 },
+  ],
+};
 
 export const checklistView: ChecklistView = {
   id: CHECKLIST_ID,
@@ -141,6 +172,7 @@ export const noticeDetail: NoticeDetail = {
   documents_url: "https://example.invalid/e-avrop/underlag/1",
   place: "Matfors",
   estimated_value_sek: 800000,
+  cpv_labels: { "45442100": "Målning" },
   documents: [{ id: DOCUMENT_ID, filename: "Förfrågningsunderlag Solbacken.pdf", page_count: 16, is_fictitious: true }],
   checklist: checklistView,
   match: null,
@@ -174,6 +206,8 @@ export const reminder: ReminderView = {
   kind: "fragestopp",
   note: null,
   due_at: "2026-10-14T08:00:00+02:00",
+  // Frågestopp is a date (the checklist's 2026-10-16); the backend sends the end of that day in Swedish time.
+  deadline_at: "2026-10-16T23:59:59+02:00",
   sent_at: null,
 };
 
@@ -203,4 +237,59 @@ export const draftChecklistView: ChecklistView = {
   status: "draft",
   approved_at: null,
   published_at: null,
+};
+
+/** A draft the buyer rejected, with the reason; POST .../reopen turns it back into a draft that keeps the note. */
+export const rejectedChecklistView: ChecklistView = {
+  ...draftChecklistView,
+  status: "rejected",
+  reviewer_note: "Frågestoppet har fel datum. Rätta det mot underlaget.",
+};
+
+/** The company's match on the demo notice, as the heuristic engine words it (no inköp review for matches). */
+export const matchView: MatchView = {
+  id: "7a6b5c4d-3e2f-4a1b-9c8d-7e6f5a4b3c2d",
+  notice: noticeSummary,
+  fit: "passar_delvis",
+  assessment: {
+    fit: "passar_delvis",
+    summary:
+      "Upphandlingen passar er delvis. Bedömningen bygger på CPV-koder och sakord i profilen och annonsen och på " +
+      "vad profilen säger om kraven i checklistan; allmänna ord om upphandling och ortnamn räknas inte.",
+    reasons: [
+      { kind: "styrka", text: "Upphandlingen gäller målning – det gör ni.", requirement_id: null, citation: null },
+      {
+        kind: "styrka",
+        text: "Ni har angett en försäkring i profilen. Kontrollera att den räcker för kravet.",
+        requirement_id: "K1",
+        citation: {
+          page: 4,
+          quote: "Leverantören ska ha en ansvarsförsäkring",
+          check: "verified",
+          found_page: null,
+        },
+      },
+      {
+        kind: "oklart",
+        text: "Underlaget ställer krav på referensuppdrag, men er profil säger inget om det.",
+        requirement_id: "K2",
+        citation: { page: 5, quote: "två referensuppdrag", check: "moved", found_page: 6 },
+      },
+    ],
+  },
+  engine: "heuristic",
+  created_at: "2026-10-05T06:30:00+02:00",
+};
+
+/** The demo checklist as a row in the buyer's queue, waiting for review. */
+export const checklistAdminItem: ChecklistAdminItem = {
+  id: CHECKLIST_ID,
+  notice_id: NOTICE_ID,
+  notice_title: noticeSummary.title,
+  deadline_at: noticeSummary.deadline_at,
+  status: "draft",
+  engine: "heuristic",
+  created_at: "2026-09-22T09:00:00+02:00",
+  verification: checklistView.verification,
+  requirement_count: checklistView.checklist.requirements.length,
 };

@@ -1,0 +1,18 @@
+/* A requirement row inside a section card: the card's inset on both sides, at least 48 px high, and a divider
+   between rows (direction.md, section 4 "Steg 1 Krav"). Square corners: the design system's row radius would bend
+   the divider up at both ends. Tokens only. */
+.inset {
+  min-block-size: var(--spacing-12);
+  padding-inline: var(--spacing-5);
+  border-radius: var(--radius-none);
+}
+
+.inset + .inset {
+  border-block-start: var(--border-width) solid var(--color-border);
+}
+
+@media (max-width: 639px) {
+  .inset {
+    padding-inline: var(--spacing-4);
+  }
+}

@@ -1,0 +1,12 @@
+/* A card with a 4 px accent edge on its start side (direction.md, section 6): the one card in a view that says what
+   to do next, such as "Nästa steg" and Start's "Nästa frist". Tokens only; the edge is the spacing step of the same
+   size. Forced colours keep it as the system's highlight. */
+.card {
+  border-inline-start: var(--spacing-1) solid var(--color-accent);
+}
+
+@media (forced-colors: active) {
+  .card {
+    border-inline-start-color: Highlight;
+  }
+}

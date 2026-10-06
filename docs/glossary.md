@@ -4,9 +4,12 @@ Syfte: Förklara upphandlings- och tekniktermer på vanlig svenska.
 
 Läs detta när: En term är okänd, eller när du skriver text som företagare ska läsa.
 
-Hör ihop med: [Bakgrund](background.md), [Arkitektur](architecture.md)
+Hör ihop med: [Bakgrund](background.md), [Arkitektur](architecture.md), [Design](design.md)
 
 Förklaringarna är förenklade och ersätter inte lagtexten.
+
+Webbappen förklarar upphandlingstermerna vid klick med texterna i `frontend/src/lib/glossary.ts`, som bygger på den här
+sidan. Ändras en term här, ändra den där också. Förklarar en checklista själv en term, går checklistans förklaring före.
 
 ## Upphandling
 
@@ -18,13 +21,16 @@ Förklaringarna är förenklade och ersätter inte lagtexten.
 | Kvalificeringskrav | Krav på företaget, till exempel ekonomisk stabilitet, referensuppdrag eller försäkring |
 | Utvärderingskriterier | Hur anbuden jämförs, till exempel 70 procent pris och 30 procent kvalitet |
 | ESPD | Europeiskt enhetligt upphandlingsdokument: en egenförsäkran där företaget preliminärt intygar att det inte ska uteslutas och att det uppfyller kvalificeringskraven |
+| F-skatt | Ett godkännande från Skatteverket som visar att företaget självt betalar sin preliminära skatt och sina avgifter. Kommunen kontrollerar oftast F-skatten själv |
+| BAS-U | Byggarbetsmiljösamordnare för utförandet: den som samordnar arbetsmiljön på en byggarbetsplats medan arbetet pågår (arbetsmiljölagen 3 kap.) |
 | Frågestopp | Sista dagen att ställa frågor om underlaget. Svaren publiceras för alla anbudsgivare |
 | Sista anbudsdag | Sista dagen att lämna anbud |
+| Förfarande | Hur upphandlingen genomförs enligt lagen, till exempel öppet förfarande. Under EU:s beloppsgränser gäller 19 kap. LOU, och underlaget beskriver hur upphandlingen går till. Namnen förenklat förfarande och urvalsförfarande togs bort ur LOU den 1 februari 2022, men äldre underlag använder dem |
 | Tilldelningsbeslut | Beslutet om vem eller vilka som vinner upphandlingen |
-| Avtalsspärr | En väntetid efter tilldelningsbeslutet då avtal inte får tecknas, oftast tio dagar. Under den kan beslutet begäras överprövat |
+| Avtalsspärr | En väntetid efter tilldelningsbeslutet då avtal inte får tecknas: 10 dagar om beslutet skickas elektroniskt, annars 15 dagar. Under den kan beslutet begäras överprövat |
 | Överprövning | Att begära att förvaltningsrätten prövar en upphandling |
 | Direktupphandling | Enklare upphandling utan formkrav, tillåten under en viss beloppsgräns |
-| Tröskelvärde | EU:s beloppsgränser. Över dem gäller EU-reglerna fullt ut och annonsen publiceras även i TED |
+| Tröskelvärde | EU:s beloppsgränser. Över dem gäller EU-reglerna fullt ut och annonsen publiceras även i TED. Under dem gäller enklare regler i 19 kap. LOU |
 | Ramavtal | Ett avtal som anger villkoren för framtida beställningar under en period |
 | CPV-kod | EU:s kodsystem för vad som upphandlas, ordnat som ett träd från breda till smala koder |
 | SNI-kod | Svensk kod för vilken bransch ett företag verkar i |
@@ -51,4 +57,4 @@ Förklaringarna är förenklade och ersätter inte lagtexten.
 | Fulltextsökning | Sökning på ord, där böjningar räknas som samma ord, till exempel "försäkring" och "försäkringar" |
 | Trigramsökning | Sökning som jämför bitar om tre tecken och därför hittar ord trots stavfel |
 | Demoperson | En påhittad användare som man loggar in som i PoC:n |
-| Heuristisk motor | Anbudsklars AI-motor utan språkmodell, som plockar ut krav och datum med fasta regler |
+| Heuristisk motor | Anbudsklars AI-motor utan språkmodell, som plockar ut krav och datum med fasta regler. Webbappen kallar den regelbaserad |

@@ -2,7 +2,7 @@
  * TanStack Query hooks, one per endpoint. Pages read server state only through these, so caching,
  * invalidation and query keys live in one place.
  */
-import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api, withQuery } from "./client";
 import type {
   AnswerView,
@@ -23,11 +23,14 @@ import type {
   JobRunView,
   LoginRequest,
   MatchView,
+  NoticeBuyers,
   NoticeCreate,
   NoticeDetail,
   NoticeList,
+  NoticeSort,
   NoticeStatus,
   PageView,
+  ProfileSaved,
   QuestionRequest,
   RejectRequest,
   ReminderRequest,
@@ -44,15 +47,25 @@ export interface NoticeFilters {
   q?: string;
   status?: NoticeStatus;
   source?: string;
+  /** CPV prefixes, comma-separated (e.g. the profile's codes for "Visa bara det som passar er"). */
   cpv?: string;
+  /** A buyer, or part of its name: matches every notice whose buyer contains it, whatever its case. */
+  buyer?: string;
+  /** Leave out for the backend's default: soonest deadline first for open notices, else newest (or best match). */
+  sort?: NoticeSort;
   limit: number;
   offset: number;
 }
+
+/** The list's filters that the buyer choices are counted with (everything but the buyer itself and the paging). */
+export type BuyerFilters = Pick<NoticeFilters, "q" | "status" | "source" | "cpv">;
 
 export const keys = {
   config: ["config"] as const,
   session: ["session"] as const,
   notices: (filters: NoticeFilters) => ["notices", filters] as const,
+  /** Under "notices", so whatever refetches the lists refetches the buyer choices too. */
+  noticeBuyers: (filters: BuyerFilters) => ["notices", "buyers", filters] as const,
   notice: (id: string) => ["notice", id] as const,
   page: (noticeId: string, documentId: string, page: number) => ["page", noticeId, documentId, page] as const,
   matches: ["matches"] as const,
@@ -110,6 +123,20 @@ export function useNotices(filters: NoticeFilters) {
   });
 }
 
+/**
+ * The buyers for the list's "Fler filter", each with how many notices filtering on it lists. Pass the list's current
+ * filters: the counts follow them, so a buyer never promises notices the list will not show. Only `q`, `status`,
+ * `source` and `cpv` are read, so paging, sorting and the chosen buyer do not refetch the choices.
+ */
+export function useNoticeBuyers({ q, status, source, cpv }: BuyerFilters) {
+  const filters: BuyerFilters = { q, status, source, cpv };
+  return useQuery({
+    queryKey: keys.noticeBuyers(filters),
+    queryFn: () => api.get<NoticeBuyers>(withQuery("/api/notices/buyers", { ...filters })),
+    placeholderData: (previous) => previous,
+  });
+}
+
 /** One notice; waits while `id` is still unknown (empty). */
 export function useNotice(id: string) {
   return useQuery({
@@ -119,12 +146,25 @@ export function useNotice(id: string) {
   });
 }
 
-export function usePage(noticeId: string, documentId: string, page: number) {
-  return useQuery({
+/** A document page never changes once extracted, so it is fetched once and shared by everything that shows it. */
+function pageQuery(noticeId: string, documentId: string, page: number) {
+  return queryOptions({
     queryKey: keys.page(noticeId, documentId, page),
     queryFn: () => api.get<PageView>(`/api/notices/${noticeId}/documents/${documentId}/pages/${page}`),
     staleTime: Infinity,
   });
+}
+
+export function usePage(noticeId: string, documentId: string, page: number) {
+  return useQuery(pageQuery(noticeId, documentId, page));
+}
+
+/**
+ * Several pages of one document at once, e.g. every page a checklist cites. The results come in the order of `pages`,
+ * one per entry, and share their cache with `usePage`.
+ */
+export function usePages(noticeId: string, documentId: string, pages: readonly number[]) {
+  return useQueries({ queries: pages.map((page) => pageQuery(noticeId, documentId, page)) });
 }
 
 export function documentFileUrl(documentId: string): string {
@@ -175,13 +215,23 @@ export function useProfile() {
   return useQuery({ queryKey: keys.profile, queryFn: () => api.get<CompanyView>("/api/profile") });
 }
 
+/**
+ * Saves the profile. The answer also says how many open notices seem to fit it now (`fitting_notices`, for "Profilen
+ * är sparad · 2 upphandlingar verkar passa er"); it is null when the matches are re-assessed after the answer (a
+ * language model), and then Start has them a little later. The fit shown in lists and on notices may change too.
+ */
 export function useUpdateProfile() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (update: CompanyUpdate) => api.put<CompanyView>("/api/profile", update),
-    onSuccess: async (profile) => {
-      client.setQueryData(keys.profile, profile);
-      await client.invalidateQueries({ queryKey: keys.matches });
+    mutationFn: (update: CompanyUpdate) => api.put<ProfileSaved>("/api/profile", update),
+    onSuccess: async (saved) => {
+      const { fitting_notices: _count, ...profile } = saved;
+      client.setQueryData<CompanyView>(keys.profile, profile);
+      await Promise.all([
+        client.invalidateQueries({ queryKey: keys.matches }),
+        client.invalidateQueries({ queryKey: ["notices"] }),
+        client.invalidateQueries({ queryKey: ["notice"] }),
+      ]);
     },
   });
 }
@@ -201,10 +251,20 @@ export function useMatches() {
   return useQuery({ queryKey: keys.matches, queryFn: () => api.get<MatchView[]>("/api/matches") });
 }
 
+/** "Inte intressant": the match leaves the list (and gets no "Ny träff" mail). Undo with `useRestoreMatch`. */
 export function useDismissMatch() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.post<unknown>(`/api/matches/${id}/dismiss`),
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.matches }),
+  });
+}
+
+/** "Ångra" after "Inte intressant": the match is listed again while it still fits the profile. */
+export function useRestoreMatch() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post<unknown>(`/api/matches/${id}/restore`),
     onSuccess: () => client.invalidateQueries({ queryKey: keys.matches }),
   });
 }
@@ -261,6 +321,7 @@ export function useUpdateChecklist(id: string) {
   );
 }
 
+/** Only a draft can be approved; the backend answers 409 with a Swedish message for any other status. */
 export function useApproveChecklist(id: string) {
   return useChecklistMutation(id, () => api.post<ChecklistView>(`/api/admin/checklists/${id}/approve`));
 }
@@ -280,6 +341,14 @@ export function useWithdrawChecklist(id: string) {
   return useChecklistMutation(id, (note: string) =>
     api.post<ChecklistView>(`/api/admin/checklists/${id}/withdraw`, { note } satisfies RejectRequest),
   );
+}
+
+/**
+ * "Öppna som utkast igen": a rejected or withdrawn checklist becomes a draft that can be corrected and approved. The
+ * reviewer's note (why it was rejected) is kept until the buyer saves a new one; 409 for any status but rejected.
+ */
+export function useReopenChecklist(id: string) {
+  return useChecklistMutation(id, () => api.post<ChecklistView>(`/api/admin/checklists/${id}/reopen`));
 }
 
 /** How often documents waiting for their first interpretation are checked again. */

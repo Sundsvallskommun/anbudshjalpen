@@ -1,0 +1,36 @@
+/* A row of the checklist under review: the card's inset on both sides (20 px, 16 px on a phone), at least 48 px high,
+   and a divider between rows (direction.md, section 4 "Granskningsbord"). Tokens only. */
+.row {
+  min-block-size: var(--spacing-12);
+  padding-inline: var(--spacing-5);
+  /* Edge to edge: square ends, so the divider between rows runs straight to the surface's edges. */
+  border-radius: 0;
+}
+
+.row + .row {
+  border-block-start: var(--border-width) solid var(--color-border);
+}
+
+/* A row of one line, as the automatic checks are: 40 px, so the checks leave the list room beside the source. */
+.compact {
+  min-block-size: var(--spacing-10);
+}
+
+/* The chosen row, whose page the source pane shows: an accent edge on its start side besides the tint, so the choice
+   does not rest on colour alone. */
+.row[aria-current="true"] {
+  box-shadow: inset var(--spacing-1) 0 0 var(--color-accent);
+}
+
+@media (max-width: 639px) {
+  .row {
+    padding-inline: var(--spacing-4);
+  }
+}
+
+@media (forced-colors: active) {
+  .row[aria-current="true"] {
+    box-shadow: none;
+    border-inline-start: var(--spacing-1) solid Highlight;
+  }
+}

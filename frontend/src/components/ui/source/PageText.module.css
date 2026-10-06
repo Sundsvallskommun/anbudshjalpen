@@ -1,0 +1,63 @@
+/* A document page as paper: about 72 characters a line, line height 1.6, section headings in semibold and the cited
+   quote marked (direction.md, section 4 "Källan"). Bespoke surface; tokens only. */
+.paper {
+  margin: 0;
+  padding-block: var(--spacing-5);
+  padding-inline: var(--spacing-6);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-container);
+  background: var(--color-background-card);
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+/* In a dialog the page scrolls inside its own box, so the claim and the status above it stay in view. */
+.scrollable {
+  max-block-size: min(55dvh, 36rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.scrollable:focus-visible {
+  outline: var(--focus-outline-width) var(--focus-outline-style) var(--focus-outline-color);
+  outline-offset: var(--focus-outline-offset);
+}
+
+.column {
+  max-inline-size: 72ch;
+  line-height: 1.6;
+}
+
+.paragraph {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: inherit;
+}
+
+.mark {
+  background: var(--color-background-yellow);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-inner);
+  outline: 2px solid var(--color-border-yellow);
+  scroll-margin-block: var(--spacing-10);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+@media (max-width: 639px) {
+  .paper {
+    padding-inline: var(--spacing-4);
+  }
+
+  .scrollable {
+    max-block-size: 50dvh;
+  }
+}
+
+@media (forced-colors: active) {
+  .mark {
+    background: Mark;
+    color: MarkText;
+    outline-color: CanvasText;
+  }
+}

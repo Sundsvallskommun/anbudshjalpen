@@ -142,6 +142,11 @@ export interface RuleSource {
   title: string;
   reference: string | null;
   url: string | null;
+  /**
+   * The start of the law text itself, cut after a whole sentence and ending with " …" when shortened. Set by the
+   * backend from its own copy of LOU (never by a model); null for sources that are not a LOU section it holds.
+   */
+  excerpt: string | null;
 }
 
 export interface RulesAnswer {
@@ -195,24 +200,68 @@ export interface AppConfig {
 
 // --- api/schemas.py: notices -------------------------------------------------------------------
 
+/**
+ * The order of a notice list: "deadline" is soonest sista anbudsdag first (notices without one last), "published"
+ * newest first, "relevance" best text match first.
+ */
+export type NoticeSort = "deadline" | "published" | "relevance";
+
 export interface NoticeSummary {
   id: Uuid;
   title: string;
   buyer: string | null;
+  /**
+   * The reference people quote for the procurement, e.g. "DEMO-2026-0147": the buyer's own identifier from TED
+   * (eForms BT-22), e-Avrop's id, or what the buyer entered. Null when the source names none, as TED does for the
+   * notices e-Avrop published.
+   */
+  reference_number: string | null;
   source: string;
   status: NoticeStatus;
   published_at: IsoDateTime | null;
   deadline_at: IsoDateTime | null;
+  /**
+   * Frågestopp from the published checklist, as the end of that day in Swedish time (like
+   * AnswerView.question_deadline): a date, so show it as one. Null without a published checklist that names it.
+   */
+  question_deadline: IsoDateTime | null;
   cpv_codes: string[];
+  /** The Swedish label of the main (first) CPV code, e.g. "Målning"; null when the code is not in the CPV list. */
+  cpv_label: string | null;
   has_documents: boolean;
   checklist_status: ChecklistStatus;
   is_fictitious: boolean;
   fit: Fit | null;
 }
 
+/** How many notices each status choice would list with the current filters (status and paging ignored). */
+export interface NoticeCounts {
+  open: number;
+  planned: number;
+  all: number;
+}
+
 export interface NoticeList {
   items: NoticeSummary[];
   total: number;
+  counts: NoticeCounts;
+  /** The order `items` are in: the requested `sort`, else the default for the filters. */
+  sort: NoticeSort;
+}
+
+/**
+ * One buyer for the list's buyer filter. A joint procurement names several buyers, and each is listed on its own.
+ * `count` is what `GET /api/notices?buyer=<name>` totals with the same other filters; the filter matches every notice
+ * whose buyer contains the name, whatever its case.
+ */
+export interface NoticeBuyer {
+  name: string;
+  count: number;
+}
+
+/** GET /api/notices/buyers: most notices first, then by name. */
+export interface NoticeBuyers {
+  items: NoticeBuyer[];
 }
 
 export interface DocumentInfo {
@@ -249,6 +298,9 @@ export interface MatchView {
   notice: NoticeSummary;
   fit: Fit;
   assessment: MatchAssessment;
+  /** The engine that made the assessment ("heuristic", "eneo" or "openai"). Matches are never reviewed by inköp. */
+  engine: string;
+  /** When the assessment was made. */
   created_at: IsoDateTime;
 }
 
@@ -259,6 +311,8 @@ export interface NoticeDetail extends NoticeSummary {
   documents_url: string | null;
   place: string | null;
   estimated_value_sek: number | null;
+  /** CPV code -> Swedish label, for the codes in `cpv_codes` that are in the CPV list. */
+  cpv_labels: Record<string, string>;
   documents: DocumentInfo[];
   checklist: ChecklistView | null;
   match: MatchView | null;
@@ -315,7 +369,14 @@ export interface ReminderView {
   notice_title: string;
   kind: ReminderKind;
   note: string | null;
+  /** When the e-mail is sent (or was due), not the deadline. */
   due_at: IsoDateTime;
+  /**
+   * The deadline the reminder is about, as the backend follows it: for sista_anbudsdag the notice's own deadline with
+   * its time when it falls on that day, otherwise the end of the deadline's day in Swedish time (frågestopp is always
+   * a date: show it as one). Null for "egen" reminders and when the deadline is no longer known.
+   */
+  deadline_at: IsoDateTime | null;
   sent_at: IsoDateTime | null;
 }
 
@@ -335,6 +396,16 @@ export interface CompanyView {
   insurance: string | null;
   public_references: string | null;
   is_fictitious: boolean;
+}
+
+/** PUT /api/profile: the saved profile, and how many open notices seem to fit it now. */
+export interface ProfileSaved extends CompanyView {
+  /**
+   * The match cards Start shows once the save has re-assessed them: open for tenders, fit "passar" or "passar_delvis",
+   * not dismissed. Null when the re-assessment runs after the answer, as it does with a language model (seconds per
+   * notice); Start has the new matches when it is done.
+   */
+  fitting_notices: number | null;
 }
 
 export interface CompanyUpdate {
@@ -394,10 +465,13 @@ export interface RulesView {
 
 // --- api/schemas.py: buyer (inköpare) views ----------------------------------------------------
 
+/** A row in the buyer's queue, which comes sorted on `deadline_at` (soonest first, none last), then newest first. */
 export interface ChecklistAdminItem {
   id: Uuid;
   notice_id: Uuid;
   notice_title: string;
+  /** The notice's sista anbudsdag. */
+  deadline_at: IsoDateTime | null;
   status: ChecklistStatus;
   engine: string;
   created_at: IsoDateTime;
@@ -417,6 +491,8 @@ export interface RejectRequest {
 export interface NoticeCreate {
   title: string;
   buyer: string | null;
+  /** The buyer's own reference (diarienummer); optional. */
+  reference_number?: string | null;
   description: string | null;
   cpv_codes: string[];
   procedure: string | null;

@@ -1,21 +1,32 @@
-import { Banner } from "@astryxdesign/core/Banner";
+import { Card } from "@astryxdesign/core/Card";
 import { HStack } from "@astryxdesign/core/HStack";
+import { Icon } from "@astryxdesign/core/Icon";
 import { Link } from "@astryxdesign/core/Link";
 import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import type { IsoDateTime } from "../api/types";
-import { formatCalendarDate, relativeCalendarDeadline, swedishDate, swedishToday } from "../lib/format";
+import { calendarDateOf, formatLongDate, isPassed } from "../lib/format";
 import type { LabelledLink } from "../lib/links";
-import { ReminderAction } from "./ReminderAction";
+import { ReminderState } from "./ui/ReminderState";
+
+/** "Ställ frågan i e-Avrop senast 30 oktober – då får alla leverantörer samma svar." */
+export function formalQuestionSentence(questionDeadline: IsoDateTime | null): string {
+  if (!questionDeadline) {
+    return "Ställ frågan i e-Avrop före sista dag för frågor – då får alla leverantörer samma svar. Datumet står i underlaget.";
+  }
+  const date = formatLongDate(calendarDateOf(questionDeadline), "auto");
+  if (isPassed(questionDeadline)) return `Sista dag för frågor var ${date}. Det är underlaget som gäller.`;
+  return `Ställ frågan i e-Avrop senast ${date} – då får alla leverantörer samma svar.`;
+}
 
 /**
- * When the document does not settle a question: ask it formally in e-Avrop before the question deadline.
- * The buyer must treat all suppliers alike, so only an answer published to everyone counts. Anbudsklar
- * never gives one supplier advice the others do not get.
+ * When the document does not settle a question: ask it formally in e-Avrop before the question deadline (direction.md,
+ * section 4 "Steg 2 Fråga"). The buyer must treat all suppliers alike, so only an answer published to everyone counts;
+ * Anbudsklar never gives one supplier advice the others do not get. A muted box inset in the answer, with the reminder
+ * and the way to e-Avrop on one line.
  *
- * `questionDeadline` is the published checklist's frågestopp. It is a date, sent as the end of that day
- * (23:59:59) in Swedish time, so it is shown as a date. The reminder is offered only when it is known:
- * without it the backend has nothing to remind about.
+ * `questionDeadline` is the published checklist's frågestopp, sent as the end of that day in Swedish time, so it is
+ * shown as a date. The reminder is offered only while it is ahead: without it the backend has nothing to remind about.
  */
 export function FormalQuestionAdvice({
   noticeId,
@@ -29,46 +40,27 @@ export function FormalQuestionAdvice({
   /** A made-up notice with no page of its own: say why it cannot be found in e-Avrop. */
   isFictitiousWithoutPage: boolean;
 }) {
-  const deadline = questionDeadline ? swedishDate(questionDeadline) : null;
-  const reminderDeadline = deadline && deadline >= swedishToday() ? deadline : null;
+  const deadline = questionDeadline ? calendarDateOf(questionDeadline) : null;
   return (
-    <Banner status="info" title="Ställ frågan formellt i e-Avrop" collapsible={false}>
-      <VStack gap={3}>
-        <Text as="p">
-          Kommunen måste behandla alla leverantörer lika. Ett svar som bara du får kan därför inte ändra vad som
-          gäller i upphandlingen. Ställ frågan i upphandlingens frågefunktion i e-Avrop, så får alla som vill
-          lämna anbud samma svar.
-        </Text>
-        <Text as="p">
-          {deadline ? (
-            <>
-              Sista dag för frågor: <Text weight="semibold">{formatCalendarDate(deadline)}</Text> (
-              {relativeCalendarDeadline(deadline)}).
-            </>
-          ) : (
-            "Sista dag för frågor står i underlaget, oftast i de administrativa föreskrifterna."
-          )}
-        </Text>
-        {isFictitiousWithoutPage && (
-          <Text as="p">
-            Den här upphandlingen är påhittad för demon och finns därför inte i e-Avrop. I en riktig upphandling
-            ställer du frågan där.
-          </Text>
-        )}
-        {(link || reminderDeadline) && (
+    <Card variant="muted" padding={4}>
+      <HStack gap={3} vAlign="start">
+        <Icon icon="info" color="secondary" size="md" />
+        <VStack gap={2} hAlign="start">
+          <VStack gap={0.5}>
+            <Text weight="semibold">Ger underlaget inget entydigt svar?</Text>
+            <Text>{formalQuestionSentence(questionDeadline)}</Text>
+          </VStack>
           <HStack gap={4} vAlign="center" wrap="wrap">
+            {deadline && <ReminderState noticeId={noticeId} kind="fragestopp" deadline={deadline} subject="sista dag för frågor" />}
             {link && (
               <Link href={link.href} isExternalLink isStandalone>
                 {link.text}
               </Link>
             )}
-            {reminderDeadline && (
-              <ReminderAction noticeId={noticeId} kind="fragestopp" deadline={reminderDeadline} subject="frågestoppet" />
-            )}
+            {isFictitiousWithoutPage && <Text type="supporting">Den här upphandlingen är påhittad och finns inte i e-Avrop.</Text>}
           </HStack>
-        )}
-        <Text type="supporting">Källa: LOU 4 kap. 1 § (likabehandling), 12 kap. 11 § och 19 kap. 13 §.</Text>
-      </VStack>
-    </Banner>
+        </VStack>
+      </HStack>
+    </Card>
   );
 }

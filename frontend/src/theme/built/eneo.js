@@ -105,6 +105,25 @@ export const eneoTheme = {
     "--size-element-lg": "48px",
     "--color-error": "light-dark(#AA181D, #F47B7F)"
   },
+  localTokens: {
+    "--layout-container": "1152px",
+    "--layout-workspace": "1344px",
+    "--layout-main": "760px",
+    "--layout-rail": "360px",
+    "--layout-form": "640px",
+    "--height-top-nav": "64px",
+    "--height-step-bar": "52px"
+  },
+  __localTokenOwners: {
+    "--layout-container": "eneo",
+    "--layout-workspace": "eneo",
+    "--layout-main": "eneo",
+    "--layout-rail": "eneo",
+    "--layout-form": "eneo",
+    "--height-top-nav": "eneo",
+    "--height-step-bar": "eneo"
+  },
+  __localTokenLineage: ["eneo"],
   components: {
     "heading": {
       "level:1": {
@@ -210,6 +229,58 @@ export const eneoTheme = {
         "overflowWrap": "anywhere"
       }
     },
+    "app-shell": {
+      "variant:section": {
+        "backgroundColor": "var(--color-background-body)",
+        "minHeight": "auto"
+      }
+    },
+    "top-nav": {
+      "base": {
+        "minHeight": "var(--height-top-nav)",
+        "paddingBlock": "0",
+        "paddingInline": "max(var(--spacing-4), calc((100% - var(--layout-container)) / 2))"
+      }
+    },
+    "top-nav-heading": {
+      "base": {
+        "marginInlineEnd": "var(--spacing-6)"
+      }
+    },
+    "top-nav-item": {
+      "base": {
+        "minHeight": "var(--height-top-nav)",
+        "borderRadius": "0",
+        "color": "var(--color-text-primary)"
+      },
+      "selected": {
+        "color": "var(--color-text-accent)",
+        "fontWeight": "var(--font-weight-semibold)",
+        "backgroundColor": "transparent",
+        "boxShadow": "inset 0 -2px 0 var(--color-accent)"
+      }
+    },
+    "tab": {
+      "selected": {
+        "--color-overlay-hover": "transparent",
+        "--color-overlay-pressed": "transparent"
+      }
+    },
+    "banner": {
+      "container:section+status:info": {
+        "backgroundColor": "var(--color-background-surface)",
+        "borderBlockEnd": "1px solid var(--color-border)",
+        "alignItems": "center",
+        "paddingBlock": "var(--spacing-1-5)",
+        "paddingInline": "max(var(--spacing-4), calc((100% - var(--layout-container)) / 2))",
+        "minHeight": "var(--spacing-9)"
+      }
+    },
+    "card": {
+      "base": {
+        "padding": "var(--spacing-5)"
+      }
+    },
     "text-input": {
       "base": {
         ":focus-within": {
@@ -287,6 +358,11 @@ export const eneoTheme = {
         "minBlockSize": "24px"
       }
     },
+    "segmented-control": {
+      "base": {
+        "backgroundColor": "light-dark(var(--color-neutral), color-mix(in srgb, var(--color-text-primary) 15%, transparent))"
+      }
+    },
     "toggle-button-group": {
       "base": {
         "flexWrap": "wrap"
@@ -323,6 +399,14 @@ export const eneoTheme = {
       "base": {
         "minHeight": "24px"
       }
+    },
+    "chat-message-bubble": {
+      "sender:user+variant:filled": {
+        "backgroundColor": "var(--color-accent-muted)",
+        "color": "var(--color-text-primary)",
+        "borderRadius": "var(--radius-container)",
+        "borderEndEndRadius": "var(--radius-inner)"
+      }
     }
   },
   __onDark: {
@@ -350,6 +434,32 @@ export const eneoTheme = {
       "2xl": 1536
     },
     "rules": [
+      {
+        "when": {
+          "width": {
+            "below": "sm"
+          }
+        },
+        "value": {
+          "localTokens": {
+            "--height-top-nav": "56px",
+            "--height-step-bar": "48px"
+          },
+          "components": {
+            "card": {
+              "base": {
+                "padding": "var(--spacing-4)"
+              }
+            },
+            "heading": {
+              "level:1": {
+                "fontSize": "var(--font-size-xl)",
+                "lineHeight": "var(--text-heading-2-leading)"
+              }
+            }
+          }
+        }
+      },
       {
         "when": {
           "pointer": "coarse"
@@ -394,6 +504,16 @@ export const eneoTheme = {
             "radio-list-item": {
               "base": {
                 "minHeight": "44px"
+              }
+            },
+            "item": {
+              "base": {
+                "minHeight": "44px"
+              }
+            },
+            "token": {
+              "base": {
+                "minHeight": "var(--spacing-6)"
               }
             }
           }

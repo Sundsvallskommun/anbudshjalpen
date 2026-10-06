@@ -1,0 +1,19 @@
+/* A page with a rail: the content (up to 760 px) and a 360 px rail 32 px apart inside the 1 152 px container
+   (direction.md, section 4 "Bredder"). Below 1 024 px the rail follows the content. Structural widths come from the
+   theme's layout tokens; tokens only. */
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--layout-rail);
+  gap: var(--spacing-8);
+  align-items: start;
+}
+
+.main {
+  min-inline-size: 0;
+}
+
+@media (max-width: 1023px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

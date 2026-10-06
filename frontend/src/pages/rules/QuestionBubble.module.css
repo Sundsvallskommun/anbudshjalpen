@@ -1,0 +1,20 @@
+/* The asked question: on the accent's tint, right-aligned, with the corner toward the asker tucked in (direction.md,
+   section 4 "Steg 2 Fråga"; radii 12 12 4 12). It keeps the asker's line breaks. On a phone it may use the
+   whole width; elsewhere three quarters of the content column. Bespoke surface; tokens only. */
+.bubble {
+  max-inline-size: min(100%, calc(var(--layout-main) * 3 / 4));
+  margin: 0;
+  padding-block: var(--spacing-3);
+  padding-inline: var(--spacing-4);
+  border-radius: var(--radius-container);
+  border-end-end-radius: var(--radius-inner);
+  background: var(--color-accent-muted);
+  color: var(--color-text-primary);
+  white-space: pre-line;
+}
+
+@media (forced-colors: active) {
+  .bubble {
+    border: var(--border-width) solid CanvasText;
+  }
+}

@@ -7,10 +7,72 @@
 }
 
 .row + .row {
-  border-block-start: 1px solid var(--color-border);
+  border-block-start: var(--border-width) solid var(--color-border);
 }
-
 
 .row {
   padding-block: var(--spacing-4);
+}
+
+/* Inside a card without padding: the card's inset on both sides (direction.md, section 4: 20 px, 16 on a phone), and
+   the rows' hover tint clipped to the card's corners. */
+.inset {
+  border-radius: calc(var(--radius-container) - var(--border-width));
+  overflow: clip;
+}
+
+.inset > .row {
+  padding-inline: var(--spacing-5);
+}
+
+@media (max-width: 639px) {
+  .inset > .row {
+    padding-inline: var(--spacing-4);
+  }
+}
+
+/* A row that is one link (direction.md, section 4 "Upphandlingar": "hela raden är klickbar"). The title link's
+   pseudo-element covers the row, so a click anywhere follows it while the link keeps the title as its only name. The
+   row is its own stacking context, so the cover never reaches above anything outside it. */
+.linked {
+  position: relative;
+  isolation: isolate;
+  /* A record row is compact: seven of them fit the first screen at 1440 × 900 (direction.md, section 11). */
+  padding-block: var(--spacing-3);
+}
+
+.linked .rowLink::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+@media (hover: hover) {
+  .linked:hover {
+    background: var(--color-overlay-hover);
+  }
+
+  .linked:hover .rowLink {
+    text-decoration: underline;
+    text-underline-offset: var(--spacing-0-5);
+  }
+}
+
+/* The focus ring goes round the whole row, the target, instead of the title alone (WCAG 2.4.7). Browsers without
+   :has() keep the link's own ring. */
+@supports selector(:has(*)) {
+  .linked:has(.rowLink:focus-visible) {
+    outline: var(--focus-outline-width) var(--focus-outline-style) var(--focus-outline-color);
+    outline-offset: calc(var(--focus-outline-width) * -1);
+  }
+
+  .linked .rowLink:focus-visible {
+    outline: none;
+  }
+}
+
+/* The end column never gives way to the start column. */
+.end {
+  flex: none;
 }

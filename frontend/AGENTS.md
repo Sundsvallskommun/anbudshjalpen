@@ -5,25 +5,54 @@ backend in production and by Vite (port 3502, proxying `/api`, `/health` and `/m
 development. Code and comments are English; every user-facing word is Swedish. Read the root `AGENTS.md`
 for the product rules.
 
+The design as built is in `docs/design.md`. Comments that cite "direction.md, section N" point to
+`docs/direction.md`, the direction the redesign followed (dated 2026-10-05 and not updated).
+
 ## Layout of the code
 
 - `src/api/types.ts` mirrors `backend/src/anbudsklar/api/schemas.py` and `backend/src/anbudsklar/contracts/`
   exactly. Change both in the same commit. `src/api/client.ts` is the only `fetch`; `src/api/queries.ts`
   holds one TanStack Query hook per endpoint.
-- `src/shell/` is the frame (Tal till text's ModuleShell pattern): `AppFrame` (brand, navigation per role,
-  the demo notice and AI disclosure that are always visible), `Page` (the one h1 per page, focused after a
-  client navigation), `RequireRole`.
-- `src/components/` holds shared pieces: citation chips and the page viewer (`citations/`), the checklist
-  sections, tokens for statuses, `UrlTabs`, `RowList`.
-- `src/pages/` has one module per route; every page but the start page is lazy-loaded.
+- `src/AppProviders.tsx` mounts what every page needs, once: the query client, the Swedish catalogue, the built theme,
+  the router's link, Astryx's `LayerProvider` (the one toast viewport `useToast()` shows in; mount no other) and the
+  app's one source dialog (`SourceDialogProvider`).
+- `src/shell/` is the frame (Tal till text's ModuleShell pattern), and holds no state:
+  - `AppFrame` composes it per route: `PhaseStrip` (the one-line demo strip), `FrameHeader` (the top bar; on a phone
+    two rows), the page, and `SiteFooter`. `ModuleShell` is Astryx's AppShell with the foot after the main region
+    (a contentinfo landmark must not sit inside main).
+  - `FrameHeader` holds `Brand`, `MainNav` (the role's three main choices; on a phone tabs on a top-level page and a
+    back link on a detail page) and `AccountMenu` (the avatar's popover, or "Logga in" for a visitor).
+  - `AboutDemo` owns the "Om demon och AI" dialog (lazily loaded `AboutDemoDialog`) that the strip and the foot open.
+  - `navigation.ts` has the rules as pure functions: main choices per role, where each role starts, back links.
+    `redirects.tsx` sends "/" to the role's start and moves old addresses (`/bevakning` → `/start`) with their query.
+  - `Page` is the page frame: the one h1 (focused after a client navigation), breadcrumbs, the widths (640, 760, 960,
+    1 152, and 1 344 for inköp's review workspace, which the strip, the top bar and the foot then follow) and the
+    rail. `RequireRole` shows a page only to its role.
+- `src/components/ui/` holds the redesign's shared components (each one's purpose is in `docs/design.md`, "Delade
+  komponenter"): `DeadlineBlock`, `ReminderState`, `SourceLink` and the source dialog (`source/`: `SourceDialog`,
+  `PageText`, and `sourceTarget.ts`, the address that opens a source), `AiProvenance` (with `basis="law"` for
+  Regelhjälpen), `StatTile`, `ResultSummary`, `NextStepCard` and `AccentCard`, `RequirementRow`, `CollapsibleSection`,
+  `StepNav`, and the app's own glyphs (`icons.tsx`, among them `DownloadIcon` and `UploadIcon`).
+- `src/components/` also holds the status tokens (`tokens.tsx`), `states.tsx` (loading and errors), `TermText`,
+  `RowList`, `UrlTabs`, `NoticeRow`, `FormalQuestionAdvice`, `DocumentUpload` and the checklist's sections
+  (`checklist/`). `src/lib/` has pure helpers: dates and numbers (`format.ts`), the Swedish words for the contract's
+  codes (`labels.ts`), links out to e-Avrop and TED (`links.ts`), terms (`terms.ts`, and `glossary.ts`, which is
+  ported from `docs/glossary.md`: change the two together), page text and quote marking, and small hooks (`usePhone`,
+  `useRevealHash`, `hooks.ts`).
+- `src/pages/` has one module per route, each lazy-loaded; a page's parts live in a folder beside it.
 - Tests: Vitest + Testing Library next to the code (`*.test.ts(x)`), with a plain `fetch` stub
-  (`src/test/render.tsx`) and fictitious data (`src/test/fixtures.ts`). No running backend is needed.
-- `e2e/` is the accessibility gate (Playwright + axe) against a running, seeded app.
+  (`src/test/render.tsx`, the whole app at an address) and fictitious data (`src/test/fixtures.ts`).
+  `src/components/ui/testing.tsx` renders one component with the app's providers. No running backend is needed.
+  A toast's words, and a field's error, are also written to Astryx's live region for screen readers, so find
+  them with an `*AllBy*` query or inside their region.
+- `e2e/` is the accessibility gate (Playwright + axe) against a running, seeded app, one state per step of the demo
+  journey plus the overlays the frame opens; the phone projects cover the phone's header, step bar and bottom sheet.
 
 ## Checks
 
 `npm run typecheck`, `npm run test`, `npm run theme:check`, `npm run build`; `npm run gate` against the
-compose stack (`BASE_URL` overrides http://127.0.0.1:3501).
+compose stack (`BASE_URL` overrides http://127.0.0.1:3501; `PLAYWRIGHT_CHANNEL=chrome` uses an installed Chrome).
+The stack serves the code it was built from: rebuild it before judging a change by the gate.
 
 ## UI rules
 
@@ -35,8 +64,16 @@ compose stack (`BASE_URL` overrides http://127.0.0.1:3501).
 - No `<div>` for layout, no `style={{}}`, no hex colours or px spacing: component props, else tokens. No Tailwind,
   no shadcn, no second UI library.
 - Bespoke surfaces with no Astryx counterpart may use a `*.module.css` beside the component, using only Astryx tokens
-  (`var(--color-*)`, `var(--spacing-*)`, `var(--radius-*)`) and semantic HTML. Today: the page viewer's text and
-  quote mark, inline term buttons, and `RowList` (rows whose titles wrap instead of being cut off).
+  (`var(--color-*)`, `var(--spacing-*)`, `var(--radius-*)`), the theme's layout tokens (`var(--layout-*)`,
+  `var(--height-*)`) and semantic HTML. Its first comment says why it exists. The shared ones today: `PageText` (the
+  page as paper and the quote mark), `SourceLink` (the hit area), `TermText` (inline term buttons), `RowList` (rows
+  whose titles wrap instead of being cut off), `CollapsibleSection` (a disclosure button inside a heading, which
+  Astryx's Collapsible cannot do), `StepNav` (the sticky bar and the step number), `AccentCard` (the accent edge of
+  "Nästa steg" and "Nästa frist"), `RequirementRow` (the row inset), `checklist/SectionRow` (rows edge to edge in a
+  section card, with a straight divider and a fixed date column), `checklist/Evaluation` (the price and quality split
+  bar), `shell/Page` (the rail grid) and `shell/SiteFooter` (the foot on the frame's content line). Global rules live
+  in `src/app.css`, such as the step bar's scroll padding and the frame following the 1 344 px workspace. Pages keep
+  theirs beside the page.
 - Do not author StyleX (`stylex.create`, `xstyle`) and do not run `astryx swizzle`.
 - A design-system shortfall is fixed once in `src/theme/eneo.theme.ts`, then `npm run theme:build`; commit
   `src/theme/built/` (generated, never hand-edited; CI runs `npm run theme:check`). Never override `--color-*` in :root.
@@ -55,8 +92,10 @@ compose stack (`BASE_URL` overrides http://127.0.0.1:3501).
 
 - User-facing text is Swedish; Astryx's own words come from `@astryxdesign/core/locales/sv-SE.json`.
 - No fonts, scripts or CDNs from other origins (CSP `script-src 'self'; style-src 'self'`). No inline scripts.
-- Every AI claim shows its source: a citation chip with the page and the verification status in words
-  ("Verifierat citat", "Hittat på annan sida", "Kunde inte kontrolleras"). Fictitious data carries the "Fiktiv" token.
+- Every AI claim shows its source: `SourceLink`'s quiet "s. N", named by the claim it backs, which opens the source
+  dialog. Only deviations get words and a token ("s. 9 (AI angav 7)", "Hittades inte i underlaget"), and
+  `AiProvenance` sums the check up once per view ("Alla 86 källhänvisningar hittades i underlaget"), with the engine
+  and whether inköp reviewed it. Fictitious data carries the "Fiktiv" token.
 - Never give one supplier advice the others do not get: when the document does not answer, point to the
   formal question in e-Avrop before the question deadline (likabehandling).
 - WCAG 2.2 AA (DOS-lagen / EN 301 549), 24 px targets with a mouse and 44 px with a finger, a visible focus indicator.

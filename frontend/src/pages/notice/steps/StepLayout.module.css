@@ -1,0 +1,38 @@
+/* A step's content (760 px) and its rail (360 px), 32 px apart in the 1 152 px container (direction.md, section 4
+   "Bredder"). The rail shows the step's context; it can stay in view below the sticky step bar while the step scrolls.
+   Below 1 024 px it follows the content, comes before it, or is left out. Structural widths come from the theme's
+   layout tokens; tokens only. */
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--layout-rail);
+  gap: var(--spacing-8);
+  align-items: start;
+}
+
+.main {
+  min-inline-size: 0;
+}
+
+.sticky {
+  position: sticky;
+  inset-block-start: calc(var(--height-step-bar) + var(--spacing-6));
+}
+
+@media (max-width: 1023px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--spacing-6);
+  }
+
+  .sticky {
+    position: static;
+  }
+
+  .hiddenNarrow {
+    display: none;
+  }
+
+  .firstNarrow {
+    order: -1;
+  }
+}

@@ -1,0 +1,9 @@
+/* The site's foot, after the main region (direction.md, section 4 "Ramen"): a line above it, and its words on the
+   frame's content line, the one the theme gives the top bar and the demo strip (the page container, or the buyer's
+   workspace on that page). It rests on the body grey. Tokens only. */
+.footer {
+  column-gap: var(--spacing-3);
+  padding-block: var(--spacing-6) var(--spacing-8);
+  padding-inline: max(var(--spacing-4), calc((100% - var(--layout-container)) / 2));
+  border-block-start: var(--border-width) solid var(--color-border);
+}

@@ -1,0 +1,29 @@
+/* The profile's save row (direction.md, section 4 "Företagsprofil": "spara-raden blir sticky när något har
+   ändrats"). At rest it is the form's last row; with unsaved changes it floats a step above the window's lower edge on
+   the surface with an edge and a shadow, so "Spara profilen" is always in reach. While it floats the page keeps a
+   focused field clear of it when it scrolls one into view (WCAG 2.4.11). Bespoke surface; tokens only. */
+.bar {
+  padding-block: var(--spacing-2);
+}
+
+.bar[data-unsaved="true"] {
+  position: sticky;
+  inset-block-end: var(--spacing-4);
+  z-index: 2;
+  padding-block: var(--spacing-3);
+  padding-inline: var(--spacing-4);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-container);
+  background: var(--color-background-surface);
+  box-shadow: var(--shadow-med);
+}
+
+:global(html):has(.bar[data-unsaved="true"]) {
+  scroll-padding-block-end: calc(var(--size-element-lg) + var(--spacing-12));
+}
+
+@media (forced-colors: active) {
+  .bar[data-unsaved="true"] {
+    border-color: CanvasText;
+  }
+}

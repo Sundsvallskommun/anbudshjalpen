@@ -1,17 +1,18 @@
-import { Banner } from "@astryxdesign/core/Banner";
-import { Button } from "@astryxdesign/core/Button";
-import { Heading } from "@astryxdesign/core/Heading";
-import { HStack } from "@astryxdesign/core/HStack";
+import { Card } from "@astryxdesign/core/Card";
+import { EmptyState } from "@astryxdesign/core/EmptyState";
+import { Grid } from "@astryxdesign/core/Grid";
 import { Text } from "@astryxdesign/core/Text";
-import { VStack } from "@astryxdesign/core/VStack";
+import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
+import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { useLogin, useSession } from "../api/queries";
-import type { Role } from "../api/types";
-import { Row, RowList } from "../components/RowList";
+import { useConfig, useLogin, useSession } from "../api/queries";
+import type { Persona, Role } from "../api/types";
 import { ErrorNotice, Loading } from "../components/states";
+import { FALLBACK_DEMO_NOTICE } from "../shell/AboutDemo";
+import { homePath } from "../shell/navigation";
 import { Page } from "../shell/Page";
-
-const HOME: Record<Role, string> = { foretagare: "/bevakning", inkopare: "/inkop" };
+import { PersonaCard } from "./login/PersonaCard";
+import { personaIdentity } from "./login/personas";
 
 /** Where to go after logging in: an internal path from `?till=`, never another site or the login itself. */
 export function safeReturnPath(value: string | null): string | null {
@@ -19,58 +20,75 @@ export function safeReturnPath(value: string | null): string | null {
   return value;
 }
 
-/** PoC-only persona picker. Production uses e-legitimation and a check that the user may represent the company. */
+/**
+ * The demo notice in full, once, below the cards (direction.md: "Hela demotexten står i en muted Section under
+ * korten"). The strip at the top has the one-line version and "Om demon och AI".
+ */
+function DemoNote({ notice }: { notice: string | undefined }) {
+  return (
+    <Card variant="muted">
+      <Text as="p">{notice ?? FALLBACK_DEMO_NOTICE}</Text>
+    </Card>
+  );
+}
+
+/**
+ * The PoC's persona picker (decision 0007; direction.md, section 4 "Logga in (demo)"): two role cards, and the
+ * user lands on the role's start, or back on the page that asked for the login. Production uses e-legitimation and
+ * a check that the person may represent the company.
+ */
 export default function LoginPage() {
   const session = useSession();
+  const config = useConfig();
   const login = useLogin();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const returnPath = safeReturnPath(params.get("till"));
+  const [chosen, setChosen] = useState<Persona | null>(null);
 
-  const choose = (persona: Role) =>
-    login.mutate(persona, { onSuccess: () => navigate(returnPath ?? HOME[persona]) });
+  const choose = (persona: Persona) => {
+    if (login.isPending) return;
+    setChosen(persona);
+    login.mutate(persona.key, { onSuccess: () => navigate(returnPath ?? homePath(persona.key)) });
+  };
 
-  const user = session.data?.user;
+  const organization = config.data?.organization_name;
+  const currentRole: Role | null = session.data?.user?.role ?? null;
+  const loggingIn = login.isPending && chosen ? personaIdentity(chosen, organization).name : null;
   return (
     <Page
       title="Logga in"
-      heading="Logga in (demo)"
-      width={640}
-      intro="Välj vem du vill vara i demonstrationen."
+      heading="Välj vem du är i demon"
+      width={760}
+      intro="Ingen riktig inloggning. I tjänsten loggar företag in med e-legitimation."
     >
-      <Banner
-        status="warning"
-        title="Förenklad inloggning för demo"
-        description="Här finns ingen riktig inloggning. I en färdig tjänst loggar företag in med e-legitimation, och det kontrolleras att personen får företräda företaget."
-        collapsible={false}
-      />
-      {user && <Text>{`Du är inloggad som ${user.name}. Välj en roll för att byta.`}</Text>}
-      {session.isPending && <Loading label="Hämtar roller …" />}
+      {session.isPending && <Loading label="Hämtar rollerna …" />}
       {session.isError && (
         <ErrorNotice title="Rollerna kunde inte hämtas" error={session.error} onRetry={() => session.refetch()} />
       )}
-      {session.isSuccess && (
-        <RowList label="Roller">
+      {session.isSuccess && session.data.personas.length === 0 && (
+        <EmptyState headingLevel={2} title="Det finns inga roller att välja" description="Demodatan är inte inlagd ännu." />
+      )}
+      {session.isSuccess && session.data.personas.length > 0 && (
+        <Grid columns={{ minWidth: 280, max: 2 }} gap={4}>
           {session.data.personas.map((persona) => (
-            <Row key={persona.key}>
-              <HStack gap={3} vAlign="center" hAlign="between" wrap="wrap">
-                <VStack gap={1}>
-                  <Heading level={2}>{persona.label}</Heading>
-                  <Text color="secondary">{persona.description}</Text>
-                </VStack>
-                <Button
-                  label={`Logga in som ${persona.label}`}
-                  variant="primary"
-                  isLoading={login.isPending && login.variables === persona.key}
-                  isDisabled={login.isPending}
-                  onClick={() => choose(persona.key)}
-                />
-              </HStack>
-            </Row>
+            <PersonaCard
+              key={persona.key}
+              role={persona.key}
+              identity={personaIdentity(persona, organization)}
+              isCurrent={currentRole === persona.key}
+              isLoggingIn={login.isPending && chosen?.key === persona.key}
+              returnsToPage={returnPath !== null}
+              onChoose={() => choose(persona)}
+            />
           ))}
-        </RowList>
+        </Grid>
       )}
       {login.isError && <ErrorNotice title="Inloggningen misslyckades" error={login.error} />}
+      <DemoNote notice={config.data?.demo_notice} />
+      <VisuallyHidden as="div" role="status">
+        {loggingIn ? `Loggar in som ${loggingIn} …` : ""}
+      </VisuallyHidden>
     </Page>
   );
 }

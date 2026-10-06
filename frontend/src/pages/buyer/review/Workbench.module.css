@@ -1,0 +1,37 @@
+/* The review table from 1 200 px (direction.md, section 4 "Två rutor från 1 200 px"): as high as the window leaves
+   above the decision bar, with the checks and the list in one column and the source in a pane beside it. The list
+   and the source scroll each on their own. Bespoke surface; tokens only.
+   The height is the window less the decision bar (a large button and its insets, ActionBar.module.css), 16 px above
+   and below the table, and room for the bar's borders. */
+.bench {
+  block-size: calc(
+    100dvh - var(--size-element-lg) - var(--spacing-3) * 2 - var(--spacing-4) * 2 - var(--spacing-2)
+  );
+  min-block-size: calc(var(--spacing-12) * 10);
+  scroll-margin-block-start: var(--spacing-4);
+}
+
+.column {
+  block-size: 100%;
+  min-block-size: 0;
+  padding-inline-end: var(--spacing-2);
+}
+
+/* The list takes what the checks above it leave. A row the keyboard moves to is scrolled clear of the group heading
+   that stays at the top of the list (WCAG 2.4.11). */
+.list {
+  flex: 1 1 0;
+  min-block-size: calc(var(--spacing-12) * 4);
+  overflow: hidden;
+}
+
+.list [role="region"] {
+  scroll-padding-block-start: var(--spacing-12);
+}
+
+/* The two columns stand 16 px apart, with the handle that sets the pane's width in the middle of the gap. */
+.pane {
+  block-size: 100%;
+  margin-inline-start: var(--spacing-2);
+  overflow: hidden;
+}

@@ -1,27 +1,28 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AnswerView, Citation, KeyDate, NoticeDetail } from "../../api/types";
+import type { Citation, KeyDate, MatchReason, NoticeDetail } from "../../api/types";
 import {
-  answerNotInDocument,
+  buyerUser,
   checklistView,
   companyUser,
-  config,
   DOCUMENT_ID,
+  draftChecklistView,
+  matchView,
   NOTICE_ID,
   noticeDetail,
   pageFour,
   reminder,
-  reviewView,
 } from "../../test/fixtures";
 import { baseRoutes, mockApi, renderApp, type MockRoute } from "../../test/render";
+import { PHONE_QUERY } from "../../lib/usePhone";
 
 const noticeRoute: MockRoute = { method: "GET", path: `/api/notices/${NOTICE_ID}`, body: noticeDetail };
-const pageRoute: MockRoute = {
+const pageRoute = (page: number, text = pageFour.text): MockRoute => ({
   method: "GET",
-  path: `/api/notices/${NOTICE_ID}/documents/${DOCUMENT_ID}/pages/4`,
-  body: pageFour,
-};
+  path: `/api/notices/${NOTICE_ID}/documents/${DOCUMENT_ID}/pages/${page}`,
+  body: { ...pageFour, page_no: page, text },
+});
 
 function noticeWith(changes: Partial<NoticeDetail>): MockRoute {
   return { method: "GET", path: `/api/notices/${NOTICE_ID}`, body: { ...noticeDetail, ...changes } };
@@ -33,8 +34,12 @@ function noticeWithCitation(citation: Citation): MockRoute {
   return noticeWith({ checklist: { ...checklistView, checklist } });
 }
 
-function dated(kind: KeyDate["kind"], date: string, quote: string): KeyDate {
-  return { kind, date, description: quote, citation: { page: 2, quote, check: "verified", found_page: null } };
+function dated(kind: KeyDate["kind"], date: string, description: string): KeyDate {
+  return { kind, date, description, citation: { page: 2, quote: description, check: "verified", found_page: null } };
+}
+
+function sectionButton(name: string | RegExp) {
+  return screen.getByRole("button", { name });
 }
 
 // Reminders are offered only for deadlines that have not passed; the tests run on a fixed day.
@@ -47,79 +52,215 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("NoticePage checklist", () => {
-  it("groups requirements by kind and shows each citation's page and verification", async () => {
+describe("NoticePage header", () => {
+  it("leads with the four key facts and only the tokens that say something", async () => {
     mockApi([...baseRoutes(null), noticeRoute]);
     renderApp(`/upphandlingar/${NOTICE_ID}`);
 
     expect(await screen.findByRole("heading", { level: 1, name: noticeDetail.title })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 3, name: "Skallkrav (1)" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 3, name: "Kvalificeringskrav (1)" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Sida 4, verifierat citat/ })).toBeInTheDocument();
-    // The quote was found on page 6, not the page 5 the AI gave: the chip opens page 6.
-    expect(screen.getByRole("button", { name: /^Sida 6, hittat på annan sida/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Sida 12, kunde inte kontrolleras/ })).toBeInTheDocument();
-    expect(screen.getByText(/2 av 4 citat hittades på angiven sida/)).toBeInTheDocument();
+    // Who buys and the reference number people quote.
+    const meta = screen.getByText("Sundsvalls kommun · DEMO-2026-0147");
+    // Fiktiv first, then the fit and the reviewed checklist (direction.md, section 4).
+    const tokens = meta.parentElement!.textContent!;
+    expect(tokens.indexOf("Fiktiv")).toBeLessThan(tokens.indexOf("Passar delvis"));
+    expect(tokens.indexOf("Passar delvis")).toBeLessThan(tokens.indexOf("Granskad checklista"));
+    // Open for tenders is the normal state and gets no token.
+    expect(screen.queryByText("Öppen för anbud")).not.toBeInTheDocument();
+
+    const facts = screen.getByRole("region", { name: "Nyckeltal" });
+    expect(within(facts).getByText("26 okt 2026")).toBeInTheDocument();
+    expect(within(facts).getByText("om 21 dagar")).toBeInTheDocument();
+    expect(within(facts).getByText("16 okt 2026")).toBeInTheDocument();
+    expect(within(facts).getByText(/^800\s000\skr$/u)).toBeInTheDocument();
+    // The procedure in plain words, its term explained on a press, and the law below.
+    expect(within(facts).getByRole("button", { name: "EU:s beloppsgränser" })).toBeInTheDocument();
+    expect(within(facts).getByText("19 kap. LOU")).toBeInTheDocument();
+    // A visitor is taken to the login to set a reminder.
+    expect(within(facts).getByRole("link", { name: "Påminn mig före sista anbudsdag 26 oktober 2026, logga in först" })).toBeInTheDocument();
+  });
+
+  it("opens the document from the header on page 1, with the original to download", async () => {
+    mockApi([...baseRoutes(null), noticeRoute, pageRoute(1, "Förfrågningsunderlag")]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    expect(await screen.findByRole("link", { name: "Ladda ned underlaget" })).toHaveAttribute(
+      "href",
+      `/api/documents/${DOCUMENT_ID}/file`,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Underlaget, 16 sidor" }));
+    const dialog = await screen.findByRole("dialog", { name: "Underlaget" });
+    expect(await within(dialog).findByText("Sida 1 av 16")).toBeInTheDocument();
+  });
+
+  it("keeps the fit behind a disclosure, with at most three reasons and their sources", async () => {
+    const extra: MatchReason = { kind: "hinder", text: "Underlaget kräver en arbetsledare med fem års erfarenhet.", requirement_id: null, citation: null };
+    const match = { ...matchView, assessment: { ...matchView.assessment, reasons: [...matchView.assessment.reasons, extra] } };
+    mockApi([...baseRoutes(companyUser), noticeWith({ match })]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    const toggle = await screen.findByRole("button", { name: "Därför passar den delvis (4 skäl)" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+
+    const panel = document.getElementById(toggle.getAttribute("aria-controls")!)!;
+    expect(within(panel).getByText("Upphandlingen gäller målning – det gör ni.")).toBeInTheDocument();
+    expect(within(panel).getByText("Kontrollera själv:")).toBeInTheDocument();
+    expect(
+      within(panel).getByRole("link", {
+        name: "Visa källan för ”Ni har angett en försäkring i profilen. Kontrollera att den räcker för kravet.”, s. 4",
+      }),
+    ).toBeInTheDocument();
+    expect(within(panel).queryByText(extra.text)).not.toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole("button", { name: "Visa alla skäl (4)" }));
+    expect(within(panel).getByText(extra.text)).toBeInTheDocument();
+    expect(within(panel).getByText(/^Automatiskt framtaget/u)).toBeInTheDocument();
+  });
+
+  it("leads from a fit reason about a requirement to its row in step 1", async () => {
+    mockApi([...baseRoutes(companyUser), noticeWith({ match: matchView })]);
+    renderApp(`/upphandlingar/${NOTICE_ID}?flik=fraga`);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Därför passar den delvis (3 skäl)" }));
+    // Only the reasons about a requirement link to one.
+    expect(screen.getAllByRole("link", { name: /^Visa kravet/u })).toHaveLength(2);
+    await userEvent.click(screen.getByRole("link", { name: "Visa kravet ”Ansvarsförsäkring om minst 5 miljoner kronor”" }));
+    expect(screen.getByRole("tab", { name: "Krav" })).toHaveAttribute("aria-selected", "true");
+    expect(document.getElementById("krav-K1")).toBeVisible();
+  });
+
+  it("keeps what else the notice says behind Om upphandlingen", async () => {
+    mockApi([...baseRoutes(null), noticeRoute]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    const toggle = await screen.findByRole("button", { name: "Om upphandlingen" });
+    await userEvent.click(toggle);
+    const panel = document.getElementById(toggle.getAttribute("aria-controls")!)!;
+    expect(within(panel).getByText(noticeDetail.description!)).toBeInTheDocument();
+    expect(within(panel).getByText("Vad som upphandlas")).toBeInTheDocument();
+    expect(within(panel).getByText("Målning")).toBeInTheDocument();
+    expect(within(panel).getByText("21 sep 2026")).toBeInTheDocument();
+    expect(within(panel).getByRole("link", { name: /Öppna annonsen/u })).toHaveAttribute("href", noticeDetail.url);
+  });
+
+  it("puts the disclosures and the document in one card on a phone, and the steps without numbers", async () => {
+    vi.spyOn(window, "matchMedia").mockImplementation(
+      (query: string) =>
+        ({
+          matches: query === PHONE_QUERY,
+          media: query,
+          onchange: null,
+          addEventListener: () => undefined,
+          removeEventListener: () => undefined,
+          addListener: () => undefined,
+          removeListener: () => undefined,
+          dispatchEvent: () => false,
+        }) as MediaQueryList,
+    );
+    mockApi([...baseRoutes(null), noticeRoute]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    const facts = await screen.findByRole("region", { name: "Nyckeltal" });
+    expect(within(facts).getByText("Frågor senast")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Underlaget, 16 sidor" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Om upphandlingen och underlaget" }));
+    expect(await screen.findByRole("button", { name: `Öppna underlaget ${noticeDetail.documents[0]!.filename}` })).toBeInTheDocument();
+    // Four short labels, no step numbers.
+    expect(within(screen.getByRole("tab", { name: "Krav" })).queryByText("1")).not.toBeInTheDocument();
+    // The tiles give the figure and the word only, and the provenance line says who reviewed in fewer words.
+    expect(screen.getByRole("link", { name: "1 skallkrav" })).toBeInTheDocument();
+    expect(screen.getByText("Granskad av inköp 23 sep")).toBeInTheDocument();
+  });
+
+  it("explains an award decision", async () => {
+    mockApi([...baseRoutes(null), noticeWith({ status: "awarded" })]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    expect(await screen.findByText("Tilldelad")).toBeInTheDocument();
+    expect(screen.getByText("Tilldelningsbeslut är fattat")).toBeInTheDocument();
+  });
+
+  it("says when a notice does not exist, without an error to retry", async () => {
+    mockApi(baseRoutes(null));
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Upphandlingen finns inte" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Ingen upphandling på den här adressen" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Till alla upphandlingar" })).toHaveAttribute("href", "/upphandlingar");
+    expect(screen.queryByRole("button", { name: "Försök igen" })).not.toBeInTheDocument();
+  });
+
+  it("offers to try again when a notice could not be fetched", async () => {
+    mockApi([...baseRoutes(null), { method: "GET", path: `/api/notices/${NOTICE_ID}`, status: 503, body: { detail: "Tjänsten svarar inte just nu." } }]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Upphandlingen kunde inte visas" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Försök igen" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Till alla upphandlingar" })).toHaveAttribute("href", "/upphandlingar");
+  });
+});
+
+describe("NoticePage step 1 Krav", () => {
+  it("groups the requirements with their counts, skallkrav and kvalificeringskrav open, each with its page", async () => {
+    mockApi([...baseRoutes(null), noticeRoute]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    expect(await screen.findByRole("tab", { name: "Krav" })).toHaveAttribute("aria-selected", "true");
+    expect(sectionButton("Skallkrav, 1 krav")).toHaveAttribute("aria-expanded", "true");
+    expect(sectionButton("Kvalificeringskrav, 1 krav")).toHaveAttribute("aria-expanded", "true");
+    expect(sectionButton("Bilagor att lämna in, 1 bilaga")).toHaveAttribute("aria-expanded", "false");
+    expect(sectionButton("Så utvärderas anbuden")).toHaveAttribute("aria-expanded", "false");
+    expect(sectionButton("Viktiga datum")).toHaveAttribute("aria-expanded", "true");
+    expect(sectionButton("Ord och begrepp, 1 ord")).toHaveAttribute("aria-expanded", "false");
+
+    expect(screen.getByRole("link", { name: "Visa källan för ”Ansvarsförsäkring om minst 5 miljoner kronor”, s. 4" })).toBeInTheDocument();
+    // The quote was found on page 6, not the page 5 the AI gave: the link opens page 6 and says so.
+    expect(screen.getByRole("link", { name: /s\. 6 \(AI angav 5\)$/u })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Visa källan för ”Sista dag för frågor, 16 oktober 2026”, s. 2" })).toBeInTheDocument();
+
+    await userEvent.click(sectionButton("Bilagor att lämna in, 1 bilaga"));
+    expect(screen.getByRole("link", { name: "Visa källan för ”Prisbilaga”, Hittades inte i underlaget" })).toBeInTheDocument();
     // Term buttons open popovers, whose <div>s a paragraph may not contain.
     expect(document.querySelector("p div")).toBeNull();
   });
 
-  it("opens the cited page with the quote marked", async () => {
-    mockApi([...baseRoutes(null), noticeRoute, pageRoute]);
-    renderApp(`/upphandlingar/${NOTICE_ID}`);
-
-    await userEvent.click(await screen.findByRole("button", { name: /^Sida 4, verifierat citat/ }));
-    const mark = await screen.findByText(
-      (_, element) => element?.tagName === "MARK" && element.textContent === "Leverantören ska ha en\nansvarsförsäkring",
-    );
-    expect(mark).toBeInTheDocument();
-    expect(screen.getByText("Sida 4 av 16")).toBeInTheDocument();
-    expect(screen.getByText("Citatet står på sida 4 i underlaget och är markerat nedan.")).toBeInTheDocument();
-  });
-
-  it("does not promise a mark when a verified quote's wording differs from the page", async () => {
-    const citation: Citation = { page: 4, quote: "Leverantören ska teckna en försäkring", check: "verified", found_page: null };
-    mockApi([...baseRoutes(null), noticeWithCitation(citation), pageRoute]);
-    renderApp(`/upphandlingar/${NOTICE_ID}`);
-
-    await userEvent.click(await screen.findByRole("button", { name: /^Sida 4, verifierat citat/ }));
-    const dialog = await screen.findByRole("dialog", { name: "Källan i underlaget" });
-    expect(await within(dialog).findByText(/lite andra ord, så det går inte att markera/)).toBeInTheDocument();
-    expect(within(dialog).queryByText(/markerat nedan/)).not.toBeInTheDocument();
-    expect(within(dialog).queryByText("Citatet går inte att markera på den här sidan.")).not.toBeInTheDocument();
-    expect(dialog.querySelector("mark")).toBeNull();
-  });
-
-  it("opens page 1 when the AI cites a page past the end of the document", async () => {
-    const citation: Citation = { page: 40, quote: "Sanktioner vid försening", check: "unverified", found_page: null };
-    const calls = mockApi([
-      ...baseRoutes(null),
-      noticeWithCitation(citation),
-      {
-        method: "GET",
-        path: `/api/notices/${NOTICE_ID}/documents/${DOCUMENT_ID}/pages/1`,
-        body: { ...pageFour, page_no: 1, text: "Förfrågningsunderlag" },
-      },
-    ]);
-    renderApp(`/upphandlingar/${NOTICE_ID}`);
-
-    await userEvent.click(await screen.findByRole("button", { name: /^Sida 40, kunde inte kontrolleras/ }));
-    const dialog = await screen.findByRole("dialog", { name: "Källan i underlaget" });
-    expect(within(dialog).getByText(/AI:n angav sida 40, men underlaget har bara 16 sidor/)).toBeInTheDocument();
-    expect(await within(dialog).findByText("Förfrågningsunderlag")).toBeInTheDocument();
-    expect(within(dialog).getByText("Sida 1 av 16")).toBeInTheDocument();
-    expect(calls.some((call) => call.path.endsWith("/pages/40"))).toBe(false);
-  });
-
-  it("offers no retry for a page that does not exist, but still lets the reader leaf on", async () => {
+  it("says once who reviewed the list and how its sources held up", async () => {
     mockApi([...baseRoutes(null), noticeRoute]);
     renderApp(`/upphandlingar/${NOTICE_ID}`);
 
-    await userEvent.click(await screen.findByRole("button", { name: /^Sida 4, verifierat citat/ }));
-    const dialog = await screen.findByRole("dialog", { name: "Källan i underlaget" });
-    expect(await within(dialog).findByText("Sidan kunde inte visas")).toBeInTheDocument();
-    expect(within(dialog).queryByRole("button", { name: "Försök igen" })).not.toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "Nästa sida" })).toBeEnabled();
+    expect(await screen.findByText("Granskad och publicerad av inköp, Sundsvalls kommun, 23 sep 2026")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "3 av 4 källhänvisningar hittades i underlaget · 1 på en annan sida än AI:n angav · 1 hittades inte och behöver kontrolleras ·",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("leads with tiles for what to do, and a tile opens its closed section", async () => {
+    mockApi([...baseRoutes(null), noticeRoute]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    expect(await screen.findByRole("link", { name: "1 skallkrav, måste uppfyllas" })).toHaveAttribute("href", "/upphandlingar/" + NOTICE_ID + "#skallkrav");
+    expect(screen.getByRole("link", { name: "1 kvalificeringskrav, krav på företaget" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "70 % pris, så vinner man" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("link", { name: "1 bilaga, att lämna med anbudet" }));
+    expect(sectionButton("Bilagor att lämna in, 1 bilaga")).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("opens a closed section that the outline goes to", async () => {
+    // The outline scrolls with scrollIntoView, which jsdom does not have.
+    Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
+    try {
+      mockApi([...baseRoutes(null), noticeRoute]);
+      renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+      const outline = await screen.findByRole("navigation", { name: "På den här sidan" });
+      expect(sectionButton("Ord och begrepp, 1 ord")).toHaveAttribute("aria-expanded", "false");
+      await userEvent.click(within(outline).getByRole("link", { name: "Ord och begrepp" }));
+      expect(sectionButton("Ord och begrepp, 1 ord")).toHaveAttribute("aria-expanded", "true");
+    } finally {
+      Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+    }
   });
 
   it("explains a term when it is pressed", async () => {
@@ -129,236 +270,235 @@ describe("NoticePage checklist", () => {
     const [term] = await screen.findAllByRole("button", { name: "försäkringsbevis" });
     await userEvent.click(term!);
     const explanation = await screen.findByRole("dialog", { name: "Förklaring av försäkringsbevis" });
-    expect(within(explanation).getByText(/Ett intyg från försäkringsbolaget/)).toBeInTheDocument();
+    expect(within(explanation).getByText(/Ett intyg från försäkringsbolaget/u)).toBeInTheDocument();
+  });
+
+  it("ends with the next step, which opens step 2", async () => {
+    mockApi([...baseRoutes(null), noticeRoute]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Ställ en fråga" }));
+    expect(screen.getByRole("tab", { name: "Fråga" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel", { name: "Fråga" })).toHaveFocus();
+  });
+
+  it("shows inköp an unpublished checklist as not yet what companies see", async () => {
+    mockApi([...baseRoutes(buyerUser), noticeWith({ checklist: draftChecklistView, question_deadline: null })]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    expect(await screen.findByText("Inte publicerad: utkast")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Granska checklistan" })).toHaveAttribute("href", `/inkop/checklistor/${draftChecklistView.id}`);
+    expect(screen.getByText(/^Automatiskt framtaget/u)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Påminn mig/u })).not.toBeInTheDocument();
   });
 });
 
-describe("NoticePage reminders", () => {
-  // As in the demo document: the checklist lists frågestopp three times, and not in date order.
+describe("NoticePage key dates", () => {
+  // As in the demo document: frågestopp three times, not in date order, and a period as two rows.
   const dates = [
-    dated("sista_anbudsdag", "2026-11-09", "Sista anbudsdag 2026-11-09"),
+    dated("sista_anbudsdag", "2026-11-09", "Sista anbudsdag 2026-11-09 kl. 23.59"),
     dated("fragestopp", "2026-10-30", "Sista dag för frågor 2026-10-30"),
-    dated("fragestopp", "2026-11-03", "Sista dag för kommunens svar på frågor 2026-11-03"),
-    dated("fragestopp", "2026-10-13", "Anmälan görs via frågefunktionen senast den 13 oktober 2026."),
+    dated("annat", "2026-11-03", "Sista dag för kommunens svar på frågor 2026-11-03"),
+    dated("fragestopp", "2026-10-13", "Anmälan via frågefunktionen senast 2026-10-13"),
+    dated("annat", "2027-05-17", "Utvändig målning 2027-05-17 – 2027-06-25"),
+    dated("annat", "2027-06-25", "Utvändig målning 2027-05-17 – 2027-06-25"),
   ];
   const withDates = noticeWith({
     deadline_at: "2026-11-10T22:59:00Z",
+    question_deadline: "2026-10-30T23:59:59+01:00",
     checklist: { ...checklistView, checklist: { ...checklistView.checklist, dates } },
   });
 
-  it("offers a reminder only on the date row the reminder is for, named by its date", async () => {
+  it("lists the dates before the tender in date order, without the ISO dates, and the rest closed", async () => {
+    mockApi([...baseRoutes(null), withDates]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    const before = await screen.findByRole("list", { name: "Före anbudet" });
+    expect(within(before).getAllByRole("listitem").map((row) => row.textContent)).toEqual([
+      // Each date is shown short ("13 okt") and read out in full.
+      expect.stringMatching(/^13 okt13 oktober 2026Sista dag för frågor/u),
+      expect.stringMatching(/^30 okt30 oktober 2026Sista dag för frågor/u),
+      expect.stringMatching(/^3 nov3 november 2026Sista dag för kommunens svar på frågor/u),
+      expect.stringMatching(/^9 nov9 november 2026Sista anbudsdag kl\. 23:59/u),
+    ]);
+    const after = screen.getByRole("button", { name: "Efter anbudet och under uppdraget (1)" });
+    await userEvent.click(after);
+    const later = screen.getByRole("list", { name: "Efter anbudet och under uppdraget" });
+    expect(within(later).getByText("17 maj – 25 jun 2027")).toBeInTheDocument();
+    expect(within(later).getByText("Utvändig målning")).toBeInTheDocument();
+  });
+
+  it("offers a reminder only on the rows the backend reminds about, and confirms it", async () => {
+    let created = false;
+    // The backend reminds two days before the checklist's frågestopp, which it sends as the end of that day.
+    const made = { ...reminder, due_at: "2026-10-28T08:00:00+01:00", deadline_at: "2026-10-30T23:59:59+01:00" };
     const calls = mockApi([
       ...baseRoutes(companyUser),
       withDates,
-      { method: "POST", path: `/api/notices/${NOTICE_ID}/reminders`, body: { ...reminder, due_at: "2026-10-28T08:00:00+01:00" } },
+      { method: "GET", path: "/api/reminders", body: () => (created ? [made] : []) },
+      {
+        method: "POST",
+        path: `/api/notices/${NOTICE_ID}/reminders`,
+        body: () => {
+          created = true;
+          return made;
+        },
+      },
     ]);
     renderApp(`/upphandlingar/${NOTICE_ID}`);
 
-    const list = await screen.findByRole("list", { name: "Viktiga datum" });
-    const buttons = within(list).getAllByRole("button", { name: /^Påminn mig/ });
-    expect(buttons.map((button) => button.textContent)).toEqual([
-      "Påminn mig före 9 november 2026",
-      "Påminn mig före 30 oktober 2026",
+    const before = await screen.findByRole("list", { name: "Före anbudet" });
+    const buttons = await within(before).findAllByRole("button", { name: /^Påminn mig/u });
+    expect(buttons.map((button) => button.getAttribute("aria-label") ?? button.textContent)).toEqual([
+      "Påminn mig före sista dag för frågor 30 oktober 2026",
+      "Påminn mig före sista anbudsdag 9 november 2026",
     ]);
-    // The rows for 3 November and 13 October get no button: a reminder from them would be for 30 October.
-    const rows = within(list).getAllByRole("listitem");
-    for (const row of rows.slice(2)) {
-      expect(within(row).queryByRole("button", { name: /^Påminn mig/ })).not.toBeInTheDocument();
-    }
 
-    await userEvent.click(within(list).getByRole("button", { name: "Påminn mig före 30 oktober 2026" }));
-    expect(await within(list).findByText(/Påminnelse skapad till 28 oktober 2026 kl\. 08:00/)).toBeInTheDocument();
-    expect(calls.find((call) => call.path.endsWith("/reminders"))?.body).toEqual({ kind: "fragestopp" });
+    await userEvent.click(buttons[0]!);
+    expect(await within(before).findByText("Påminnelse mejlas 28 okt")).toBeInTheDocument();
+    const row = within(before).getByText("Påminnelse mejlas 28 okt").closest("li")!;
+    expect(within(row).getByRole("status")).toHaveTextContent(
+      "Klart! Du får ett mejl 28 oktober kl. 08:00, två dagar före sista dag för frågor.",
+    );
+    expect(calls.find((call) => call.method === "POST")?.body).toEqual({ kind: "fragestopp" });
   });
 
-  it("names the header reminder by the date the backend uses, the checklist's", async () => {
+  it("names the header's reminder by the date the backend uses, the checklist's", async () => {
     mockApi([...baseRoutes(companyUser), withDates]);
     renderApp(`/upphandlingar/${NOTICE_ID}`);
 
-    expect(
-      await screen.findByRole("button", { name: "Påminn mig före sista anbudsdag 9 november 2026" }),
-    ).toBeInTheDocument();
+    const facts = await screen.findByRole("region", { name: "Nyckeltal" });
+    expect(await within(facts).findByRole("button", { name: "Påminn mig före sista anbudsdag 9 november 2026" })).toBeInTheDocument();
   });
 
-  it("offers no reminder for a deadline that has passed", async () => {
+  it("marks passed dates and offers no reminder for them", async () => {
     vi.setSystemTime(new Date("2026-11-01T10:00:00+01:00"));
     mockApi([...baseRoutes(companyUser), withDates]);
     renderApp(`/upphandlingar/${NOTICE_ID}`);
 
-    const list = await screen.findByRole("list", { name: "Viktiga datum" });
-    expect(within(list).getAllByRole("button", { name: /^Påminn mig/ }).map((button) => button.textContent)).toEqual([
-      "Påminn mig före 9 november 2026",
-    ]);
+    const before = await screen.findByRole("list", { name: "Före anbudet" });
+    const buttons = await within(before).findAllByRole("button", { name: /^Påminn mig/u });
+    expect(buttons).toHaveLength(1);
+    expect(within(before).getAllByText("passerat")).toHaveLength(2);
   });
 });
 
-describe("NoticePage questions", () => {
-  async function ask(answer: AnswerView, notice: MockRoute = noticeRoute, extra: MockRoute[] = []) {
-    const calls = mockApi([
-      ...baseRoutes(companyUser),
-      notice,
-      { method: "POST", path: `/api/notices/${NOTICE_ID}/questions`, body: answer },
-      { method: "POST", path: `/api/notices/${NOTICE_ID}/reminders`, body: reminder },
-      ...extra,
-    ]);
-    renderApp(`/upphandlingar/${NOTICE_ID}?flik=fraga`);
-    await userEvent.type(await screen.findByRole("textbox", { name: /Din fråga/ }), "Får vi arbeta på helger?");
-    await userEvent.click(screen.getByRole("button", { name: "Fråga" }));
-    expect(await screen.findByText(answer.answer.answer)).toBeInTheDocument();
-    return { calls, panel: screen.getByRole("tabpanel", { name: "Fråga underlaget" }) };
-  }
+describe("NoticePage source dialog", () => {
+  it("opens the cited page with the quote marked and says where the claim was shown", async () => {
+    mockApi([...baseRoutes(null), noticeRoute, pageRoute(4)]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
 
-  it("answers with citations, advises a formal question and creates a reminder", async () => {
-    const { calls, panel } = await ask(answerNotInDocument);
-
-    expect(screen.getByText("Svaret står inte i underlaget")).toBeInTheDocument();
-    expect(within(panel).getByRole("button", { name: /^Sida 4, verifierat citat/ })).toBeInTheDocument();
-    expect(within(panel).getByText("Ställ frågan formellt i e-Avrop")).toBeInTheDocument();
-    expect(within(panel).getByText(/behandla alla leverantörer lika/)).toBeInTheDocument();
-    // Frågestopp is a date: no invented time of day.
-    expect(within(panel).getByText("16 oktober 2026")).toBeInTheDocument();
-    expect(within(panel).queryByText(/kl\. 00:00/)).not.toBeInTheDocument();
-
-    await userEvent.click(within(panel).getByRole("button", { name: "Påminn mig före frågestoppet 16 oktober 2026" }));
-    expect(await within(panel).findByText(/Påminnelse skapad till 14 oktober 2026 kl\. 08:00/)).toBeInTheDocument();
-
-    const question = calls.find((call) => call.path.endsWith("/questions"));
-    expect(question?.body).toEqual({ question: "Får vi arbeta på helger?", history: [] });
-    expect(calls.find((call) => call.path.endsWith("/reminders"))?.body).toEqual({ kind: "fragestopp" });
-  });
-
-  it("offers no frågestopp reminder when the checklist gives no frågestopp", async () => {
-    const { panel } = await ask({ ...answerNotInDocument, question_deadline: null });
-
-    expect(within(panel).getByText(/Sista dag för frågor står i underlaget/)).toBeInTheDocument();
-    expect(within(panel).queryByRole("button", { name: /^Påminn mig/ })).not.toBeInTheDocument();
-  });
-
-  it("links to the procurement in e-Avrop, whichever of the notice's links goes there", async () => {
-    const eavrop = "https://www.e-avrop.com/sundsvall/e-Upphandling/Default.aspx?id=fiktiv";
-    const { panel } = await ask(
-      answerNotInDocument,
-      noticeWith({ url: "https://ted.europa.eu/sv/notice/-/detail/1-2026", documents_url: eavrop }),
-    );
-
-    expect(within(panel).getByRole("link", { name: /Öppna upphandlingen i e-Avrop/ })).toHaveAttribute("href", eavrop);
-  });
-
-  it("does not call e-Avrop itself the procurement when the notice only has a TED page", async () => {
-    const eavrop = "https://www.e-avrop.com/sundsvall";
-    const { panel } = await ask(
-      { ...answerNotInDocument, formal_question_url: eavrop },
-      noticeWith({ url: "https://ted.europa.eu/sv/notice/-/detail/1-2026", documents_url: null }),
-    );
-
-    expect(within(panel).getByRole("link", { name: /Gå till e-Avrop/ })).toHaveAttribute("href", eavrop);
-    expect(within(panel).queryByRole("link", { name: /Öppna upphandlingen/ })).not.toBeInTheDocument();
-  });
-
-  it("says why a fictitious notice cannot be found in e-Avrop", async () => {
-    const { panel } = await ask(
-      { ...answerNotInDocument, formal_question_url: "https://www.e-avrop.com/sundsvall" },
-      noticeWith({ url: null, documents_url: null }),
-    );
-
-    expect(within(panel).getByText(/påhittad för demon och finns därför inte i e-Avrop/)).toBeInTheDocument();
-    expect(within(panel).getByRole("link", { name: /Gå till e-Avrop/ })).toBeInTheDocument();
-  });
-
-  const laterDocument = {
-    id: "5d4c3b2a-1f0e-4d9c-8b7a-6f5e4d3c2b1a",
-    filename: "Förfrågningsunderlag version 2.pdf",
-    page_count: 18,
-    is_fictitious: true,
-  };
-  const twoDocuments = noticeWith({
-    documents: [...noticeDetail.documents, laterDocument],
-    checklist: { ...checklistView, document_id: laterDocument.id },
-  });
-
-  it("opens answer citations in the document the answer names", async () => {
-    const { panel } = await ask({ ...answerNotInDocument, document_id: laterDocument.id }, twoDocuments, [
-      { ...pageRoute, path: `/api/notices/${NOTICE_ID}/documents/${laterDocument.id}/pages/4`, body: { ...pageFour, page_count: 18 } },
-    ]);
-
-    await userEvent.click(within(panel).getByRole("button", { name: /^Sida 4, verifierat citat/ }));
+    await userEvent.click(await screen.findByRole("link", { name: /Ansvarsförsäkring om minst 5 miljoner kronor”, s\. 4$/u }));
     const dialog = await screen.findByRole("dialog", { name: "Källan i underlaget" });
-    expect(within(dialog).getByText(laterDocument.filename)).toBeInTheDocument();
-    expect(await within(dialog).findByText("Sida 4 av 18")).toBeInTheDocument();
+    // The page's lines are joined into paragraphs, so the quote that ran over a line break reads as one line.
+    const mark = await within(dialog).findByText(
+      (_, element) => element?.tagName === "MARK" && element.textContent === "Leverantören ska ha en ansvarsförsäkring",
+    );
+    expect(mark).toBeInTheDocument();
+    expect(within(dialog).getByText("Citatet står på sida 4 och är markerat nedan.")).toBeInTheDocument();
+    expect(within(dialog).getByText(`Från: Skallkrav · ${noticeDetail.title}`)).toBeInTheDocument();
   });
 
-  it("opens answer citations in the first document when the answer does not name one", async () => {
-    const { document_id: _unnamed, ...withoutDocument } = answerNotInDocument;
-    const { panel } = await ask(withoutDocument as AnswerView, twoDocuments, [pageRoute]);
+  it("does not promise a mark when a verified quote's wording differs from the page", async () => {
+    const citation: Citation = { page: 4, quote: "Leverantören ska teckna en försäkring", check: "verified", found_page: null };
+    mockApi([...baseRoutes(null), noticeWithCitation(citation), pageRoute(4)]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
 
-    await userEvent.click(within(panel).getByRole("button", { name: /^Sida 4, verifierat citat/ }));
+    await userEvent.click(await screen.findByRole("link", { name: /Ansvarsförsäkring om minst 5 miljoner kronor”, s\. 4$/u }));
     const dialog = await screen.findByRole("dialog", { name: "Källan i underlaget" });
-    expect(within(dialog).getByText(noticeDetail.documents[0]!.filename)).toBeInTheDocument();
-    expect(await within(dialog).findByText("Sida 4 av 16")).toBeInTheDocument();
+    expect(await within(dialog).findByText(/lite andra ord, så det går inte att markera/u)).toBeInTheDocument();
+    expect(dialog.querySelector("mark")).toBeNull();
+  });
+
+  it("opens page 1 when the AI cites a page past the end of the document", async () => {
+    const citation: Citation = { page: 40, quote: "Sanktioner vid försening", check: "unverified", found_page: null };
+    const calls = mockApi([...baseRoutes(null), noticeWithCitation(citation), pageRoute(1, "Förfrågningsunderlag")]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    await userEvent.click(await screen.findByRole("link", { name: /Ansvarsförsäkring om minst 5 miljoner kronor”, Hittades inte i underlaget$/u }));
+    const dialog = await screen.findByRole("dialog", { name: "Källan i underlaget" });
+    expect(within(dialog).getByText(/AI:n angav sida 40, men underlaget har bara 16 sidor/u)).toBeInTheDocument();
+    expect(await within(dialog).findByText("Sida 1 av 16")).toBeInTheDocument();
+    expect(calls.some((call) => call.path.endsWith("/pages/40"))).toBe(false);
+  });
+
+  it("opens the source an address names, as a link from a mail or another page does", async () => {
+    mockApi([...baseRoutes(null), noticeRoute, pageRoute(4)]);
+    const params = new URLSearchParams({ citat: "Leverantören ska ha en ansvarsförsäkring", sida: "4", pastaende: "Försäkringen" });
+    renderApp(`/upphandlingar/${NOTICE_ID}?${params.toString()}`);
+
+    const dialog = await screen.findByRole("dialog", { name: "Källan i underlaget" });
+    expect(within(dialog).getByText("Försäkringen")).toBeInTheDocument();
+    expect(await within(dialog).findByText("Citatet står på sida 4 och är markerat nedan.")).toBeInTheDocument();
+  });
+
+  it("opens the document for the old address of the document tab", async () => {
+    mockApi([...baseRoutes(null), noticeRoute, pageRoute(1, "Förfrågningsunderlag")]);
+    renderApp(`/upphandlingar/${NOTICE_ID}?flik=underlag`);
+
+    const dialog = await screen.findByRole("dialog", { name: "Underlaget" });
+    expect(await within(dialog).findByText("Sida 1 av 16")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Krav" })).toHaveAttribute("aria-selected", "true");
   });
 });
 
-describe("NoticePage submission", () => {
-  it("submits through e-Avrop itself when the notice only has a TED page, which takes no tenders", async () => {
-    const ted = "https://ted.europa.eu/sv/notice/-/detail/1-2026";
-    mockApi([...baseRoutes(companyUser), noticeWith({ url: ted, documents_url: null })]);
-    renderApp(`/upphandlingar/${NOTICE_ID}?flik=inlamning`);
+describe("NoticePage without a checklist", () => {
+  const withoutChecklist = noticeWith({ checklist: null, checklist_status: "none", question_deadline: null, match: matchView });
 
-    const panel = await screen.findByRole("tabpanel", { name: "Inför inlämning" });
-    expect(await within(panel).findByRole("link", { name: /Gå till e-Avrop/ })).toHaveAttribute(
-      "href",
-      config.eavrop_url,
-    );
-    expect(within(panel).queryByRole("link", { name: /Lämna anbudet i e-Avrop/ })).not.toBeInTheDocument();
+  it("explains why there are no steps and offers the notice and questions, with the one reminder at the deadline", async () => {
+    mockApi([...baseRoutes(companyUser), withoutChecklist]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    expect(await screen.findByRole("heading", { level: 2, name: "Ingen granskad checklista ännu" })).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Öppna annonsen (öppnas i en ny flik)" })).toHaveAttribute("href", noticeDetail.url);
+    // One reminder per deadline: beside sista anbudsdag in the key facts.
+    const reminders = await screen.findAllByRole("button", { name: "Påminn mig före sista anbudsdag 26 oktober 2026" });
+    expect(reminders).toHaveLength(1);
+    expect(within(screen.getByRole("region", { name: "Nyckeltal" })).getByRole("button", { name: /^Påminn mig/u })).toBe(reminders[0]);
+
+    await userEvent.click(screen.getByRole("button", { name: "Fråga underlaget" }));
+    expect(await screen.findByRole("heading", { level: 2, name: "Fråga underlaget" })).toHaveFocus();
+    expect(screen.getByRole("textbox", { name: /Din fråga/u })).toBeInTheDocument();
   });
 
-  it("names the procurement in e-Avrop when the notice links there", async () => {
-    const eavrop = "https://www.e-avrop.com/sundsvall/e-Upphandling/Default.aspx?id=fiktiv";
-    mockApi([...baseRoutes(companyUser), noticeWith({ url: null, documents_url: eavrop })]);
-    renderApp(`/upphandlingar/${NOTICE_ID}?flik=inlamning`);
-
-    const panel = await screen.findByRole("tabpanel", { name: "Inför inlämning" });
-    expect(await within(panel).findByRole("link", { name: /Lämna anbudet i e-Avrop/ })).toHaveAttribute(
-      "href",
-      eavrop,
-    );
-  });
-
-  it("points a made-up notice without a page to e-Avrop and says why it is not there", async () => {
-    mockApi([...baseRoutes(companyUser), noticeWith({ url: null, documents_url: null })]);
-    renderApp(`/upphandlingar/${NOTICE_ID}?flik=inlamning`);
-
-    const panel = await screen.findByRole("tabpanel", { name: "Inför inlämning" });
-    expect(await within(panel).findByRole("link", { name: /Gå till e-Avrop/ })).toHaveAttribute(
-      "href",
-      config.eavrop_url,
-    );
-    expect(within(panel).getByText(/påhittad för demon och finns därför inte i e-Avrop/)).toBeInTheDocument();
-  });
-});
-
-describe("NoticePage draft review", () => {
-  it("reviews an uploaded draft without storing it and lists gaps first", async () => {
-    const calls = mockApi([
+  it("leads to the notice and to the documents where they are kept when none are read in here", async () => {
+    const ted = "https://ted.europa.eu/sv/notice/-/detail/123456-2026";
+    const eavrop = "https://www.e-avrop.com/sundsvall/e-Upphandling/Default.aspx?id=123456";
+    mockApi([
       ...baseRoutes(companyUser),
-      noticeRoute,
-      { method: "POST", path: `/api/notices/${NOTICE_ID}/review`, body: reviewView },
+      noticeWith({ checklist: null, checklist_status: "none", has_documents: false, documents: [], url: ted, documents_url: eavrop, source: "ted" }),
     ]);
-    renderApp(`/upphandlingar/${NOTICE_ID}?flik=granska`);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
 
-    expect(await screen.findByText("Utkastet sparas inte")).toBeInTheDocument();
-    const input = document.querySelector<HTMLInputElement>('input[type="file"]');
-    await userEvent.upload(input!, new File(["%PDF-1.7 utkast"], "utkast.pdf", { type: "application/pdf" }));
-    await userEvent.click(screen.getByRole("button", { name: "Granska utkastet" }));
+    expect(await screen.findByText(/^Underlaget finns i e-Avrop men har inte lästs in här/u)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Öppna annonsen i TED (öppnas i en ny flik)" })).toHaveAttribute("href", ted);
+    expect(screen.getByRole("link", { name: "Underlaget i e-Avrop (öppnas i en ny flik)" })).toHaveAttribute("href", eavrop);
+    expect(screen.queryByRole("button", { name: "Fråga underlaget" })).not.toBeInTheDocument();
+  });
 
-    const titles = await screen.findAllByRole("heading", { level: 4 });
-    expect(titles.map((heading) => heading.textContent)).toEqual([
-      "Ansvarsförsäkring om minst 5 miljoner kronor",
-      "Två referensuppdrag",
-    ]);
-    expect(screen.getByText("Obevisat", { selector: "*" })).toBeInTheDocument();
-    expect(screen.getByText(/Utkastet har inte sparats/)).toBeInTheDocument();
-    const upload = calls.find((call) => call.path.endsWith("/review"));
-    expect((upload?.body as FormData).get("file")).toBeInstanceOf(File);
+  it("says that the fit rests on the notice alone", async () => {
+    mockApi([...baseRoutes(companyUser), withoutChecklist]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Därför passar den delvis (3 skäl)" }));
+    expect(screen.getByText(/Bedömt bara på CPV-kod och ord i annonsen/u)).toBeInTheDocument();
+  });
+
+  it("promises no checklist for an awarded notice", async () => {
+    mockApi([...baseRoutes(companyUser), noticeWith({ checklist: null, checklist_status: "none", status: "awarded", has_documents: false, documents: [] })]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    expect(await screen.findByRole("heading", { level: 2, name: "Ingen granskad checklista" })).toBeInTheDocument();
+    expect(screen.getByText(/^Tilldelningsbeslutet är fattat, och det finns ingen granskad checklista/u)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Påminn mig/u })).not.toBeInTheDocument();
+  });
+
+  it("offers no questions when there is no document", async () => {
+    mockApi([...baseRoutes(null), noticeWith({ checklist: null, has_documents: false, documents: [], question_deadline: null })]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    expect(await screen.findByText(/Underlaget finns hos upphandlingen men har inte lästs in här/u)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Fråga underlaget" })).not.toBeInTheDocument();
   });
 });

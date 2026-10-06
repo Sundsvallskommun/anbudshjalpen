@@ -1,0 +1,54 @@
+/* The list of the checklist under review: a toolbar, then groups whose heading sits on a muted band between dividers,
+   with rows edge to edge (direction.md, section 4 "Granskningsbord"). The insets follow the card's (20 px, 16 px on a
+   phone). Bespoke surface; tokens only. */
+.toolbar {
+  padding-block: var(--spacing-3);
+  padding-inline: var(--spacing-5);
+}
+
+.groupHead {
+  padding-block: var(--spacing-2);
+  padding-inline: var(--spacing-5);
+  border-block: var(--border-width) solid var(--color-border);
+  background: var(--color-background-muted);
+}
+
+/* Beside the source pane the list scrolls in its own box: the heading of the group being read stays at its top. The
+   muted band is laid over the card's colour, so rows do not show through it. */
+.sticky {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  background:
+    linear-gradient(var(--color-background-muted), var(--color-background-muted)),
+    var(--color-background-card);
+}
+
+.summary {
+  padding-block: var(--spacing-3) var(--spacing-4);
+  padding-inline: var(--spacing-5);
+}
+
+.summaryText {
+  flex: 1 1 calc(var(--spacing-12) * 6);
+  margin: 0;
+  max-inline-size: 72ch;
+  white-space: pre-wrap;
+}
+
+.empty {
+  margin: 0;
+  padding: var(--spacing-5);
+}
+
+@media (max-width: 639px) {
+  .toolbar,
+  .groupHead,
+  .summary {
+    padding-inline: var(--spacing-4);
+  }
+
+  .empty {
+    padding: var(--spacing-4);
+  }
+}

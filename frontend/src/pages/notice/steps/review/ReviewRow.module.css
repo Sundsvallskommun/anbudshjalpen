@@ -1,0 +1,26 @@
+/* A review row inside its group card, on the card's inset with a divider between rows. A row that must be fixed has a
+   red edge at its start (direction.md, section 4: "Varje rad har röd vänsterkant"). Tokens only. */
+.row {
+  padding-block: var(--spacing-4);
+  padding-inline: var(--spacing-5);
+}
+
+.row + .row {
+  border-block-start: var(--border-width) solid var(--color-border);
+}
+
+.urgent {
+  box-shadow: inset var(--spacing-1) 0 0 var(--color-error);
+}
+
+@media (max-width: 639px) {
+  .row {
+    padding-inline: var(--spacing-4);
+  }
+}
+
+@media (forced-colors: active) {
+  .urgent {
+    border-inline-start: var(--spacing-1) solid Mark;
+  }
+}

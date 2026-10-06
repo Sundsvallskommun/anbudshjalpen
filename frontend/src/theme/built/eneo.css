@@ -232,6 +232,13 @@
     --color-on-error: light-dark(#FFFFFF, #1A0A0C);
     --size-element-lg: 48px;
     --color-error: light-dark(#AA181D, #F47B7F);
+    --layout-container: 1152px;
+    --layout-workspace: 1344px;
+    --layout-main: 760px;
+    --layout-rail: 360px;
+    --layout-form: 640px;
+    --height-top-nav: 64px;
+    --height-step-bar: 52px;
   }
 
   :scope {
@@ -358,6 +365,52 @@
     overflow-wrap: anywhere;
   }
 
+  .astryx-app-shell[data-variant="section"] {
+    background-color: var(--color-background-body);
+    min-height: auto;
+  }
+
+  .astryx-top-nav {
+    min-height: var(--height-top-nav);
+    padding-block: 0;
+    padding-inline: max(var(--spacing-4), calc((100% - var(--layout-container)) / 2));
+  }
+
+  .astryx-top-nav-heading {
+    margin-inline-end: var(--spacing-6);
+  }
+
+  .astryx-top-nav-item {
+    min-height: var(--height-top-nav);
+    border-radius: 0;
+    color: var(--color-text-primary);
+  }
+
+  .astryx-top-nav-item[data-selected="selected"] {
+    color: var(--color-text-accent);
+    font-weight: var(--font-weight-semibold);
+    background-color: transparent;
+    box-shadow: inset 0 -2px 0 var(--color-accent);
+  }
+
+  .astryx-tab[data-selected="selected"] {
+    --color-overlay-hover: transparent;
+    --color-overlay-pressed: transparent;
+  }
+
+  .astryx-banner[data-container="section"][data-status="info"] {
+    background-color: var(--color-background-surface);
+    border-block-end: 1px solid var(--color-border);
+    align-items: center;
+    padding-block: var(--spacing-1-5);
+    padding-inline: max(var(--spacing-4), calc((100% - var(--layout-container)) / 2));
+    min-height: var(--spacing-9);
+  }
+
+  .astryx-card {
+    --astryx-card-padding: var(--spacing-5);
+  }
+
   .astryx-text-input:focus-within {
     outline: var(--focus-outline-width) var(--focus-outline-style) var(--focus-outline-color);
     outline-offset: var(--focus-outline-offset);
@@ -412,6 +465,10 @@
     min-block-size: 24px;
   }
 
+  .astryx-segmented-control {
+    background-color: light-dark(var(--color-neutral), color-mix(in srgb, var(--color-text-primary) 15%, transparent));
+  }
+
   .astryx-toggle-button-group {
     flex-wrap: wrap;
   }
@@ -442,6 +499,13 @@
 
   .astryx-collapsible-trigger {
     min-height: 24px;
+  }
+
+  .astryx-chat-message-bubble[data-sender="user"][data-variant="filled"] {
+    background-color: var(--color-accent-muted);
+    color: var(--color-text-primary);
+    border-radius: var(--radius-container);
+    border-end-end-radius: var(--radius-inner);
   }
 
   .astryx-text[data-color="primary"] { color: var(--color-text-primary); }
@@ -497,6 +561,39 @@
 }
 
 @layer astryx-theme {
+@media (width < 640px) {
+  @scope ([data-astryx-theme="eneo"]) to ([data-astryx-theme]) {
+    :scope {
+      --height-top-nav: 56px;
+      --height-step-bar: 48px;
+    }
+
+    .astryx-card {
+      --astryx-card-padding: var(--spacing-4);
+      --astryx-card-padding-inline: initial;
+      --astryx-card-padding-inline-start: initial;
+      --astryx-card-padding-inline-end: initial;
+      --astryx-card-padding-block-start: initial;
+      --astryx-card-padding-block-end: initial;
+    }
+
+    .astryx-heading[data-level="1"] {
+      font-size: var(--font-size-xl);
+      line-height: var(--text-heading-2-leading);
+    }
+
+    .astryx-heading[data-color="primary"] { color: var(--color-text-primary); }
+
+    .astryx-heading[data-color="secondary"] { color: var(--color-text-secondary); }
+
+    .astryx-heading[data-color="disabled"] { color: var(--color-text-disabled); }
+
+    .astryx-heading[data-color="placeholder"] { color: var(--color-text-secondary); }
+
+    .astryx-heading[data-color="accent"] { color: var(--color-text-accent); }
+  }
+}
+
 @media (pointer: coarse) {
   @scope ([data-astryx-theme="eneo"]) to ([data-astryx-theme]) {
     :scope {
@@ -532,7 +629,25 @@
     .astryx-radio-list-item {
       min-height: 44px;
     }
+
+    .astryx-item {
+      min-height: 44px;
+    }
+
+    .astryx-token {
+      min-height: var(--spacing-6);
+    }
   }
+}
+
+@scope ([data-astryx-theme="eneo"]) to ([data-astryx-theme]) {
+  .astryx-heading[data-weight="normal"] { font-weight: var(--font-weight-normal); }
+
+  .astryx-heading[data-weight="medium"] { font-weight: var(--font-weight-medium); }
+
+  .astryx-heading[data-weight="semibold"] { font-weight: var(--font-weight-semibold); }
+
+  .astryx-heading[data-weight="bold"] { font-weight: var(--font-weight-bold); }
 }
 }
 

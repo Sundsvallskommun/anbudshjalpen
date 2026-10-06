@@ -4,6 +4,11 @@
  * one h1 per page, no sideways scrolling at 320 px and 200 % zoom (WCAG 1.4.10), and no Content Security
  * Policy violation or uncaught error (the backend serves the app with `script-src 'self'; style-src 'self'`).
  *
+ * The phone projects cover the phone's frame in every state: the two-row header (the main choices as tabs on a
+ * top-level page, the back link on a detail page), the step bar's short labels, and the source in a bottom sheet
+ * instead of a dialog. The overlays the frame opens (the demo strip's "Om demon och AI", the account menu) have
+ * states of their own.
+ *
  * The app must be running with the demo data (`anbudsklar seed`). States that need data the database
  * does not have are skipped with the reason, never passed silently.
  */
@@ -20,28 +25,47 @@ interface State {
   go: (page: Page) => Promise<string | void>;
 }
 
-async function openFirstNotice(page: Page, withChecklist: boolean): Promise<string | void> {
-  await page.goto("/");
+/** The token on a notice whose checklist inköp has reviewed and published (lib/labels PUBLISHED_CHECKLIST). */
+const PUBLISHED_CHECKLIST = "Granskad checklista";
+
+async function open(page: Page, path: string) {
+  await page.goto(path);
   await ready(page);
+}
+
+async function openFirstNotice(page: Page, withChecklist: boolean): Promise<string | void> {
+  await open(page, "/upphandlingar");
   const rows = page.getByRole("list", { name: "Upphandlingar" }).getByRole("listitem");
-  const candidates = withChecklist ? rows.filter({ hasText: "Checklista finns" }) : rows;
-  if ((await candidates.count()) === 0) return withChecklist ? "ingen upphandling med publicerad checklista" : "inga upphandlingar";
+  const candidates = withChecklist ? rows.filter({ hasText: PUBLISHED_CHECKLIST }) : rows;
+  if ((await candidates.count()) === 0) return withChecklist ? "ingen upphandling med granskad checklista" : "inga upphandlingar";
   await candidates.first().getByRole("link").first().click();
-  await page.waitForURL(/\/upphandlingar\//);
+  await page.waitForURL(/\/upphandlingar\/[^/?#]+/);
   // React keeps the old page on screen until the new one has loaded.
   await expect(page.locator("h1")).not.toHaveText("Upphandlingar");
   await ready(page);
 }
 
-async function openTab(page: Page, tab: string) {
-  await page.getByRole("tab", { name: tab }).click();
+/** One of the notice page's four steps: Krav, Fråga, Granska or Lämna in (a step's mark adds words to its name). */
+async function openStep(page: Page, step: "Krav" | "Fråga" | "Granska" | "Lämna in") {
+  await page.getByRole("tablist", { name: "Steg" }).getByRole("tab", { name: step }).click();
   await ready(page);
 }
 
 const STATES: State[] = [
-  { name: "upphandlingar", persona: null, go: async (page) => page.goto("/").then(() => ready(page)) },
-  { name: "logga-in", persona: null, go: async (page) => page.goto("/logga-in").then(() => ready(page)) },
-  { name: "regelhjalpen", persona: null, go: async (page) => page.goto("/regelhjalpen").then(() => ready(page)) },
+  { name: "upphandlingar", persona: null, go: (page) => open(page, "/upphandlingar") },
+  { name: "logga-in", persona: null, go: (page) => open(page, "/logga-in") },
+  { name: "regelhjalpen", persona: null, go: (page) => open(page, "/regelhjalpen") },
+  {
+    name: "om-demon",
+    persona: null,
+    go: async (page) => {
+      await open(page, "/upphandlingar");
+      // The demo strip's link: "Om demon och AI", or "Mer" named "Mer om demon och AI" on a phone.
+      await page.getByRole("banner").getByRole("button", { name: /om demon och AI$/i }).click();
+      await page.getByRole("dialog", { name: "Om demon och AI" }).waitFor();
+      await ready(page);
+    },
+  },
   { name: "upphandling-checklista", persona: null, go: (page) => openFirstNotice(page, true) },
   {
     name: "upphandling-kalla",
@@ -49,7 +73,8 @@ const STATES: State[] = [
     go: async (page) => {
       const skip = await openFirstNotice(page, true);
       if (skip) return skip;
-      await page.getByRole("button", { name: /^Sida \d+, .*Visa källan$/ }).first().click();
+      // Every "s. N" is a link named by what it backs ("Visa källan för ”…”, s. 4"); a phone opens a bottom sheet.
+      await page.getByRole("link", { name: /^Visa källan/ }).first().click();
       await page.getByRole("dialog", { name: "Källan i underlaget" }).waitFor();
       await ready(page);
     },
@@ -60,19 +85,29 @@ const STATES: State[] = [
     go: async (page) => {
       const skip = await openFirstNotice(page, true);
       if (skip) return skip;
-      await openTab(page, "Fråga underlaget");
+      await openStep(page, "Fråga");
     },
   },
-  { name: "bevakning", persona: "foretagare", go: async (page) => page.goto("/bevakning").then(() => ready(page)) },
-  { name: "profil", persona: "foretagare", go: async (page) => page.goto("/profil").then(() => ready(page)) },
-  { name: "paminnelser", persona: "foretagare", go: async (page) => page.goto("/paminnelser").then(() => ready(page)) },
+  { name: "start", persona: "foretagare", go: (page) => open(page, "/start") },
+  {
+    name: "kontomeny",
+    persona: "foretagare",
+    go: async (page) => {
+      await open(page, "/start");
+      await page.getByRole("button", { name: /^Konto: / }).click();
+      await page.getByRole("dialog", { name: "Konto" }).waitFor();
+      await ready(page);
+    },
+  },
+  { name: "profil", persona: "foretagare", go: (page) => open(page, "/profil") },
+  { name: "paminnelser", persona: "foretagare", go: (page) => open(page, "/paminnelser") },
   {
     name: "upphandling-granska",
     persona: "foretagare",
     go: async (page) => {
       const skip = await openFirstNotice(page, true);
       if (skip) return skip;
-      await openTab(page, "Granska utkast");
+      await openStep(page, "Granska");
     },
   },
   {
@@ -81,24 +116,29 @@ const STATES: State[] = [
     go: async (page) => {
       const skip = await openFirstNotice(page, true);
       if (skip) return skip;
-      await openTab(page, "Inför inlämning");
+      await openStep(page, "Lämna in");
     },
   },
-  { name: "inkop-ko", persona: "inkopare", go: async (page) => page.goto("/inkop").then(() => ready(page)) },
-  { name: "inkop-ny", persona: "inkopare", go: async (page) => page.goto("/inkop?flik=ny").then(() => ready(page)) },
-  { name: "inkop-insikter", persona: "inkopare", go: async (page) => page.goto("/inkop?flik=insikter").then(() => ready(page)) },
-  { name: "inkop-jobb", persona: "inkopare", go: async (page) => page.goto("/inkop?flik=jobb").then(() => ready(page)) },
+  { name: "inkop-ko", persona: "inkopare", go: (page) => open(page, "/inkop") },
+  { name: "inkop-ny", persona: "inkopare", go: (page) => open(page, "/inkop?flik=ny") },
+  { name: "inkop-insikter", persona: "inkopare", go: (page) => open(page, "/inkop?flik=insikter") },
+  // The jobs moved to Drift (/inkop/drift, in inköp's account menu); "/inkop?flik=jobb" redirects there.
+  { name: "inkop-jobb", persona: "inkopare", go: (page) => open(page, "/inkop/drift") },
   {
     name: "inkop-granska-checklista",
     persona: "inkopare",
     go: async (page) => {
-      await page.goto("/inkop?flik=granska");
-      await ready(page);
-      const links = page.getByRole("list", { name: "Checklistor" }).getByRole("link");
+      await open(page, "/inkop?flik=granska");
+      const links = page.getByRole("table", { name: "Checklistor" }).getByRole("link", { name: /^Granska / });
       if ((await links.count()) === 0) return "inga checklistor att granska";
       await links.first().click();
       await page.waitForURL(/\/inkop\/checklistor\//);
-      await expect(page.locator("h1")).toHaveText("Granska checklistan");
+      // The h1 is the notice's title, with "Granska checklista" above it. Until the notice has loaded, the h1 (and on
+      // wider screens the trail) says "Granska checklista" instead.
+      const eyebrow = page.getByText("Granska checklista", { exact: true });
+      await expect(eyebrow).toHaveCount(1);
+      await expect(page.getByRole("heading", { level: 1 })).not.toHaveText("Granska checklista");
+      await expect(eyebrow).toBeVisible();
       await ready(page);
     },
   },

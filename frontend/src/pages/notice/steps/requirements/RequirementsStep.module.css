@@ -1,0 +1,6 @@
+/* A part of step 1 that the outline and the statistic tiles link to lands a row's distance below the sticky step bar,
+   as the section cards do (CollapsibleSection): the page's scroll padding (app.css) already clears the bar, and this
+   margin adds to it. Tokens only. */
+.anchor {
+  scroll-margin-block-start: var(--spacing-4);
+}

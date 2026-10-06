@@ -1,0 +1,33 @@
+/* The review's header (direction.md, section 4): the status Stepper beside the h1, wide enough for its three steps side
+   by side, with the line about an earlier published version under it, aligned to the end like the steps. On a phone
+   the Stepper shows the current step under its track instead. Tokens only. */
+.status {
+  max-inline-size: 100%;
+}
+
+.stepper {
+  inline-size: calc(var(--spacing-12) * 8);
+  max-inline-size: 100%;
+}
+
+.note {
+  max-inline-size: calc(var(--spacing-12) * 12);
+  text-align: end;
+}
+
+/* The document's long file name is cut to one line instead of widening its column: it asks for no width of its own
+   and fills what the column gives it. */
+.fileValue {
+  inline-size: 0;
+  min-inline-size: 100%;
+}
+
+@media (max-width: 639px) {
+  .stepper {
+    inline-size: auto;
+  }
+
+  .note {
+    text-align: start;
+  }
+}

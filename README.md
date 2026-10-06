@@ -38,6 +38,7 @@ och kör testerna står i [Utveckling](docs/development.md).
 | se vad PoC:n ska visa | [PoC](docs/poc.md) |
 | se hur lösningen är uppbyggd | [Arkitektur](docs/architecture.md) |
 | förstå AI-uppgifterna och citatkontrollen | [AI-uppgifterna](docs/ai-tasks.md) |
+| se hur gränssnittet är uppbyggt och vilka ord det använder | [Design](docs/design.md) |
 | koppla appen till Eneo | [Eneo-integration](docs/eneo-integration.md) |
 | veta varifrån datan kommer | [Datakällor](docs/data-sources.md) |
 | köra appen och testerna | [Utveckling](docs/development.md) |

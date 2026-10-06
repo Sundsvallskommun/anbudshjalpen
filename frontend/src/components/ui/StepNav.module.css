@@ -1,0 +1,79 @@
+/* The sticky step bar (direction.md, section 4): it stays at the top while the step scrolls, on the page's grey until
+   it sticks and on the surface with a low shadow once it has. It is the theme's bar height (52 px, 48 on a phone;
+   the 48 px tabs fill it) with a line across its whole width, which the chosen tab's accent line covers. The page's
+   scroll padding keeps a focused control from hiding under it (app.css, WCAG 2.4.11). Bespoke surface; tokens only. */
+.bar {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  min-block-size: var(--height-step-bar);
+  border-block-end: var(--border-width) solid var(--color-border);
+  background: var(--color-background-body);
+  transition: box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.bar[data-stuck="true"] {
+  background: var(--color-background-surface);
+  box-shadow: var(--shadow-low);
+}
+
+.sentinel {
+  display: block;
+  block-size: 0;
+}
+
+/* "Sista anbudsdag 9 nov · om 35 dagar" at the far end, centred on the bar while the tabs stand on its line. */
+.end {
+  flex: none;
+  align-self: center;
+  padding-inline-end: var(--spacing-2);
+}
+
+.bar:not([data-stuck="true"]) .end {
+  display: none;
+}
+
+/* The step number in a 20 px circle: outlined, and filled with the accent on the chosen step. */
+.number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--spacing-5);
+  block-size: var(--spacing-5);
+  border: var(--border-width) solid var(--color-border-emphasized);
+  border-radius: var(--radius-full);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.numberChosen {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+/* The panel starts a group's distance below the bar. */
+.panel {
+  padding-block-start: var(--spacing-6);
+}
+
+.panel:focus {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .numberChosen {
+    border-color: Highlight;
+    background: Highlight;
+    color: HighlightText;
+  }
+}

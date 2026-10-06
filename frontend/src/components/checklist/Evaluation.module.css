@@ -1,0 +1,64 @@
+/* The evaluation as a bar split into price and quality (direction.md, section 4: "en stapel som delas 70/30 i accent och
+   accent-muted"). A meter draws the first share on the second; it is decoration, since the legend beside it says the
+   same in words. Tokens only. */
+.split {
+  display: block;
+  inline-size: 100%;
+  block-size: var(--spacing-3);
+  margin: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-muted);
+  overflow: hidden;
+  appearance: none;
+}
+
+.split::-webkit-meter-inner-element {
+  display: block;
+}
+
+.split::-webkit-meter-bar {
+  block-size: var(--spacing-3);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-muted);
+}
+
+.split::-webkit-meter-optimum-value,
+.split::-webkit-meter-suboptimum-value,
+.split::-webkit-meter-even-less-good-value {
+  border-radius: var(--radius-full) 0 0 var(--radius-full);
+  background: var(--color-accent);
+}
+
+.split::-moz-meter-bar {
+  border-radius: var(--radius-full) 0 0 var(--radius-full);
+  background: var(--color-accent);
+}
+
+/* The legend's square for each share, in the colour of its part of the bar. */
+.swatch {
+  display: inline-block;
+  flex: none;
+  inline-size: var(--spacing-3);
+  block-size: var(--spacing-3);
+  border-radius: var(--radius-inner);
+  background: var(--color-accent);
+}
+
+.swatchSecond {
+  background: var(--color-accent-muted);
+  box-shadow: inset 0 0 0 var(--border-width) var(--color-accent);
+}
+
+@media (forced-colors: active) {
+  .swatch {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+
+  .swatchSecond {
+    background: Canvas;
+    box-shadow: inset 0 0 0 var(--border-width) CanvasText;
+  }
+}
