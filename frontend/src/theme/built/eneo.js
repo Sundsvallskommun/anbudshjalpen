@@ -363,6 +363,13 @@ export const eneoTheme = {
         "backgroundColor": "light-dark(var(--color-neutral), color-mix(in srgb, var(--color-text-primary) 15%, transparent))"
       }
     },
+    "segmented-control-item": {
+      "base": {
+        ":not([data-selected=\"selected\"])": {
+          "color": "light-dark(var(--color-text-secondary), color-mix(in srgb, var(--color-text-secondary) 50%, var(--color-text-primary)))"
+        }
+      }
+    },
     "toggle-button-group": {
       "base": {
         "flexWrap": "wrap"

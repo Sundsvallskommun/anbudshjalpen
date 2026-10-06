@@ -2,12 +2,11 @@ import { InternationalizationProvider } from "@astryxdesign/core/i18n";
 import { LayerProvider } from "@astryxdesign/core/Layer";
 import { LinkProvider } from "@astryxdesign/core/Link";
 import sv from "@astryxdesign/core/locales/sv-SE.json";
-import { Theme } from "@astryxdesign/core/theme";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { Link as RouterLink } from "react-router";
 import { SourceDialogProvider } from "./components/ui/source/SourceDialogProvider";
-import { eneoTheme } from "./theme/built/eneo";
+import { AppearanceTheme } from "./shell/appearance";
 
 const MESSAGES = { "sv-SE": sv };
 
@@ -17,8 +16,9 @@ const MESSAGES = { "sv-SE": sv };
  * link for every link the design system draws (a link is a client navigation, not a page load), the
  * one toast viewport, and the app's one source dialog, which every "s. N" opens. Render it inside the router.
  *
- * The colour mode follows the operating system ("system"); the theme's tokens are light-dark() values,
- * so no script decides it. React Router's Link reads `to`, which Astryx passes alongside `href`.
+ * The colour mode is the visitor's choice under "Utseende" (AppearanceTheme): light, dark or the device's
+ * setting, which is the default. The theme's tokens are light-dark() values, so the mode only sets the
+ * colour scheme. React Router's Link reads `to`, which Astryx passes alongside `href`.
  *
  * LayerProvider mounts the viewport that useToast() shows its toasts in ("Dold · Ångra", "Checklistan är
  * publicerad"), here inside the theme, the catalogue and the router: without it each toast falls back to a
@@ -29,13 +29,13 @@ export function AppProviders({ queryClient, children }: { queryClient: QueryClie
   return (
     <QueryClientProvider client={queryClient}>
       <InternationalizationProvider locale="sv-SE" messages={MESSAGES}>
-        <Theme theme={eneoTheme} mode="system">
+        <AppearanceTheme>
           <LinkProvider component={RouterLink}>
             <LayerProvider>
               <SourceDialogProvider>{children}</SourceDialogProvider>
             </LayerProvider>
           </LinkProvider>
-        </Theme>
+        </AppearanceTheme>
       </InternationalizationProvider>
     </QueryClientProvider>
   );

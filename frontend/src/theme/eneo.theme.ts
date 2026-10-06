@@ -138,6 +138,18 @@ export const eneoTheme = defineTheme({
           'light-dark(var(--color-neutral), color-mix(in srgb, var(--color-text-primary) 15%, transparent))',
       },
     },
+    // On a raised surface, such as the account menu's popover, the track is lighter still, and an unselected label in
+    // the secondary colour falls to 3.8:1 in dark mode. Halfway between the secondary and the primary colour it is 5:1
+    // there. Only unselected labels change: the selected one keeps the design system's colours, also in forced
+    // colours, and light mode keeps them all.
+    'segmented-control-item': {
+      base: {
+        ':not([data-selected="selected"])': {
+          color:
+            'light-dark(var(--color-text-secondary), color-mix(in srgb, var(--color-text-secondary) 50%, var(--color-text-primary)))',
+        },
+      },
+    },
     // A row of chips wraps instead of reaching past a 320 px screen: the group is one inline line.
     'toggle-button-group': {base: {flexWrap: 'wrap'}},
     // A dialog opens on its title (the title takes focus, which gives it no outline): where focus is on it, as on

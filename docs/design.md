@@ -19,7 +19,10 @@ hänvisar till med avsnittsnummer.
 Gränssnittet byggs med Astryx och Eneo-temat ([beslut 0002](decisions/0002-react-and-astryx.md)). Eneo-accenten
 (#004595), systemtypsnittet och tillgänglighetsöverstyrningarna i `frontend/src/theme/eneo.theme.ts` ligger fast. Det
 moderna kommer från ytor, hierarki och färre men tydligare val: ingen ny färg, inga gradienter och inga illustrationer.
-Mörkt läge följer temat.
+Temat har ett ljust och ett mörkt läge. Användaren väljer under Utseende, i kontomenyn och i foten: Ljust, Mörkt eller
+Automatiskt, som följer datorns eller telefonens inställning och är förvalt. Valet sparas i webbläsaren
+(`frontend/src/shell/appearance.tsx`), och `frontend/public/appearance.js` sätter det innan sidan ritas, så att en sida i
+mörkt läge inte blinkar ljust.
 
 Hur koden skrivs, till exempel Astryx-komponenter i stället för egen layout och temafixar i `eneo.theme.ts`, står i
 `frontend/AGENTS.md`. Se också [Ändra designen](#ändra-designen).
@@ -47,8 +50,8 @@ Hur koden skrivs, till exempel Astryx-komponenter i stället för egen layout oc
 
 | Vem | Huvudmeny | Kontomeny (avataren) | Landar på |
 |---|---|---|---|
-| Företagare | Start · Upphandlingar · Regelhjälpen | Företagsprofil, Påminnelser, Logga ut | Start |
-| Inköpare | Inköp, med antalet att granska · Upphandlingar · Regelhjälpen | Drift, Logga ut | Inköp › Att granska |
+| Företagare | Start · Upphandlingar · Regelhjälpen | Utseende, Företagsprofil, Påminnelser, Logga ut | Start |
+| Inköpare | Inköp, med antalet att granska · Upphandlingar · Regelhjälpen | Utseende, Drift, Logga ut | Inköp › Att granska |
 | Besökare | Upphandlingar · Regelhjälpen, och knappen "Logga in" | – | Upphandlingar |
 
 Reglerna står i `frontend/src/shell/navigation.ts`. Adressen `/` skickar var och en till sin startsida, och efter
@@ -88,7 +91,7 @@ Varje sida visas i ramen `AppFrame` i `frontend/src/shell/`:
   bredare skärmar) och en kort rad som "Granska checklista" stå. I rubrikraden kan en knapp stå, under den en ingress,
   och bredvid innehållet en högerspalt.
 - **Foten** (`SiteFooter`): "Anbudsklar · Sundsvalls kommun · Om demon och AI", där länken öppnar samma dialog som
-  demobandet. Foten står efter sidans `main`, inte i den, så att den är sidans enda `contentinfo` på översta nivån:
+  demobandet, och sist på raden valet Utseende, som även den som inte har loggat in når. Foten står efter sidans `main`, inte i den, så att den är sidans enda `contentinfo` på översta nivån:
   `ModuleShell` lägger den efter Astryx `AppShell`. Den har en linje över sig och samma innehållslinje som toppnaven,
   och på en kort sida följer den direkt efter innehållet i stället för att stå under första skärmen. Målbildens länk
   till en tillgänglighetsredogörelse kommer när den sidan är skriven.
@@ -269,7 +272,7 @@ Andra delade delar ligger i `frontend/src/components/`, `frontend/src/shell/` oc
 | `TermText` | Fackord som går att trycka på för en förklaring, ur `frontend/src/lib/glossary.ts` (som bygger på [Ordlistan](glossary.md)) eller checklistans egna termer |
 | `FormalQuestionAdvice` | Rutan om likabehandling, tonad och infälld i svaret: "Ger underlaget inget entydigt svar?" Ställ frågan i e-Avrop före sista dag för frågor, med "Påminn mig" och länken dit frågan ställs, eller för en påhittad upphandling utan egen sida att den inte finns i e-Avrop |
 | `states.tsx` | `Loading` och `ErrorNotice`, med vad som misslyckades och "Försök igen" när det kan hjälpa |
-| `shell/` | Ramen: `AppFrame`, `ModuleShell` (Astryx `AppShell` med foten efter `main`), `PhaseStrip`, `FrameHeader`, `Brand`, `MainNav`, `AccountMenu`, `AboutDemo` (dialogen "Om demon och AI"), `Page`, `SiteFooter`, `RequireRole` och reglerna i `navigation.ts` och `redirects.tsx` |
+| `shell/` | Ramen: `AppFrame`, `ModuleShell` (Astryx `AppShell` med foten efter `main`), `PhaseStrip`, `FrameHeader`, `Brand`, `MainNav`, `AccountMenu`, `AboutDemo` (dialogen "Om demon och AI"), `appearance.tsx` (temat i besökarens utseende) och `AppearanceControl` (valet Utseende), `Page`, `SiteFooter`, `RequireRole` och reglerna i `navigation.ts` och `redirects.tsx` |
 
 Orden till statusarna och motorerna står på ett ställe, `frontend/src/lib/labels.ts`, och datum och belopp formateras i
 `frontend/src/lib/format.ts`.

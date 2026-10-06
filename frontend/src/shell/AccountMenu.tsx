@@ -11,6 +11,7 @@ import { useLocation, useNavigate } from "react-router";
 import { useLogout } from "../api/queries";
 import type { UserView } from "../api/types";
 import { errorMessage } from "../components/states";
+import { AppearanceControl } from "./AppearanceControl";
 
 /** Who the user is acting as: the company's name, or inköp. */
 export function accountContext(user: UserView): string {
@@ -42,6 +43,9 @@ function MenuContent({ user, onClose }: { user: UserView; onClose: () => void })
         <Text weight="semibold">{user.name}</Text>
         <Text type="supporting">{accountContext(user)}</Text>
       </VStack>
+      <VStack paddingInline={2} paddingBlock={1}>
+        <AppearanceControl layout="stacked" />
+      </VStack>
       <VStack as="ul" role="list" gap={0}>
         {accountLinks(user).map((link) => (
           <Item key={link.href} as="li" label={link.label} href={link.href} density="balanced" />
@@ -71,7 +75,7 @@ function MenuContent({ user, onClose }: { user: UserView; onClose: () => void })
 
 /**
  * The avatar button at the end of the top bar ("AB"), with the name and company beside it on a wide screen. It opens a
- * popover with the account's places (Företagsprofil and Påminnelser, or Drift for inköp) and "Logga ut", and closes
+ * popover with Utseende, the account's places (Företagsprofil and Påminnelser, or Drift for inköp) and "Logga ut", and closes
  * when the user goes somewhere. The avatar is 48 px with a finger (the design system has no 44).
  */
 export function AccountMenu({ user, isWide }: { user: UserView; isWide: boolean }) {

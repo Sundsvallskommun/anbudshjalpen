@@ -13,16 +13,19 @@ The design as built is in `docs/design.md`. Comments that cite "direction.md, se
 - `src/api/types.ts` mirrors `backend/src/anbudsklar/api/schemas.py` and `backend/src/anbudsklar/contracts/`
   exactly. Change both in the same commit. `src/api/client.ts` is the only `fetch`; `src/api/queries.ts`
   holds one TanStack Query hook per endpoint.
-- `src/AppProviders.tsx` mounts what every page needs, once: the query client, the Swedish catalogue, the built theme,
-  the router's link, Astryx's `LayerProvider` (the one toast viewport `useToast()` shows in; mount no other) and the
-  app's one source dialog (`SourceDialogProvider`).
-- `src/shell/` is the frame (Tal till text's ModuleShell pattern), and holds no state:
+- `src/AppProviders.tsx` mounts what every page needs, once: the query client, the Swedish catalogue, the built theme
+  in the visitor's appearance (`AppearanceTheme`), the router's link, Astryx's `LayerProvider` (the one toast viewport
+  `useToast()` shows in; mount no other) and the app's one source dialog (`SourceDialogProvider`).
+- `src/shell/` is the frame (Tal till text's ModuleShell pattern), and holds no server data:
   - `AppFrame` composes it per route: `PhaseStrip` (the one-line demo strip), `FrameHeader` (the top bar; on a phone
     two rows), the page, and `SiteFooter`. `ModuleShell` is Astryx's AppShell with the foot after the main region
     (a contentinfo landmark must not sit inside main).
   - `FrameHeader` holds `Brand`, `MainNav` (the role's three main choices; on a phone tabs on a top-level page and a
     back link on a detail page) and `AccountMenu` (the avatar's popover, or "Logga in" for a visitor).
   - `AboutDemo` owns the "Om demon och AI" dialog (lazily loaded `AboutDemoDialog`) that the strip and the foot open.
+  - `appearance.tsx` keeps the visitor's appearance (Ljust, Mörkt or Automatiskt, which follows the device and is the
+    default) in localStorage and passes it to Astryx `Theme`; `AppearanceControl` offers it in the account menu and the
+    foot. `public/appearance.js` sets a stored choice before the first paint with the same key: change the two together.
   - `navigation.ts` has the rules as pure functions: main choices per role, where each role starts, back links.
     `redirects.tsx` sends "/" to the role's start and moves old addresses (`/bevakning` → `/start`) with their query.
   - `Page` is the page frame: the one h1 (focused after a client navigation), breadcrumbs, the widths (640, 760, 960,
