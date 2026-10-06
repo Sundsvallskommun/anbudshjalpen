@@ -2,8 +2,10 @@
 
 It keeps the app and the tests runnable anywhere and gives the quality test a baseline
 to beat. Everything it reports is either a verbatim excerpt of the page text (so every
-citation verifies) or a plain count, and every summary says that no language model was
-used. It never guesses: whatever the rules cannot find is reported as not found.
+citation verifies) or a plain count. It never guesses: whatever the rules cannot find is
+reported as not found. How a result was made is carried by the engine name next to it
+(`engine` on every view), so the texts carry no prefix about it and read the same way as
+another engine's, in plain Swedish addressed to the company.
 """
 
 from __future__ import annotations
@@ -11,7 +13,7 @@ from __future__ import annotations
 import datetime as dt
 import re
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 
 from anbudsklar.ai.engine import EngineRun, QuestionTurn, RuleContext
@@ -39,9 +41,9 @@ from anbudsklar.contracts import (
     TermExplanation,
 )
 from anbudsklar.contracts.tasks import CheckStatus, DateKind, Fit, RequirementKind
-from anbudsklar.cpv import MIN_GROUP_DIGITS, closest_cpv_pair
+from anbudsklar.cpv import MIN_GROUP_DIGITS, closest_cpv_pair, significant_digits
+from anbudsklar.lou_refs import lou_excerpt
 
-HEURISTIC_PREFIX = "Automatisk sammanställning utan språkmodell:"
 _QUOTE_LIMIT = 300
 _PLAIN_LIMIT = 600
 _TITLE_WORDS = 12
@@ -110,6 +112,18 @@ def _matching_words(text: str, stems: set[str], limit: int = 5) -> list[str]:
         if word[:6] in stems and word not in words and word not in _STOPWORDS:
             words.append(word)
     return words[:limit]
+
+
+def _listing(words: Sequence[str]) -> str:
+    """A list as running Swedish text writes it: "målning, fasader och förskola"."""
+
+    if len(words) <= 1:
+        return "".join(words)
+    return f"{', '.join(words[:-1])} och {words[-1]}"
+
+
+def _counted(count: int, one: str, many: str) -> str:
+    return f"{count} {one if count == 1 else many}"
 
 
 # "2.3 Frågor under anbudstiden", "Bilaga 2 Referensblankett": a numbered heading starts a
@@ -747,7 +761,7 @@ def _open_questions(dates: Sequence[KeyDate], evaluation: Sequence[EvaluationCri
     if "sista_anbudsdag" not in kinds:
         questions.append("Sista anbudsdag hittades inte automatiskt. Kontrollera annonsen i e-Avrop.")
     if "fragestopp" not in kinds:
-        questions.append("Frågestopp hittades inte automatiskt. Kontrollera underlaget.")
+        questions.append("Sista dag för frågor hittades inte automatiskt. Kontrollera underlaget.")
     if not evaluation:
         questions.append("Hur anbuden utvärderas hittades inte automatiskt. Kontrollera underlaget.")
     return questions
@@ -756,12 +770,60 @@ def _open_questions(dates: Sequence[KeyDate], evaluation: Sequence[EvaluationCri
 # --- bedom_matchning ----------------------------------------------------------------
 
 
-_PROFILE_CHECKS: tuple[tuple[re.Pattern[str], str, str], ...] = (
-    (re.compile(r"försäkring", re.IGNORECASE), "insurance", "försäkring"),
-    (re.compile(r"referens", re.IGNORECASE), "public_references", "referensuppdrag"),
-    (re.compile(r"omsättning|ekonomisk", re.IGNORECASE), "annual_turnover_sek", "omsättning"),
-    (re.compile(r"certifi|\biso\b", re.IGNORECASE), "certifications", "certifiering"),
+@dataclass(frozen=True)
+class _ProfileCheck:
+    """A kind of requirement that a field of the company profile says something about."""
+
+    pattern: re.Pattern[str]
+    attribute: str  # the CompanyProfile field
+    topic: str  # "Underlaget ställer krav på <topic>"
+    stated: str  # the reason when the profile fills in the field
+
+
+# Whole words and compounds, never look-alikes: "socialförsäkringsavgifter" is a tax duty and
+# not an insurance, "kommunens referens" on an invoice is no reference assignment, and
+# "ekonomiskt mest fördelaktiga" is the award criterion, not the company's finances.
+_PROFILE_CHECKS: tuple[_ProfileCheck, ...] = (
+    _ProfileCheck(
+        re.compile(r"(?<!social)försäkring(?!skassa)", re.IGNORECASE),
+        "insurance",
+        "försäkring",
+        "Ni har angett en försäkring i profilen. Kontrollera att den räcker för kravet.",
+    ),
+    _ProfileCheck(
+        re.compile(r"\breferens(?:uppdrag|objekt|projekt|blankett|person|tagare|er\b|erna\b)", re.IGNORECASE),
+        "public_references",
+        "referensuppdrag",
+        "Ni har angett uppdrag för offentliga köpare i profilen. Kontrollera att de räcker för kravet.",
+    ),
+    _ProfileCheck(
+        re.compile(
+            r"\b(?:års)?omsättning|\bstabil\s+ekonomi\b|\bkreditupplysning|\briskklass"
+            r"|\bekonomisk\w*\s+(?:och\s+finansiell\w*\s+)?(?:stabilitet|ställning|kapacitet|förmåga|bas)\b",
+            re.IGNORECASE,
+        ),
+        "annual_turnover_sek",
+        "företagets ekonomi",
+        "Ni har angett er omsättning i profilen. Kontrollera att den räcker för kravet.",
+    ),
+    _ProfileCheck(
+        re.compile(r"certifi|\biso\b", re.IGNORECASE),
+        "certifications",
+        "certifiering",
+        "Ni har angett certifieringar i profilen. Kontrollera att de räcker för kravet.",
+    ),
 )
+# Requirements on the company decide whether a tender can be accepted at all, so a check
+# cites one of them before a contract term that repeats the topic ("keep the insurance").
+_COMPANY_KINDS: frozenset[RequirementKind] = frozenset({"kvalificeringskrav", "skallkrav"})
+
+
+def _requirement_text(requirement: Requirement) -> str:
+    """Everything the checklist says about a requirement: a folded "Uppdragen ska redovisas i
+    referensblanketten" names the topic that the requirement's first sentence leaves out."""
+
+    parts = [requirement.title, requirement.citation.quote, requirement.plain_language, requirement.evidence]
+    return " ".join(part for part in parts if part)
 
 
 def _requirement_reasons(profile: CompanyProfile, checklist: Checklist | None) -> list[MatchReason]:
@@ -769,34 +831,81 @@ def _requirement_reasons(profile: CompanyProfile, checklist: Checklist | None) -
         return []
     reasons: list[MatchReason] = []
     covered: set[str] = set()
-    for requirement in checklist.requirements:
-        text = f"{requirement.title} {requirement.citation.quote}"
-        for pattern, attribute, label in _PROFILE_CHECKS:
-            if label in covered or not pattern.search(text):
+    ordered = sorted(checklist.requirements, key=lambda requirement: requirement.kind not in _COMPANY_KINDS)
+    for requirement in ordered:
+        text = _requirement_text(requirement)
+        for check in _PROFILE_CHECKS:
+            if check.topic in covered or not check.pattern.search(text):
                 continue
-            covered.add(label)
+            covered.add(check.topic)
             citation = Citation(page=requirement.citation.page, quote=requirement.citation.quote)
-            if getattr(profile, attribute):
-                text_out = f"Profilen nämner {label}. Kontrollera att det räcker för kravet."
-                reasons.append(
-                    MatchReason(
-                        kind="styrka", text=text_out, requirement_id=requirement.id, citation=citation
-                    )
+            if getattr(profile, check.attribute):
+                reason = MatchReason(
+                    kind="styrka", text=check.stated, requirement_id=requirement.id, citation=citation
                 )
             else:
-                text_out = f"Underlaget ställer krav på {label}, men profilen säger inget om det."
-                reasons.append(
-                    MatchReason(
-                        kind="oklart", text=text_out, requirement_id=requirement.id, citation=citation
-                    )
+                reason = MatchReason(
+                    kind="oklart",
+                    text=f"Underlaget ställer krav på {check.topic}, men er profil säger inget om det.",
+                    requirement_id=requirement.id,
+                    citation=citation,
                 )
+            reasons.append(reason)
     return reasons
 
 
+def _lower_first(label: str) -> str:
+    """A CPV label inside a sentence ("målning av byggnader"); an acronym ("IT-tjänster") keeps its case."""
+
+    if len(label) > 1 and label[1].isupper():
+        return label
+    return label[:1].lower() + label[1:]
+
+
+def _cpv_name(code: str, labels: Mapping[str, str]) -> str | None:
+    label = labels.get(code)
+    return _lower_first(label) if label else None
+
+
+def _covers(own: str, theirs: str) -> bool:
+    """The company's code is the notice's code or one of its ancestors."""
+
+    mine, other = significant_digits(own), significant_digits(theirs)
+    return mine is not None and other is not None and other.startswith(mine)
+
+
+def _cpv_reason(
+    profile: CompanyProfile, notice: NoticeContext, cpv_length: int, own: str, theirs: str, conflict: bool
+) -> MatchReason | None:
+    """What the CPV codes say, in the words of the CPV list rather than its numbers."""
+
+    if cpv_length >= _SAME_CPV_GROUP:
+        work, mine = _cpv_name(theirs, notice.cpv_labels), _cpv_name(own, profile.cpv_labels)
+        if work is None:
+            text = "Upphandlingens CPV-koder ligger nära era."
+        elif _covers(own, theirs) or mine == work:
+            text = f"Upphandlingen gäller {work} – det gör ni."
+        elif mine is None:
+            text = f"Upphandlingen gäller {work}, nära det ni gör enligt profilen."
+        else:
+            text = f"Upphandlingen gäller {work}, nära det ni gör ({mine})."
+        return MatchReason(kind="styrka", text=text)
+    if conflict:
+        main = _cpv_name(notice.cpv_codes[0], notice.cpv_labels)
+        text = (
+            f"Upphandlingen gäller {main}, som inte ligger nära det ni gör enligt profilen."
+            if main
+            else "Upphandlingens CPV-koder ligger inte nära någon av era."
+        )
+        return MatchReason(kind="hinder", text=text)
+    return None
+
+
+# The web app's fit words: "Verkar passa", "Passar delvis", "Verkar inte passa".
 _FIT_TEXT: dict[Fit, str] = {
-    "passar": "Upphandlingen verkar passa företaget",
-    "passar_delvis": "Upphandlingen passar företaget delvis eller med reservationer",
-    "passar_inte": "Upphandlingen verkar inte passa företaget",
+    "passar": "Upphandlingen verkar passa er",
+    "passar_delvis": "Upphandlingen passar er delvis",
+    "passar_inte": "Upphandlingen verkar inte passa er",
 }
 
 # Words that every notice and profile share and that say nothing about what is bought:
@@ -928,6 +1037,11 @@ def _check_attachment(attachment: RequiredAttachment, draft_text: str) -> Attach
 
 # --- The engine ---------------------------------------------------------------------
 
+# Leads of the texts the engine builds from excerpts. Without a language model there is no
+# conclusion to draw, so the lead only says what follows.
+ANSWER_LEAD = "Det här står i underlaget:"
+RULES_LEAD = "Paragrafer som kan handla om din fråga:"
+
 
 class HeuristicEngine:
     """Rule-based implementation of `AiEngine`. Deterministic and offline."""
@@ -946,10 +1060,11 @@ class HeuristicEngine:
         evaluation = _evaluation(sentences)
         dates = _dates(sentences)
         summary = (
-            f"{HEURISTIC_PREFIX} underlaget har {document.page_count} sidor. "
-            f"Hittade {len(requirements)} krav, {len(attachments)} bilagor, "
-            f"{len(evaluation)} utvärderingskriterier och {len(dates)} datum. "
-            "Allt är utdrag ur texten. Kontrollera mot underlaget innan du använder listan."
+            f"Underlaget har {_counted(document.page_count, 'sida', 'sidor')}. Listan har "
+            f"{len(requirements)} krav, {_counted(len(attachments), 'bilaga', 'bilagor')}, "
+            f"{_counted(len(evaluation), 'utvärderingskriterium', 'utvärderingskriterier')} och "
+            f"{len(dates)} datum, alla som utdrag ur texten. "
+            "Kontrollera mot underlaget innan du använder listan."
         )
         checklist = Checklist(
             summary=summary,
@@ -971,36 +1086,32 @@ class HeuristicEngine:
         cpv_conflict = bool(profile.cpv_codes and notice.cpv_codes) and cpv_length < _SAME_CPV_GROUP
         shared = _shared_words(profile, notice)
         reasons: list[MatchReason] = []
-        if cpv_length >= _SAME_CPV_GROUP:
-            reasons.append(
-                MatchReason(kind="styrka", text=f"Profilens CPV-kod {own} ligger nära annonsens {theirs}.")
-            )
-        elif cpv_conflict:
-            reasons.append(
-                MatchReason(kind="hinder", text="Ingen av profilens CPV-koder ligger nära annonsens.")
-            )
+        cpv_reason = _cpv_reason(profile, notice, cpv_length, own, theirs, cpv_conflict)
+        if cpv_reason is not None:
+            reasons.append(cpv_reason)
         if shared:
-            reasons.append(
-                MatchReason(
-                    kind="styrka", text=f"Profilen och annonsen har gemensamma ord: {', '.join(shared[:5])}."
-                )
-            )
+            words = _listing(shared[:5])
+            reasons.append(MatchReason(kind="styrka", text=f"Ni och annonsen använder samma ord: {words}."))
         fit = _match_fit(cpv_length, cpv_conflict, len(shared))
         if fit == "passar_inte" and not any(reason.kind == "hinder" for reason in reasons):
             reasons.insert(
                 0,
                 MatchReason(
-                    kind="hinder", text="Profilen och annonsen har inga gemensamma CPV-koder eller sakord."
+                    kind="hinder",
+                    text="Varken CPV-koderna eller orden i annonsen liknar det ni har angett i profilen.",
                 ),
             )
+        basis = "CPV-koder och sakord i profilen och annonsen"
         if fit != "passar_inte":
             requirement_reasons = _requirement_reasons(profile, checklist)
             if fit == "passar" and any(reason.kind == "oklart" for reason in requirement_reasons):
                 fit = "passar_delvis"
             reasons.extend(requirement_reasons)
+            if requirement_reasons:
+                basis += " och på vad profilen säger om kraven i checklistan"
         summary = (
-            f"{HEURISTIC_PREFIX} {_FIT_TEXT[fit]}. Bedömningen bygger bara på CPV-koder och sakord i "
-            "profilen och annonsen; allmänna ord om upphandling och ortnamn räknas inte."
+            f"{_FIT_TEXT[fit]}. Bedömningen bygger på {basis}; allmänna ord om upphandling och ortnamn "
+            "räknas inte."
         )
         return MatchAssessment(fit=fit, summary=summary, reasons=reasons[:6]), self._run()
 
@@ -1013,9 +1124,9 @@ class HeuristicEngine:
         attachments = [_check_attachment(attachment, draft_text) for attachment in checklist.attachments]
         counts = {status: sum(check.status == status for check in checks) for status in _REVIEW_COMMENTS}
         summary = (
-            f"{HEURISTIC_PREFIX} {counts['uppfyllt']} av {len(checks)} krav verkar besvarade i utkastet, "
-            f"{counts['obevisat']} saknar synligt bevis, {counts['oklart']} är oklara och {counts['saknas']} "
-            "hittades inte. Kontrollera själv innan du lämnar anbudet."
+            f"I utkastet ser {counts['uppfyllt']} av {len(checks)} krav bra ut. Bevis saknas för "
+            f"{counts['obevisat']}, {counts['oklart']} behöver du kontrollera själv och {counts['saknas']} "
+            "hittades inte. Gå igenom listan innan du lämnar anbudet."
         )
         return ReviewResult(summary=summary, checks=checks, attachments=attachments), self._run()
 
@@ -1035,16 +1146,17 @@ class HeuristicEngine:
         if not best:
             answer = Answer(
                 answer=(
-                    f"{HEURISTIC_PREFIX} hittade inget i underlaget som besvarar frågan. Ställ frågan i "
-                    "frågefunktionen i e-Avrop före frågestoppet, så att svaret når alla leverantörer."
+                    "Inget i underlaget verkar besvara frågan. Ställ frågan i e-Avrop före sista dag för "
+                    "frågor, så får alla leverantörer samma svar."
                 ),
                 found_in_document=False,
                 suggest_formal_question=True,
             )
             return answer, self._run()
+        # The first line is the lead the web app shows in bold; one line per citation follows.
         lines = "\n".join(f"– {_excerpt(sentence.text)} (sida {sentence.page})" for sentence in best)
         answer = Answer(
-            answer=f"{HEURISTIC_PREFIX} det här står i underlaget om din fråga:\n{lines}",
+            answer=f"{ANSWER_LEAD}\n{lines}",
             found_in_document=True,
             citations=[_citation(sentence) for sentence in best],
             suggest_formal_question=False,
@@ -1066,7 +1178,7 @@ class HeuristicEngine:
             CpvSuggestion(
                 code=re.sub(r"\D", "", candidate.code)[:8],
                 label=candidate.label,
-                reason=f"Automatisk matchning utan språkmodell: beskrivningen nämner {', '.join(words)}.",
+                reason=f"Beskrivningen nämner {_listing(words)}.",
             )
             for _, candidate, words in scored[:5]
         ]
@@ -1077,17 +1189,18 @@ class HeuristicEngine:
     ) -> tuple[RulesAnswer, EngineRun]:
         if not context:
             text = (
-                f"{HEURISTIC_PREFIX} hittade ingen regeltext som passar frågan. Fråga gärna "
-                "Upphandlingsmyndighetens frågeportal eller kommunens inköpsavdelning."
+                "Ingen regeltext verkar handla om frågan. Fråga gärna Upphandlingsmyndighetens "
+                "frågeportal eller kommunens inköpsavdelning."
             )
             return RulesAnswer(answer=text), self._run()
-        selected = context[:3]
-        excerpts = "\n\n".join(
-            f"{item.reference} – {item.title}: {_excerpt(_collapse(item.text), 400)}" for item in selected
-        )
-        text = f"{HEURISTIC_PREFIX} det här säger regeltexterna som hittades:\n\n{excerpts}"
-        sources = [RuleSource(title=item.title, reference=item.reference, url=item.url) for item in selected]
-        return RulesAnswer(answer=text, sources=sources), self._run()
+        sources = [
+            RuleSource(
+                title=item.title, reference=item.reference, url=item.url, excerpt=lou_excerpt(item.text)
+            )
+            for item in context[:3]
+        ]
+        excerpts = "\n\n".join(f"{source.reference} – {source.title}: {source.excerpt}" for source in sources)
+        return RulesAnswer(answer=f"{RULES_LEAD}\n\n{excerpts}", sources=sources), self._run()
 
     async def aclose(self) -> None:
         return None

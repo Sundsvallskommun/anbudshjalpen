@@ -88,6 +88,8 @@ async def test_search_filters_notices_and_points_to_the_next_page(
 async def test_notice_details_list_documents_and_published_checklist(
     db_session: AsyncSession, seeded: Seeded
 ) -> None:
+    seeded.notice.reference_number = "DEMO-2026-0147"
+    await db_session.flush()
     async with mcp_client(db_session) as client:
         details = await client.call_tool("hamta_upphandling", {"upphandling_id": str(seeded.notice.id)})
         draft_only = await client.call_tool(
@@ -99,6 +101,8 @@ async def test_notice_details_list_documents_and_published_checklist(
     text = texts(details)
     assert f"- dokument_id: {seeded.document.id} | {FILENAME} | 6 sidor" in text
     assert "45442100 Målning" in text and "FIKTIV UPPHANDLING" in text
+    assert "Referensnummer: DEMO-2026-0147" in text
+    assert "Referensnummer" not in texts(draft_only)  # no line for a notice without one
     assert "Inköp har publicerat en checklista" in text
     assert "Inga dokument är inlästa" in texts(draft_only) and "Ingen publicerad checklista" in texts(
         draft_only

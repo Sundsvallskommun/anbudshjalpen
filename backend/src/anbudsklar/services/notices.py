@@ -14,9 +14,13 @@ from anbudsklar.api.schemas import (
     DocumentInfo,
     Fit,
     MatchView,
+    NoticeBuyer,
+    NoticeBuyers,
+    NoticeCounts,
     NoticeCreate,
     NoticeDetail,
     NoticeList,
+    NoticeSort,
     NoticeStatus,
     NoticeSummary,
     PageView,
@@ -25,17 +29,31 @@ from anbudsklar.contracts import MatchAssessment
 from anbudsklar.documents.extract import DocumentError
 from anbudsklar.documents.store import store_document
 from anbudsklar.models import Document, DocumentPage, MatchRecord, Notice
-from anbudsklar.search.queries import search_notices
+from anbudsklar.search.queries import (
+    count_notices_by_buyer,
+    count_notices_by_status,
+    cpv_labels,
+    notice_order,
+    search_notices,
+)
 from anbudsklar.services.access import Viewer
-from anbudsklar.services.checklists import checklist_statuses, to_checklist_view, visible_checklist
+from anbudsklar.services.checklists import (
+    checklist_payload,
+    checklist_statuses,
+    key_date,
+    published_checklists,
+    to_checklist_view,
+    visible_checklist,
+)
 from anbudsklar.services.cpv import normalize_cpv_codes
-from anbudsklar.services.dates import utcnow
+from anbudsklar.services.dates import end_of_local_day, utcnow
 from anbudsklar.services.errors import FileTooLargeError, NotFoundError
 from anbudsklar.services.files import as_service_error, mimetype_for
 
 MANUAL_SOURCE = "manual"
 OPEN = "open"
 CLOSED = "closed"
+PLANNED = "planned"
 MAX_DOCUMENT_BYTES = 50 * 1024 * 1024
 _FITS: frozenset[str] = frozenset(get_args(Fit))
 
@@ -62,6 +80,18 @@ async def first_document(session: AsyncSession, notice_id: uuid.UUID) -> Documen
     )
 
 
+def default_sort(status: NoticeStatus | None, text: str | None) -> NoticeSort:
+    """Open notices are about what to do next, so the soonest deadline comes first.
+
+    Other lists are newest first, and a text search without a status puts the best
+    match first.
+    """
+
+    if status == OPEN:
+        return "deadline"
+    return notice_order(None, text)
+
+
 async def list_notices(
     session: AsyncSession,
     viewer: Viewer,
@@ -70,19 +100,56 @@ async def list_notices(
     status: NoticeStatus | None,
     cpv_prefixes: list[str],
     source: str | None,
+    buyer: str | None = None,
+    sort: NoticeSort | None = None,
     limit: int,
     offset: int,
 ) -> NoticeList:
+    """One page of notices, with how many each status choice would list for the same filters."""
+
+    text = text or None
+    applied = notice_order(sort or default_sort(status, text), text)
     notices, total = await search_notices(
         session,
-        text=text or None,
+        text=text,
         cpv_prefixes=cpv_prefixes or None,
         status=status,
         source=source,
+        buyer=buyer or None,
+        order=applied,
         limit=limit,
         offset=offset,
     )
-    return NoticeList(items=await notice_summaries(session, notices, viewer), total=total)
+    per_status, everything = await count_notices_by_status(
+        session,
+        (OPEN, PLANNED),
+        text=text,
+        cpv_prefixes=cpv_prefixes or None,
+        source=source,
+        buyer=buyer or None,
+    )
+    return NoticeList(
+        items=await notice_summaries(session, notices, viewer),
+        total=total,
+        counts=NoticeCounts(open=per_status[OPEN], planned=per_status[PLANNED], all=everything),
+        sort=applied,
+    )
+
+
+async def list_buyers(
+    session: AsyncSession,
+    *,
+    text: str | None,
+    status: NoticeStatus | None,
+    cpv_prefixes: list[str],
+    source: str | None,
+) -> NoticeBuyers:
+    """The buyers for the list's buyer filter, counted with the list's other filters."""
+
+    buyers = await count_notices_by_buyer(
+        session, text=text or None, status=status, cpv_prefixes=cpv_prefixes or None, source=source
+    )
+    return NoticeBuyers(items=[NoticeBuyer(name=buyer.name, count=buyer.count) for buyer in buyers])
 
 
 async def notice_summaries(
@@ -94,6 +161,8 @@ async def notice_summaries(
     with_documents = await _notices_with_documents(session, ids)
     statuses = await checklist_statuses(session, ids, viewer)
     fits = await _fits(session, ids, viewer)
+    labels = await cpv_labels(session, {code for notice in notices if (code := main_cpv_code(notice))})
+    question_deadlines = await _question_deadlines(session, ids)
     now = utcnow()
     return [
         _summary(
@@ -102,9 +171,32 @@ async def notice_summaries(
             has_documents=notice.id in with_documents,
             checklist_status=statuses.get(notice.id, "none"),
             fit=fits.get(notice.id),
+            cpv_label=labels.get(main_cpv_code(notice) or ""),
+            question_deadline=question_deadlines.get(notice.id),
         )
         for notice in notices
     ]
+
+
+async def _question_deadlines(session: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.UUID, datetime]:
+    """Frågestopp per notice from its published checklist, the one inköp has reviewed.
+
+    Reminders follow the same date (`services.reminders`), so a list, a card and a reminder
+    never disagree about it.
+    """
+
+    deadlines: dict[uuid.UUID, datetime] = {}
+    for notice_id, record in (await published_checklists(session, ids)).items():
+        day = key_date(checklist_payload(record), "fragestopp")
+        if day is not None:
+            deadlines[notice_id] = end_of_local_day(day)
+    return deadlines
+
+
+def main_cpv_code(notice: Notice) -> str | None:
+    """The notice's main CPV code: the first one, as TED and e-Avrop list it."""
+
+    return notice.cpv_codes[0] if notice.cpv_codes else None
 
 
 def effective_status(notice: Notice, now: datetime) -> str:
@@ -163,6 +255,7 @@ async def notice_detail(session: AsyncSession, notice_id: uuid.UUID, viewer: Vie
         documents_url=notice.documents_url,
         place=notice.place,
         estimated_value_sek=notice.estimated_value_sek,
+        cpv_labels=await cpv_labels(session, notice.cpv_codes or []),
         documents=[document_info(document) for document in documents],
         checklist=to_checklist_view(checklist) if checklist else None,
         match=match_view(match, summary) if match else None,
@@ -190,6 +283,7 @@ async def create_notice(session: AsyncSession, data: NoticeCreate) -> Notice:
         external_id=uuid.uuid4().hex,
         title=data.title,
         buyer=data.buyer,
+        reference_number=(data.reference_number or "").strip() or None,
         description=data.description,
         cpv_codes=normalize_cpv_codes(data.cpv_codes),
         notice_type="contract",
@@ -232,7 +326,13 @@ async def attach_document(
 def notice_url(public_url: str, notice_id: uuid.UUID) -> str:
     """Link to the notice in the web app, for e-mails."""
 
-    return f"{public_url.rstrip('/')}/upphandlingar/{notice_id}"
+    return page_url(public_url, f"upphandlingar/{notice_id}")
+
+
+def page_url(public_url: str, path: str) -> str:
+    """Link to a page of the web app ("start", "paminnelser"), for e-mails."""
+
+    return f"{public_url.rstrip('/')}/{path.lstrip('/')}"
 
 
 def document_info(document: Document) -> DocumentInfo:
@@ -251,23 +351,34 @@ def match_view(record: MatchRecord, notice: NoticeSummary) -> MatchView:
         notice=notice,
         fit=assessment.fit,
         assessment=assessment,
+        engine=record.engine,
         created_at=record.created_at,
     )
 
 
 def _summary(
-    notice: Notice, *, status: str, has_documents: bool, checklist_status: str, fit: str | None
+    notice: Notice,
+    *,
+    status: str,
+    has_documents: bool,
+    checklist_status: str,
+    fit: str | None,
+    cpv_label: str | None,
+    question_deadline: datetime | None,
 ) -> NoticeSummary:
     return NoticeSummary.model_validate(
         {
             "id": notice.id,
             "title": notice.title,
             "buyer": notice.buyer,
+            "reference_number": notice.reference_number,
             "source": notice.source,
             "status": status,
             "published_at": notice.published_at,
             "deadline_at": notice.deadline_at,
+            "question_deadline": question_deadline,
             "cpv_codes": list(notice.cpv_codes or []),
+            "cpv_label": cpv_label,
             "has_documents": has_documents,
             "checklist_status": checklist_status,
             "is_fictitious": notice.is_fictitious,

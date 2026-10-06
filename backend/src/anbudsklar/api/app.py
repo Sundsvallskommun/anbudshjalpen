@@ -23,7 +23,7 @@ from anbudsklar.api.web import SecurityHeadersMiddleware, serve_web
 from anbudsklar.config import Settings, get_settings
 from anbudsklar.db import get_engine, session_scope
 from anbudsklar.mcp.server import build_mcp
-from anbudsklar.services.background import SessionFactory
+from anbudsklar.services.background import MatchRefresher, SessionFactory
 from anbudsklar.services.errors import (
     ConflictError,
     FileTooLargeError,
@@ -109,6 +109,7 @@ def create_app(
     app.state.session_factory = sessions
     app.state.rate_limiter = RateLimiter()
     app.state.ai_slots = AiSlots()
+    app.state.match_refresher = MatchRefresher()
     app.state.buyer_persona_enabled = buyer_persona_enabled(settings)
     app.add_middleware(BodyLimitMiddleware)
     app.add_middleware(SecurityHeadersMiddleware)  # outermost, so refusals get the headers too

@@ -32,6 +32,7 @@ class NoticeValues:
     raw: dict[str, Any]
     description: str | None = None
     buyer: str | None = None
+    reference_number: str | None = None
     cpv_codes: list[str] = field(default_factory=list)
     procedure: str | None = None
     published_at: datetime | None = None

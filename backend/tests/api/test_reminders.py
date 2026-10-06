@@ -7,7 +7,7 @@ from datetime import datetime, time, timedelta
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from anbudsklar.services.dates import STOCKHOLM
+from anbudsklar.services.dates import STOCKHOLM, end_of_local_day
 
 from .factories import Demo, add_checklist, add_document, add_notice, demo_checklist, login
 
@@ -72,3 +72,42 @@ async def test_reminder_input_is_checked(
     unpublished = await client.post(f"/api/notices/{notice.id}/reminders", json={"kind": "fragestopp"})
     assert unpublished.status_code == 422
     assert "publicerade checklistan" in unpublished.json()["detail"]
+
+
+async def test_a_reminder_names_the_deadline_it_is_about(client: httpx.AsyncClient, demo: Demo) -> None:
+    """`due_at` is when the mail goes and `deadline_at` the deadline itself: two facts, never mixed up."""
+
+    await login(client, "foretagare")
+    url = f"/api/notices/{demo.notice.id}/reminders"
+    question = (await client.post(url, json={"kind": "fragestopp"})).json()
+    # Frågestopp is a date: the last day for questions lasts until it ends.
+    assert datetime.fromisoformat(question["deadline_at"]) == end_of_local_day(demo.fragestopp)
+    tender = (await client.post(url, json={"kind": "sista_anbudsdag"})).json()
+    # The checklist and the notice agree on the day, so the notice's own time of day is kept.
+    assert datetime.fromisoformat(tender["deadline_at"]) == demo.notice.deadline_at
+    assert _local(tender["deadline_at"]).time() == time(23, 59)
+    assert tender["deadline_at"] != tender["due_at"]
+    own_at = (datetime.now(STOCKHOLM) + timedelta(days=3)).isoformat()
+    own = (await client.post(url, json={"kind": "egen", "due_at": own_at})).json()
+    assert own["deadline_at"] is None
+
+    listed = {item["kind"]: item["deadline_at"] for item in (await client.get("/api/reminders")).json()}
+    assert listed == {
+        "fragestopp": question["deadline_at"],
+        "sista_anbudsdag": tender["deadline_at"],
+        "egen": None,
+    }
+
+
+async def test_the_reviewed_checklist_date_wins_over_the_notice(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    corrected = demo.deadline + timedelta(days=2)  # inköp corrected the date in the checklist
+    demo.checklist.payload = demo_checklist(demo.fragestopp, corrected).model_dump(mode="json")
+    await db_session.flush()
+    await login(client, "foretagare")
+    tender = (
+        await client.post(f"/api/notices/{demo.notice.id}/reminders", json={"kind": "sista_anbudsdag"})
+    ).json()
+    assert datetime.fromisoformat(tender["deadline_at"]) == end_of_local_day(corrected)
+    assert _local(tender["due_at"]).date() == corrected - timedelta(days=2)

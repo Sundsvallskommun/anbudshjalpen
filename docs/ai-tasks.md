@@ -61,7 +61,10 @@ Checklistan går från utkast till godkänd till publicerad, eller avvisas. Bara
 och via MCP. En publicerad checklista som visar sig vara fel kan inköparen dra tillbaka med en motivering
 (knappen "Dra tillbaka", `POST /api/admin/checklists/{id}/withdraw`). Den blir avvisad, företagen ser den förra publicerade
 checklistan om det finns någon, matchningarna mot annonsen bedöms om, och checklistan kan rättas och publiceras igen.
-När inköparen rättar en checklista kontrolleras citaten igen, med samma regel för datum och vikter.
+När inköparen rättar en checklista kontrolleras citaten igen, med samma regel för datum och vikter. En avvisad
+checklista godkänns aldrig som den är: "Öppna som utkast igen" (`POST /api/admin/checklists/{id}/reopen`) gör den, även
+en tillbakadragen, till ett utkast. Motiveringen står kvar i anteckningen tills inköparen sparar en ny, och först
+utkastet kan godkännas.
 
 ### Bedöma matchning (`bedom_matchning`)
 
@@ -69,11 +72,11 @@ När inköparen rättar en checklista kontrolleras citaten igen, med samma regel
 |---|---|
 | Metod | `assess_match(profile, notice, checklist)` |
 | Indata | Företagsprofilen (`CompanyProfile`), annonsen och den publicerade checklistan om den finns |
-| Svar | `MatchAssessment`: `passar`, `passar_delvis` eller `passar_inte`, en sammanfattning och skäl av typen `styrka`, `hinder` eller `oklart`, med koppling till krav och citat |
+| Svar | `MatchAssessment`: `passar`, `passar_delvis` eller `passar_inte`, en sammanfattning och skäl av typen `styrka`, `hinder` eller `oklart`, med koppling till krav och citat. Webbappen och mejlen säger Verkar passa, Passar delvis och Verkar inte passa, eftersom bedömningen jämför CPV-koder och ord, inte om kraven är uppfyllda |
 | Förval | Fasta regler före modellen, se nedan |
 | Kontroll | Citaten i skälen kontrolleras |
 | Med `heuristic` | Se [Den heuristiska motorn](#den-heuristiska-motorn) |
-| Körs av | Jobbet `match_all` var 30:e minut. Mejlet "Ny träff" skickas för `passar` och `passar_delvis`, högst en gång per användare och annons |
+| Körs av | Jobbet `match_all` var 30:e minut, och när företaget sparar sin profil: med `heuristic` före svaret, som då säger hur många öppna upphandlingar som verkar passa, och med en språkmodell direkt efter svaret, en körning i taget per företag. Mejlet "Ny träff" skickas för `passar` och `passar_delvis`, högst en gång per användare och annons |
 
 Förvalet (`services/matching.py`) släpper bara fram annonser vars sista anbudsdag inte har passerat och som är öppna
 eller har en publicerad checklista. Annonsen ska dessutom matcha företaget på CPV eller på ord:
@@ -85,6 +88,19 @@ eller har en publicerad checklista. Annonsen ska dessutom matcha företaget på 
   (ett om beskrivningen bara ger ett). Allmänna ord, ortnamn och upphandlingsord som "anbud" och "ramavtal" räknas
   inte.
 
+En bedömning görs om när annonsen, profilen eller den publicerade checklistan har ändrats, och när
+`ASSESSMENT_VERSION` i `services/matching.py` byts. Den byts när den heuristiska motorns regler för matchning eller
+instruktionen för `bedom_matchning` ändras, så att sparade skäl får den nya formuleringen. Vad det betyder vid en
+uppdatering står i [Drift](operations.md#uppdatera).
+
+När företaget sparar sin profil (`PUT /api/profile`) får dess träffar en ny bedömning direkt, så att Start inte visar
+träffar för den gamla profilen till nästa körning av `match_all`. Med `heuristic` och högst 200 kandidater görs det före
+svaret, som då säger hur många öppna upphandlingar som verkar passa eller passar delvis (`fitting_notices`). Annars görs
+det i appen efter svaret, och `fitting_notices` är `null`: med en språkmodell tar varje bedömning några sekunder. Det
+går en körning i taget per företag (`services/background.py`). Sparas profilen igen under körningen behålls inget från
+den, och en ny körning läser den nya profilen. En bedömning som misslyckas ändrar aldrig den sparade profilen, och
+`match_all` gör den vid nästa körning.
+
 En bedömning som inte längre klarar förvalet raderas inte utan markeras som inaktuell, så att ett avfärdande och
 mejlet "Ny träff" minns om annonsen kommer tillbaka.
 
@@ -94,7 +110,7 @@ mejlet "Ny träff" minns om annonsen kommer tillbaka.
 |---|---|
 | Metod | `review_draft(checklist, draft)` |
 | Indata | Den publicerade checklistan och företagets utkast (`PagedDocument`) |
-| Svar | `ReviewResult`: sammanfattning, en kontroll per krav (`uppfyllt`, `obevisat`, `saknas` eller `oklart`) med kommentar och citat ur utkastet, och en kontroll per bilaga (`bifogad`, `saknas` eller `oklart`) |
+| Svar | `ReviewResult`: sammanfattning, en kontroll per krav (`uppfyllt`, `obevisat`, `saknas` eller `oklart`) med kommentar och citat ur utkastet, och en kontroll per bilaga (`bifogad`, `saknas` eller `oklart`). Webbappen säger Ser bra ut, Bevis saknas, Hittades inte och Kontrollera själv, och grupperar kraven som Måste åtgärdas, Kontrollera själv och Ser bra ut |
 | Kontroll | Citaten ur utkastet kontrolleras mot utkastets sidor (`draft_check`) |
 | Körs av | En inloggad företagare som laddar upp ett utkast |
 
@@ -108,7 +124,7 @@ Granskningen pekar ut brister men skriver aldrig om utkastet.
 | Metod | `answer_question(notice, document, question, history)` |
 | Indata | Annonsen, underlaget, frågan och de senaste tidigare frågorna och svaren. API:t tar emot högst tio, och appen skickar de nyaste som ryms i 12 000 tecken vidare till motorn |
 | Underlag | Dokumentet bakom den checklista som den som frågar ser, alltså den publicerade för företag och besökare. Utan checklista används annonsens första dokument |
-| Svar | `Answer`: svaret, om det står i underlaget, citat och om frågan bör ställas formellt (`suggest_formal_question`). API:t lägger till vilket dokument som lästes (`document_id`), frågestoppet ur checklistan (`question_deadline`, slutet av dagen 23:59:59 svensk tid) och var frågan ställs formellt (`formal_question_url`) |
+| Svar | `Answer`: svaret, om det står i underlaget, citat och om frågan bör ställas formellt (`suggest_formal_question`). API:t lägger till vilket dokument som lästes (`document_id`), frågestoppet ur checklistan (`question_deadline`, slutet av dagen 23:59:59 svensk tid) och var frågan ställs formellt (`formal_question_url`). Svaret börjar med slutsatsen i en mening, som webbappen visar i fetstil. Med `heuristic` är första raden "Det här står i underlaget:" och därefter en rad per citat |
 | Kontroll | Citaten kontrolleras |
 | Körs av | Vem som helst på annonsens sida, även utan inloggning |
 
@@ -124,11 +140,14 @@ När frågan bör ställas formellt visar webbappen:
   säger vad det är, till exempel "Öppna annonsen i TED"
 - frågestoppet som ett datum, när den publicerade checklistan anger ett
 - knappen för att skapa en påminnelse, bara när den publicerade checklistan anger ett frågestopp som inte har passerat
-
-Fliken "Inför inlämning" följer samma regel för var anbudet lämnas: upphandlingen i e-Avrop när annonsen länkar dit,
-annonsens egen sida när den inte är TED:s, och annars "Gå till e-Avrop" med adressen från `GET /api/config`
-(`eavrop_url`, samma som `EAVROP_BASE_URL`).
 - för en påhittad annons utan egen sida, att den är påhittad och därför inte finns i e-Avrop
+
+Svarar underlaget på frågan står bara en kort rad om att fråga i e-Avrop före frågestoppet om något är oklart.
+
+Steg 4 "Lämna in" följer samma regel för var anbudet lämnas: upphandlingen i e-Avrop när annonsen länkar dit,
+annonsens egen sida när den inte är TED:s, och annars "Gå till e-Avrop" med adressen från `GET /api/config`
+(`eavrop_url`, samma som `EAVROP_BASE_URL`). En påhittad annons utan egen sida säger även där att den inte finns i
+e-Avrop.
 
 ### Föreslå CPV-koder (`foresla_cpv`)
 
@@ -138,7 +157,7 @@ annonsens egen sida när den inte är TED:s, och annars "Gå till e-Avrop" med a
 | Indata | Företagets beskrivning och kandidater som vår sökning hittat i den officiella CPV-listan |
 | Svar | `CpvSuggestions`: högst åtta koder med åtta siffror, benämning och motivering |
 | Kontroll | Modellen väljer bland kandidaterna, så koderna kommer från CPV-listan |
-| Körs av | Profilsidan |
+| Körs av | Profilsidan, som visar förslagen som rutor att kryssa i, med motiveringen under varje kod |
 
 ### Regelhjälpen (`regelhjalpen`)
 
@@ -146,7 +165,7 @@ annonsens egen sida när den inte är TED:s, och annars "Gå till e-Avrop" med a
 |---|---|
 | Metod | `answer_rules(question, session_id, context)` |
 | Indata | En allmän fråga om upphandlingsregler, och session för följdfrågor |
-| Svar | `RulesAnswer`: svaret och källor med rubrik, hänvisning (till exempel "LOU 20 kap. 1 §") och länk |
+| Svar | `RulesAnswer`: svaret och källor med rubrik, hänvisning (till exempel "LOU 20 kap. 1 §"), länk och, för LOU-paragrafer, början av lagtexten i hela meningar (`excerpt`), som appen hämtar ur sin egen kopia av LOU oavsett motor. Webbappen visar varje källa som ett kort, under rubriken "Svaret bygger på". Med en språkmodell börjar svaret med det korta svaret i en mening, som webbappen visar i fetstil. Med `heuristic` är svaret raden "Paragrafer som kan handla om din fråga:" och utdragen, så webbappen visar bara korten, med raden som rubrik |
 | Med Eneo | Assistenten har vägledningar från Upphandlingsmyndigheten och sundsvall.se som kunskap och hämtar LOU via MCP-verktygen `sok_lou` och `hamta_paragraf`. Följdfrågor går i samma session, men bara från webbläsaren som startade samtalet. Ett `session_id` som inte är ett UUID ger 422, och ett som appen inte gav just den webbläsaren startar ett nytt samtal, se [Eneo-integration](eneo-integration.md#så-anropar-appen-en-assistent) |
 | Med andra motorer | Appen söker själv fram LOU-paragrafer och skickar dem med som sammanhang |
 
@@ -155,8 +174,9 @@ Svaret gäller inte ett visst underlag. Källorna pekar på lagparagrafer och we
 ## Den heuristiska motorn
 
 `heuristic` (`backend/src/anbudsklar/ai/heuristic.py`) använder ingen språkmodell. Allt den visar är ordagranna utdrag
-ur sidtexten eller enkla räkningar, så dess citat verifieras, och varje sammanfattning säger att ingen språkmodell
-användes. Den ger [kvalitetstestets](quality-test.md) undre gräns.
+ur sidtexten eller enkla räkningar, så dess citat verifieras. Texterna har inget prefix om hur de togs fram: det står i
+fältet `engine` bredvid varje resultat, och webbappen visar det i ursprungsraden. Den ger
+[kvalitetstestets](quality-test.md) undre gräns.
 
 **Tolka underlag**
 
@@ -183,9 +203,15 @@ användes. Den ger [kvalitetstestets](quality-test.md) undre gräns.
   skälen får ett **hinder** om att koderna inte ligger nära varandra.
 - **Räknas inte:** allmänna upphandlingsord, räkneord, ortnamn i Västernorrland, profilens egna kommuner, annonsens
   köpare och meningar i profilen som säger vad företaget inte gör ("Vi har inte lämnat anbud tidigare").
-- **Checklistan:** skäl från den publicerade checklistan, där krav på försäkring, referensuppdrag, omsättning och
-  certifiering jämförs med profilen, visas bara för annonser som passar eller passar delvis. Säger profilen inget om
-  något av dem som checklistan kräver, sänks **passar** till **passar delvis**.
+- **Checklistan:** skäl från den publicerade checklistan, där krav på försäkring, referensuppdrag, företagets ekonomi
+  och certifiering jämförs med profilen, visas bara för annonser som passar eller passar delvis. Säger profilen inget
+  om något av dem som checklistan kräver, sänks **passar** till **passar delvis**. Kraven söks i rubrik, citat,
+  förklaring och bevis som hela ord och sammansättningar: "socialförsäkringsavgifter" är inget försäkringskrav,
+  "kommunens referens" inget referensuppdrag och "ekonomiskt mest fördelaktiga" inget krav på ekonomi. Kvalificerings-
+  och skallkrav citeras före krav på uppdraget och avtalsvillkor.
+- **Skälen** skrivs till företaget ("ni") med CPV-kodernas benämningar, till exempel "Upphandlingen gäller målning – det
+  gör ni.", aldrig med bara siffror. Matchningen skickar benämningarna till alla motorer (`cpv_labels` i
+  `NoticeContext` och `CompanyProfile`).
 
 ## Citatkontroll
 
@@ -213,17 +239,22 @@ sidan, och det räknas in i antalet som inköparen ser före publiceringen. Ett 
 exempel "sex dagar före sista anbudsdag", blir därför okontrollerat. Ett datum som står utan år stämmer om dag och
 månad stämmer.
 
-**I webbappen** visar ett märke vid varje citat statusen, och checklistan sammanfattar med "X av Y citat hittades på
-angiven sida". Inköparen ser antalen innan checklistan publiceras. Ett klick på citatet öppnar sidan och markerar
-citatet med samma regler som `locate_quote`: normalisering, delar runt en ellips och ungefärlig träff på minst 90 med
-samma tal. Går ett verifierat citat ändå inte att markera säger rutan att AI:n har återgett det med lite andra ord, i
-stället för att det är markerat. Okontrollerade citat markeras inte, och ett citat vars sida ligger efter underlagets
-sista sida öppnar sida 1 med en förklaring.
+**I webbappen** har varje påstående en diskret länk till sin sida, "s. 5". Bara avvikelser får ord: ett citat på en
+annan sida visas som "s. 9 (AI angav 7)" och ett okontrollerat som "Hittades inte i underlaget". Kontrollen sammanfattas
+en gång per vy i ursprungsraden, till exempel "Alla 86 källhänvisningar hittades i underlaget" eller "84 av 86
+källhänvisningar hittades i underlaget · 2 hittades inte och behöver kontrolleras". Inköparen ser antalen under Inköp ›
+Att granska och innan checklistan publiceras. Länken öppnar källdialogen ([Design](design.md#källdialogen)), som
+säger i ord var citatet står och markerar det på sidan med samma regler som `locate_quote`: normalisering, delar runt en
+ellips och ungefärlig träff på minst 90 med samma tal. Går ett verifierat citat ändå inte att markera säger dialogen att
+det står där med lite andra ord och visar citatet ovanför sidan. Okontrollerade citat markeras inte, och ett citat vars
+sida ligger efter underlagets sista sida öppnar sida 1 med en förklaring.
 
 ## Ändra en uppgift
 
 - **Instruktion:** ändra filen i `backend/src/anbudsklar/ai/prompts/`, kör [kvalitetstestet](quality-test.md) och kör
-  `anbudsklar eneo provision` så att assistenten i Eneo får den nya texten.
+  `anbudsklar eneo provision` så att assistenten i Eneo får den nya texten. Gäller ändringen `bedom_matchning`, eller
+  den heuristiska motorns regler för matchning, byt också `ASSESSMENT_VERSION` i
+  `backend/src/anbudsklar/services/matching.py`, så att sparade bedömningar görs om.
 - **Kontrakt:** ändra modellen i `backend/src/anbudsklar/contracts/`, höj `CONTRACT_VERSION`, uppdatera
   `frontend/src/api/types.ts` och kör `anbudsklar eneo provision`. Sparade resultat har den gamla versionen.
 - **Ny uppgift:** lägg till värdet i `Task`, ett kontrakt i `TASK_OUTPUTS`, en instruktionsfil, en metod i `AiEngine`

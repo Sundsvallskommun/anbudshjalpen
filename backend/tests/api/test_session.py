@@ -16,7 +16,8 @@ async def test_config_discloses_ai_and_the_demo(client: httpx.AsyncClient) -> No
     assert response.status_code == 200
     assert body["ai_engine"] == "heuristic"
     assert "AI kan ha fel" in body["ai_disclosure"]
-    assert "regelbaserad" in body["ai_disclosure"]
+    assert "fasta regler i stället för AI" in body["ai_disclosure"]  # says which engine, in plain words
+    assert "språkmodell" not in body["ai_disclosure"]
     assert "Fiktiv" in body["demo_notice"]
     assert body["organization_name"] == "Sundsvalls kommun"
     assert body["eavrop_url"] == "https://www.e-avrop.com/sundsvall"  # the fallback link for notices

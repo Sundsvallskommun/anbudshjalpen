@@ -260,6 +260,7 @@ def _notice_values(entry: NoticeEntry, anchor: dt.date, reference: dt.date) -> d
         "title": entry.title,
         "description": entry.description,
         "buyer": entry.buyer,
+        "reference_number": entry.reference_number,
         "cpv_codes": entry.cpv_codes,
         "notice_type": entry.notice_type,
         "procedure": entry.procedure,
@@ -273,7 +274,6 @@ def _notice_values(entry: NoticeEntry, anchor: dt.date, reference: dt.date) -> d
         "is_fictitious": True,
         "raw": {
             "fixture": True,
-            "reference_number": entry.reference_number,
             "built_for_reference_date": reference.isoformat(),
             "key_dates": [
                 {

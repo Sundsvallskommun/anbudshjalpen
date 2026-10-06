@@ -20,8 +20,10 @@ from anbudsklar.api.deps import (
 from anbudsklar.api.limits import rate_limited
 from anbudsklar.api.schemas import (
     AnswerView,
+    NoticeBuyers,
     NoticeDetail,
     NoticeList,
+    NoticeSort,
     NoticeStatus,
     PageView,
     QuestionRequest,
@@ -37,29 +39,68 @@ from anbudsklar.services.dates import utcnow
 
 router = APIRouter(tags=["notices"])
 
+TextQuery = Annotated[str | None, Query(max_length=200, description="Fritext")]
+StatusQuery = Annotated[NoticeStatus | None, Query(alias="status")]
+CpvQuery = Annotated[
+    list[str] | None, Query(description="CPV-prefix, 2–8 siffror; upprepa eller kommaseparera")
+]
+SourceQuery = Annotated[str | None, Query(max_length=32)]
+
 
 @router.get("/notices")
 async def list_notices(
     session: SessionDep,
     viewer: ViewerDep,
-    q: Annotated[str | None, Query(max_length=200, description="Fritext")] = None,
-    notice_status: Annotated[NoticeStatus | None, Query(alias="status")] = None,
-    cpv: Annotated[
-        list[str] | None, Query(description="CPV-prefix, 2–8 siffror; upprepa eller kommaseparera")
+    q: TextQuery = None,
+    notice_status: StatusQuery = None,
+    cpv: CpvQuery = None,
+    source: SourceQuery = None,
+    buyer: Annotated[
+        str | None, Query(max_length=300, description="Köpare: en del av namnet, oavsett skiftläge")
     ] = None,
-    source: Annotated[str | None, Query(max_length=32)] = None,
+    sort: Annotated[
+        NoticeSort | None,
+        Query(description="deadline, published eller relevance; standard: deadline för öppna, annars nyast"),
+    ] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> NoticeList:
+    """A page of notices. `counts` says how many each status choice would give with the same filters."""
+
     return await notices.list_notices(
         session,
         viewer,
-        text=q.strip() if q else None,
+        text=_stripped(q),
         status=notice_status,
         cpv_prefixes=normalize_cpv_prefixes(cpv or []),
         source=source,
+        buyer=_stripped(buyer),
+        sort=sort,
         limit=limit,
         offset=offset,
+    )
+
+
+@router.get("/notices/buyers")
+async def list_notice_buyers(
+    session: SessionDep,
+    q: TextQuery = None,
+    notice_status: StatusQuery = None,
+    cpv: CpvQuery = None,
+    source: SourceQuery = None,
+) -> NoticeBuyers:
+    """The buyers for the list's buyer filter, each with what `GET /notices?buyer=` would total.
+
+    Takes the list's other filters, so the counts match the list they filter. Declared before
+    `/notices/{notice_id}`, which would otherwise take "buyers" for an id.
+    """
+
+    return await notices.list_buyers(
+        session,
+        text=_stripped(q),
+        status=notice_status,
+        cpv_prefixes=normalize_cpv_prefixes(cpv or []),
+        source=source,
     )
 
 
@@ -142,6 +183,10 @@ async def create_reminder(
     reminder = await reminders.create_reminder(session, user.id, notice_id, body, utcnow())
     await session.commit()
     return reminder
+
+
+def _stripped(value: str | None) -> str | None:
+    return (value.strip() or None) if value else None
 
 
 def _inline(filename: str) -> str:

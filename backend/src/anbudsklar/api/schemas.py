@@ -22,12 +22,16 @@ from anbudsklar.contracts import (
     ReviewResult,
     RulesAnswer,
 )
+from anbudsklar.search.types import NoticeOrder
 
 Role = Literal["foretagare", "inkopare"]
 ChecklistStatus = Literal["none", "draft", "approved", "published", "rejected"]
 NoticeStatus = Literal["open", "closed", "awarded", "planned"]
 Fit = Literal["passar", "passar_delvis", "passar_inte"]
 InterpretationState = Literal["pending", "retrying", "failed"]
+# "deadline": soonest sista anbudsdag first, notices without one last; "published": newest
+# first; "relevance": best text match first (newest first when there is no text).
+NoticeSort = NoticeOrder
 
 # List items in request bodies get their own length cap, not only the list.
 CpvCodeIn = Annotated[str, Field(max_length=16)]
@@ -85,20 +89,54 @@ class NoticeSummary(ApiModel):
     id: uuid.UUID
     title: str
     buyer: str | None
+    # The reference people quote for the procurement ("DEMO-2026-0147"): the buyer's own
+    # identifier from TED (eForms BT-22), e-Avrop's id, or what the buyer entered. None when
+    # the source names none, as TED does for notices that e-Avrop published.
+    reference_number: str | None = None
     source: str
     status: NoticeStatus
     published_at: datetime | None
     deadline_at: datetime | None
+    # Frågestopp from the published checklist, as the end of that day in Stockholm (like
+    # AnswerView.question_deadline): the last day for questions, so show it as a date.
+    question_deadline: datetime | None = None
     cpv_codes: list[str]
+    cpv_label: str | None = None  # Swedish label of the main (first) CPV code, when the code is known
     has_documents: bool
     checklist_status: ChecklistStatus
     is_fictitious: bool
     fit: Fit | None = None  # for the signed-in company, when assessed
 
 
+class NoticeCounts(ApiModel):
+    """How many notices each status choice would list with the same filters (status and paging ignored)."""
+
+    open: int
+    planned: int
+    all: int
+
+
 class NoticeList(ApiModel):
     items: list[NoticeSummary]
     total: int
+    counts: NoticeCounts
+    sort: NoticeSort  # the order of `items`: the requested one, else the default for the filters
+
+
+class NoticeBuyer(ApiModel):
+    """One buyer for the list's buyer filter.
+
+    A joint procurement names several buyers, and each of them is listed on its own. `count`
+    is what `GET /api/notices?buyer=<name>` totals with the same other filters, where the
+    filter matches any notice whose buyer contains the name (case does not matter).
+    """
+
+    name: str
+    count: int
+
+
+class NoticeBuyers(ApiModel):
+    items: list[NoticeBuyer]  # most notices first, then by name
 
 
 class DocumentInfo(ApiModel):
@@ -135,7 +173,8 @@ class MatchView(ApiModel):
     notice: NoticeSummary
     fit: Fit
     assessment: MatchAssessment
-    created_at: datetime
+    engine: str  # heuristic, eneo or openai: who made the assessment (never reviewed by inköp)
+    created_at: datetime  # when the assessment was made
 
 
 class NoticeDetail(NoticeSummary):
@@ -145,6 +184,7 @@ class NoticeDetail(NoticeSummary):
     documents_url: str | None
     place: str | None
     estimated_value_sek: int | None
+    cpv_labels: dict[str, str] = Field(default_factory=dict)  # code -> Swedish label, for known codes
     documents: list[DocumentInfo]
     checklist: ChecklistView | None  # companies only see published checklists
     match: MatchView | None = None
@@ -202,7 +242,12 @@ class ReminderView(ApiModel):
     notice_title: str
     kind: ReminderKind
     note: str | None
-    due_at: datetime
+    due_at: datetime  # when the e-mail is sent, which is not the deadline
+    # The deadline the reminder is about, so the UI never works it out: for sista anbudsdag
+    # the notice's own deadline (with its time) when it falls on the day the reminder follows,
+    # otherwise the end of that day in Stockholm (frågestopp is a date: show it as one).
+    # None for "egen" reminders and when the deadline is no longer known.
+    deadline_at: datetime | None = None
     sent_at: datetime | None
 
 
@@ -223,6 +268,15 @@ class CompanyView(ApiModel):
     insurance: str | None
     public_references: str | None
     is_fictitious: bool
+
+
+class ProfileSaved(CompanyView):
+    """The saved profile (`CompanyView`) and how many open notices seem to fit it now."""
+
+    # The match cards Start shows after the save re-assessed them: open for tenders, fit
+    # "passar" or "passar_delvis", not dismissed. None when the re-assessment runs after the
+    # response, as it does with a language model (seconds per notice): Start has them when done.
+    fitting_notices: int | None = None
 
 
 class CompanyUpdate(ApiModel):
@@ -289,6 +343,7 @@ class ChecklistAdminItem(ApiModel):
     id: uuid.UUID
     notice_id: uuid.UUID
     notice_title: str
+    deadline_at: datetime | None  # the notice's sista anbudsdag; the queue is sorted on it
     status: ChecklistStatus
     engine: str
     created_at: datetime
@@ -308,6 +363,7 @@ class RejectRequest(ApiModel):
 class NoticeCreate(ApiModel):
     title: str = Field(min_length=3, max_length=500)
     buyer: str | None = Field(default=None, max_length=300)
+    reference_number: str | None = Field(default=None, max_length=100)  # the buyer's diarienummer
     description: str | None = Field(default=None, max_length=8000)
     cpv_codes: list[CpvCodeIn] = Field(default_factory=list, max_length=30)
     procedure: str | None = Field(default=None, max_length=300)

@@ -9,11 +9,13 @@ Two steps, so that the result can be explained and tested (docs/architecture.md)
 2. The engine assesses each candidate against the published checklist. Citations are
    verified against the checklist's document before the result is stored.
 
-An assessment is reused until the notice, the company profile or the checklist changes.
-`MatchRecord.created_at` is the time of the latest assessment. A record that stops
-passing the prefilter is marked stale, not deleted, so that a dismissal and the "Ny
-träff" e-mail are remembered if it passes again. Each user gets at most one "Ny träff"
-per notice (`MatchNotification`).
+An assessment is reused until the notice, the company profile or the checklist changes, or
+until `ASSESSMENT_VERSION` does. `MatchRecord.created_at` is the time of the latest
+assessment. A saved profile has its matches re-assessed at once (`rematch_quickly`, or after
+the response with a language model), so Start does not show fits for the old profile until
+the next scheduled run. A record that stops passing the prefilter is marked stale, not
+deleted, so that a dismissal and the "Ny träff" e-mail are remembered if it passes again.
+Each user gets at most one "Ny träff" per notice (`MatchNotification`).
 """
 
 from __future__ import annotations
@@ -34,19 +36,30 @@ from anbudsklar.cpv import CPV_DIGITS, MIN_GROUP_DIGITS, best_cpv_overlap
 from anbudsklar.documents.citations import verify_match
 from anbudsklar.documents.store import load_paged_document
 from anbudsklar.models import ChecklistRecord, Company, MatchNotification, MatchRecord, Notice, User
+from anbudsklar.search.queries import cpv_labels
 from anbudsklar.services.access import ROLE_COMPANY, Viewer
 from anbudsklar.services.checklists import PUBLISHED, checklist_payload, published_checklists
 from anbudsklar.services.contexts import company_profile, notice_context
 from anbudsklar.services.dates import utcnow
 from anbudsklar.services.errors import NotFoundError
-from anbudsklar.services.notices import match_view, notice_summaries, notice_url
+from anbudsklar.services.notices import match_view, notice_summaries, notice_url, page_url
 from anbudsklar.services.text import keywords
 from anbudsklar.worker.mail import Mailer, MailError, match_message
 
 logger = logging.getLogger(__name__)
 
 FIT_ORDER = {"passar": 0, "passar_delvis": 1, "passar_inte": 2}
-NOTIFY_FITS = ("passar", "passar_delvis")
+# The fits worth acting on: Start's match cards, the "Ny träff" mail and the count after a profile save.
+FITTING = ("passar", "passar_delvis")
+ASSESSMENT_VERSION = "2026-10-05"
+"""The heuristic's match rules and the bedom_matchning prompt as of this date. Change it when
+either changes: assessments made under another version are made again on the next run, so their
+stored texts follow the new wording (as when the engine prefix and bare CPV codes were dropped)."""
+# Engines that assess without a model call, so a request can wait for them.
+QUICK_ENGINES = frozenset({"heuristic"})
+# More candidates than this are re-assessed in the background even with a quick engine. The
+# heuristic took about 20 ms for the demo company's 41 candidates, so this stays well under a second.
+MAX_QUICK_CANDIDATES = 200
 # Without a CPV match, a notice must contain this many of the company's own keywords.
 MIN_KEYWORD_HITS = 2
 # Outcomes of one "Ny träff" e-mail.
@@ -106,11 +119,19 @@ async def match_all(session: AsyncSession, engine: AiEngine) -> dict[str, int]:
 
 
 async def match_company(
-    session: AsyncSession, engine: AiEngine, company: Company, *, cache: PageCache | None = None
+    session: AsyncSession,
+    engine: AiEngine,
+    company: Company,
+    *,
+    cache: PageCache | None = None,
+    candidates: dict[uuid.UUID, tuple[Notice, float]] | None = None,
 ) -> MatchStats:
+    """Assess the company's candidates that have no fresh assessment (`candidates` if already found)."""
+
     cache = cache or PageCache()
     stats = MatchStats()
-    candidates = await _candidates(session, company, utcnow())
+    if candidates is None:
+        candidates = await _candidates(session, company, utcnow())
     stats.candidates = len(candidates)
     existing = {
         record.notice_id: record
@@ -122,6 +143,7 @@ async def match_company(
             stats.removed += 1
 
     checklists = await published_checklists(session, list(candidates))
+    labels: dict[str, str] | None = None
     for notice_id, (notice, score) in candidates.items():
         record = existing.get(notice_id)
         checklist = checklists.get(notice_id)
@@ -130,8 +152,10 @@ async def match_company(
             if _is_fresh(record, notice, company, checklist):
                 stats.unchanged += 1
                 continue
+        if labels is None:  # looked up once, and only when something needs an assessment
+            labels = await _labels(session, company, candidates)
         try:
-            await _assess(session, engine, company, notice, score, checklist, record, cache)
+            await _assess(session, engine, company, notice, score, checklist, record, cache, labels)
         except EngineError:
             logger.warning("Match assessment failed for notice %s", notice_id, exc_info=True)
             stats.failed += 1
@@ -139,6 +163,71 @@ async def match_company(
         stats.assessed += 1
     await session.flush()
     return stats
+
+
+async def rematch_quickly(session: AsyncSession, engine: AiEngine, company_id: uuid.UUID) -> int | None:
+    """Re-assess a company's matches in the request, after its profile was saved and committed.
+
+    Returns how many open notices now seem to fit (`count_fitting`), or None when the caller
+    should leave the work to a run after the response (`services.background.MatchRefresher`):
+    a language model takes seconds per notice, an unusually long candidate list would hold the
+    request, and a profile saved again meanwhile makes this run's assessments outdated. A
+    failure never undoes the saved profile; it is logged and left to that run too.
+    """
+
+    if engine.name not in QUICK_ENGINES:
+        return None
+    try:
+        done = await rematch_company(session, engine, company_id, max_candidates=MAX_QUICK_CANDIDATES)
+    except Exception:
+        logger.exception("Matches of company %s could not be re-assessed after a profile change", company_id)
+        await session.rollback()
+        return None
+    return await count_fitting(session, company_id, utcnow()) if done else None
+
+
+async def rematch_company(
+    session: AsyncSession, engine: AiEngine, company_id: uuid.UUID, *, max_candidates: int | None = None
+) -> bool:
+    """Re-assess one company's matches and commit them; False when nothing was kept.
+
+    Assessments are kept only while the profile is the one they read: when it was saved again
+    during the run, the run is rolled back and returns False, so the caller assesses the new
+    profile instead (otherwise the outdated results would look fresh). False also when there
+    are more than `max_candidates` candidates.
+    """
+
+    company = await session.get(Company, company_id)
+    if company is None:
+        return True  # nothing to assess any more
+    read = company.updated_at
+    candidates = await _candidates(session, company, utcnow())
+    if max_candidates is not None and len(candidates) > max_candidates:
+        return False
+    await match_company(session, engine, company, candidates=candidates)
+    if await session.scalar(select(Company.updated_at).where(Company.id == company_id)) != read:
+        await session.rollback()
+        return False
+    await session.commit()
+    return True
+
+
+async def count_fitting(session: AsyncSession, company_id: uuid.UUID, now: datetime) -> int:
+    """How many open notices seem to fit the company: the match cards Start shows."""
+
+    count = await session.scalar(
+        select(func.count())
+        .select_from(MatchRecord)
+        .join(Notice, Notice.id == MatchRecord.notice_id)
+        .where(
+            MatchRecord.company_id == company_id,
+            MatchRecord.fit.in_(FITTING),
+            MatchRecord.dismissed.is_(False),
+            MatchRecord.stale.is_(False),
+            _deadline_ahead(now),
+        )
+    )
+    return count or 0
 
 
 async def list_matches(session: AsyncSession, viewer: Viewer) -> list[MatchView]:
@@ -164,13 +253,26 @@ async def list_matches(session: AsyncSession, viewer: Viewer) -> list[MatchView]
 
 
 async def dismiss_match(session: AsyncSession, viewer: Viewer, match_id: uuid.UUID) -> None:
+    """The company is not interested: the match leaves the list and gets no "Ny träff" mail."""
+
+    (await _own_match(session, viewer, match_id)).dismissed = True
+    await session.flush()
+
+
+async def restore_match(session: AsyncSession, viewer: Viewer, match_id: uuid.UUID) -> None:
+    """Undo a dismissal ("Ångra"); the match is listed again while it still passes the prefilter."""
+
+    (await _own_match(session, viewer, match_id)).dismissed = False
+    await session.flush()
+
+
+async def _own_match(session: AsyncSession, viewer: Viewer, match_id: uuid.UUID) -> MatchRecord:
     record = await session.scalar(
         select(MatchRecord).where(MatchRecord.id == match_id, MatchRecord.company_id == viewer.company_id)
     )
     if record is None:
         raise NotFoundError("Träffen finns inte.")
-    record.dismissed = True
-    await session.flush()
+    return record
 
 
 async def notify_matches(
@@ -188,7 +290,7 @@ async def notify_matches(
         .join(Notice, Notice.id == MatchRecord.notice_id)
         .join(Company, Company.id == MatchRecord.company_id)
         .where(
-            MatchRecord.fit.in_(NOTIFY_FITS),
+            MatchRecord.fit.in_(FITTING),
             MatchRecord.notified_at.is_(None),
             MatchRecord.dismissed.is_(False),
             MatchRecord.stale.is_(False),
@@ -248,6 +350,8 @@ async def _send_match_mail(
         summary=str(record.payload.get("summary", "")),
         deadline_at=notice.deadline_at,
         organization=settings.organization_name,
+        engine=record.engine,
+        start_url=page_url(settings.public_url, "start"),
     )
     try:
         await mailer.send(message)
@@ -313,9 +417,22 @@ async def _keyword_ranks(
     return {notice_id: float(rank) for notice_id, rank, count in rows if count >= needed}
 
 
+async def _labels(
+    session: AsyncSession, company: Company, candidates: dict[uuid.UUID, tuple[Notice, float]]
+) -> dict[str, str]:
+    """CPV labels for the company's and the candidates' codes, so reasons name the work in words."""
+
+    codes = set(company.cpv_codes or [])
+    for notice, _ in candidates.values():
+        codes.update(notice.cpv_codes or [])
+    return await cpv_labels(session, codes)
+
+
 def _is_fresh(
     record: MatchRecord, notice: Notice, company: Company, checklist: ChecklistRecord | None
 ) -> bool:
+    if record.assessment_version != ASSESSMENT_VERSION:
+        return False
     changes = [notice.updated_at, company.updated_at, checklist.published_at if checklist else None]
     return all(changed is None or record.created_at >= changed for changed in changes)
 
@@ -329,9 +446,12 @@ async def _assess(
     checklist: ChecklistRecord | None,
     record: MatchRecord | None,
     cache: PageCache,
+    labels: dict[str, str],
 ) -> None:
     contract = checklist_payload(checklist) if checklist else None
-    assessment, run = await engine.assess_match(company_profile(company), notice_context(notice), contract)
+    assessment, run = await engine.assess_match(
+        company_profile(company, labels), notice_context(notice, labels), contract
+    )
     pages = await cache.get(session, checklist.document_id) if checklist else []
     verified = verify_match(assessment, pages)
     if record is None:
@@ -340,5 +460,6 @@ async def _assess(
     record.fit = verified.fit
     record.prefilter_score = score
     record.engine = run.engine
+    record.assessment_version = ASSESSMENT_VERSION
     record.payload = verified.model_dump(mode="json")
     record.created_at = utcnow()

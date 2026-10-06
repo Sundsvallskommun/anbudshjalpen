@@ -103,6 +103,14 @@ Kommandot gör det här, i ordning:
 Kommandot hittar befintliga objekt på namnet och går att köra flera gånger. Kör det igen efter varje ändring av en
 instruktion, ett kontrakt eller ett MCP-verktyg.
 
+> **Kör det igen efter ändringen 2026-10-05.** Instruktionerna för `besvara_fraga`, `regelhjalpen` och
+> `bedom_matchning` ändrades: svaren börjar med slutsatsen i en mening, och bedömningen skrivs till företaget med
+> webbappens ord för passform (verkar passa, passar delvis, verkar inte passa) och med CPV-kodernas benämningar. En
+> instans som sattes upp före ändringen har kvar de gamla instruktionerna tills kommandot körs. Kör det innan
+> `match_all` körs första gången efter uppdateringen, eftersom den körningen gör en ny bedömning av alla sparade
+> träffar ([Drift](operations.md#uppdatera)). De nya fälten `cpv_labels` i motorernas indata och `excerpt` i
+> Regelhjälpens källor sätts av appen vid varje anrop och kräver ingen ny körning.
+
 ## Nycklar
 
 | Nyckel | Används av | Finns i | Behörighet |
@@ -165,7 +173,8 @@ Eneo inte har kvar, startar ett nytt samtal.
 
 Regelhjälpens källor kommer från Eneos kunskapsreferenser och från MCP-verktygens referenser. En paragraf i LOU blir en
 källa med hänvisningen "LOU 20 kap. 1 §" och paragrafens rubrik som titel. En sida ur ett underlag får hänvisningen
-"sida N" och filnamnet som titel.
+"sida N" och filnamnet som titel. Till en LOU-paragraf lägger appen själv början av lagtexten (`excerpt`) ur sin egen
+kopia av LOU, så utdraget kommer aldrig från modellen ([AI-uppgifterna](ai-tasks.md#regelhjälpen-regelhjalpen)).
 
 Underlaget skickas som text i stället för som fil, eftersom en servicenyckel inte får ladda upp filer i Eneo. Då
 stämmer också sidnumren med vår citatkontroll.
@@ -186,7 +195,7 @@ raderingarna.
 Felmeddelandena från motorn kan nå en anonym besökare och nämner därför inte `ENEO_BACKEND_URL` eller sökvägen till
 `ENEO_ASSISTANTS_FILE`. De uppgifterna står i appens logg. Ett inställningsfel, som en nekad nyckel eller en saknad
 assistent, visas för besökare bara som "AI-motorn är inte rätt inställd just nu". Inköparen ser den exakta texten i
-listan över underlag utan checklista, och loggen har den med orsaken.
+rutan om underlag som inte har tolkats, överst under Inköp › Att granska, och loggen har den med orsaken.
 
 Ett 400-fel med kod 9007 som inte gäller kontexten, och 401, 403 och 404, kan rättas av en operatör. Där fortsätter
 tolkningen därför att försöka med allt längre paus. Fel som samma underlag aldrig klarar markeras som slutgiltiga

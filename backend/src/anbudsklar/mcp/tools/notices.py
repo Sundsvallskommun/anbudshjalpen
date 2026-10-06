@@ -209,8 +209,10 @@ def _render_notice(
     lines = [f"# {notice.title}", f"upphandling_id: {notice.id}"]
     if notice.is_fictitious:
         lines.append(FICTITIOUS_NOTICE)
+    lines.append(f"Köpare: {notice.buyer or MISSING}")
+    if notice.reference_number:
+        lines.append(f"Referensnummer: {notice.reference_number}")  # as the buyer and e-Avrop name it
     lines += [
-        f"Köpare: {notice.buyer or MISSING}",
         f"Status: {NOTICE_STATUS_LABELS.get(notice.status, notice.status)}",
         f"Förfarande: {notice.procedure or MISSING}",
         f"Publicerad: {format_datetime(notice.published_at)}",

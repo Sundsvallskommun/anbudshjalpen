@@ -103,6 +103,18 @@ async def reject_checklist(
     return checklists.to_checklist_view(record)
 
 
+@router.post("/checklists/{checklist_id}/reopen")
+async def reopen_checklist(checklist_id: uuid.UUID, session: SessionDep) -> ChecklistView:
+    """Open a rejected or withdrawn checklist as a draft again; only a draft can then be approved.
+
+    The reason it was rejected stays in `reviewer_note` until the buyer saves a new note.
+    """
+
+    record = await checklists.reopen_checklist(session, checklist_id)
+    await session.commit()
+    return checklists.to_checklist_view(record)
+
+
 @router.post("/notices", status_code=status.HTTP_201_CREATED)
 async def create_notice(body: NoticeCreate, session: SessionDep, user: BuyerDep) -> NoticeDetail:
     notice = await notices.create_notice(session, body)

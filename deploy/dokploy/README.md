@@ -97,6 +97,8 @@ adresser och kommandon.
   fil. Har den slutat fungera (Eneo svarar 401 eller 403), eller går den ut inom 14 dagar, finns en ny i
   `/tmp/eneo.env`, och kommandot varnar om att sätta den i Environment: gör som i avsnitt 3, steg 2 och 3. Svarar
   Eneo något annat på kontrollen av nyckeln, till exempel 429 eller 5xx, stoppar kommandot utan att röra nyckeln.
+  Instruktionerna ändrades senast 2026-10-05, så en testmiljö som kopplades till Eneo före det behöver en körning (se
+  [Eneo-integration](../../docs/eneo-integration.md#sätta-upp-anbudsklar-eneo-provision)).
 - **Fixturerna:** har `data/fixtures` ändrats, kör `anbudsklar seed` i containern för `anbudsklar-app` efter
   driftsättningen. Imagen innehåller fixturerna och byggs om vid varje driftsättning. Ett ersatt underlag får en ny
   checklista som måste granskas och publiceras igen.

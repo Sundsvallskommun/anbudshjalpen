@@ -122,6 +122,7 @@ async def test_dates_are_relative_to_today(db_session: AsyncSession, calls: Call
 
     notice = await db_session.scalar(select(Notice).where(Notice.external_id == PAINTING["external_id"]))
     assert notice is not None and notice.is_fictitious and notice.status == "open"
+    assert notice.reference_number == PAINTING["reference_number"] == "DEMO-2026-0147"
     deadline_day = today + timedelta(days=PAINTING["deadline"]["offset_days"])
     deadline_time = time.fromisoformat(PAINTING["deadline"]["time"])
     assert notice.deadline_at == datetime.combine(deadline_day, deadline_time, STOCKHOLM)

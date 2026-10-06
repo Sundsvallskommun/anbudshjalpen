@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.ai.engine import AiEngine
 from anbudsklar.api.schemas import CompanyUpdate, CompanyView, CpvHit, CpvSuggestionView
 from anbudsklar.contracts import CpvCandidate, CpvSuggestion, CpvSuggestions
-from anbudsklar.models import Company, CpvCode
-from anbudsklar.search.queries import search_cpv
+from anbudsklar.models import Company
+from anbudsklar.search.queries import cpv_labels, search_cpv
 from anbudsklar.services.access import Viewer
 from anbudsklar.services.cpv import normalize_cpv_codes
 from anbudsklar.services.errors import InvalidInputError, NotFoundError
@@ -64,13 +63,6 @@ async def update_profile(session: AsyncSession, viewer: Viewer, update: CompanyU
     await session.flush()
     await session.refresh(company)
     return await company_view(session, company)
-
-
-async def cpv_labels(session: AsyncSession, codes: list[str]) -> dict[str, str]:
-    if not codes:
-        return {}
-    rows = await session.execute(select(CpvCode.code, CpvCode.label_sv).where(CpvCode.code.in_(codes)))
-    return {code: label for code, label in rows}
 
 
 async def cpv_hits(session: AsyncSession, query: str) -> list[CpvHit]:

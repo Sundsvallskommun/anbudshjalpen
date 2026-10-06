@@ -51,6 +51,31 @@ async def test_company_reads_and_updates_its_own_profile(
     assert demo.other_company.cpv_codes == ["90911200"]
 
 
+async def test_saving_the_profile_says_how_many_open_notices_fit_it_now(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    """With the heuristic engine the matches are re-assessed before the answer (the save toast's count)."""
+
+    await add_cpv_codes(db_session, CPV)
+    await login(client, "foretagare")
+    painting = {"description": "Vi målar skolor och förskolor invändigt.", "cpv_codes": ["45442100"]}
+
+    saved = await client.put("/api/profile", json=painting)
+    assert saved.status_code == 200, saved.text
+    body = saved.json()
+    assert body["fitting_notices"] == 1
+    assert body["cpv_codes"] == ["45442100"]  # still the whole profile, as before
+    [match] = (await client.get("/api/matches")).json()
+    assert match["notice"]["id"] == str(demo.notice.id)
+
+    assert (await client.post(f"/api/matches/{match['id']}/dismiss")).status_code == 204
+    assert (await client.put("/api/profile", json=painting)).json()["fitting_notices"] == 0  # not interested
+
+    cleaning = {"description": "Vi städar kontor och lager.", "cpv_codes": ["90911200"]}
+    assert (await client.put("/api/profile", json=cleaning)).json()["fitting_notices"] == 0
+    assert (await client.get("/api/matches")).json() == []
+
+
 async def test_profile_rejects_unknown_and_malformed_codes(
     client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
 ) -> None:

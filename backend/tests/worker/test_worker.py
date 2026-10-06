@@ -129,8 +129,9 @@ async def test_due_reminders_are_sent_once(db_session: AsyncSession) -> None:
     }
     [message] = mailer.sent
     assert message.to == "anna@example.test"
-    assert message.subject.startswith("Frågestopp ")
+    assert message.subject.startswith("Sista dag för frågor ")
     assert demo.notice.title in message.subject
+    assert f"Ändra eller ta bort dina påminnelser: {PUBLIC_URL}/paminnelser" in message.text
     assert due.sent_at == now
     assert later.sent_at is None
 

@@ -2,13 +2,16 @@
 
 A reminder for frågestopp or sista anbudsdag follows its deadline: when a newly
 published or withdrawn checklist (or a corrected notice) moves the date, the send time
-moves with it, both when the checklist changes and again just before sending.
+moves with it, both when the checklist changes and again just before sending. The send
+time (`due_at`) and the deadline itself (`ReminderView.deadline_at`) are two different
+facts, and the app and the e-mail always name the deadline as the deadline.
 """
 
 from __future__ import annotations
 
 import logging
 import uuid
+from collections.abc import Mapping
 from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import select
@@ -16,11 +19,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.api.schemas import ReminderRequest, ReminderView
 from anbudsklar.config import Settings
-from anbudsklar.models import Notice, Reminder, User
-from anbudsklar.services.checklists import checklist_payload, key_date, published_checklist
-from anbudsklar.services.dates import STOCKHOLM, local_date, local_datetime
+from anbudsklar.contracts import Checklist
+from anbudsklar.models import ChecklistRecord, Notice, Reminder, User
+from anbudsklar.services.checklists import (
+    checklist_payload,
+    key_date,
+    published_checklist,
+    published_checklists,
+)
+from anbudsklar.services.dates import STOCKHOLM, end_of_local_day, local_date, local_datetime
 from anbudsklar.services.errors import InvalidInputError, NotFoundError
-from anbudsklar.services.notices import get_notice, notice_url
+from anbudsklar.services.notices import get_notice, notice_url, page_url
 from anbudsklar.worker.mail import REMINDER_LABELS, Mailer, MailError, reminder_message
 
 logger = logging.getLogger(__name__)
@@ -43,14 +52,38 @@ def derived_due_at(deadline: date, now: datetime) -> datetime:
     return max(planned_due_at(deadline), now)
 
 
-async def deadline_for(session: AsyncSession, notice: Notice, kind: str) -> date | None:
-    """The deadline from the published checklist; the notice's own deadline backs up sista anbudsdag."""
+def reminder_deadline(notice: Notice, kind: str, checklist: Checklist | None) -> datetime | None:
+    """The deadline a reminder of this kind follows, as a moment; None for "egen" and unknown ones.
 
+    The published checklist's date comes first, because inköp has reviewed it; the
+    notice's own deadline backs up sista anbudsdag, and gives it its time of day when it
+    falls on the same day. A date without a time of day lasts until that day ends in
+    Stockholm, since it names the last day on which something may be done.
+    """
+
+    if kind not in DERIVED_KINDS:
+        return None
+    day = key_date(checklist, kind) if checklist else None
+    own = notice.deadline_at if kind == "sista_anbudsdag" else None
+    if day is None:
+        return own
+    if own is not None and local_date(own) == day:
+        return own
+    return end_of_local_day(day)
+
+
+async def deadline_at_for(session: AsyncSession, notice: Notice, kind: str) -> datetime | None:
+    if kind not in DERIVED_KINDS:
+        return None
     record = await published_checklist(session, notice.id)
-    deadline = key_date(checklist_payload(record), kind) if record else None
-    if deadline is None and kind == "sista_anbudsdag" and notice.deadline_at is not None:
-        deadline = local_date(notice.deadline_at)
-    return deadline
+    return reminder_deadline(notice, kind, checklist_payload(record) if record else None)
+
+
+async def deadline_for(session: AsyncSession, notice: Notice, kind: str) -> date | None:
+    """The calendar day of the deadline, which the send time is planned from."""
+
+    deadline_at = await deadline_at_for(session, notice, kind)
+    return local_date(deadline_at) if deadline_at else None
 
 
 async def create_reminder(
@@ -59,7 +92,8 @@ async def create_reminder(
     """Derived reminders are kept once per user, notice and kind; asking again moves the existing one."""
 
     notice = await get_notice(session, notice_id)
-    due_at = await _due_at(session, notice, request, now)
+    deadline_at = await deadline_at_for(session, notice, request.kind)
+    due_at = _due_at(request, deadline_at, now)
 
     reminder = None
     if request.kind != "egen":
@@ -77,17 +111,30 @@ async def create_reminder(
     reminder.due_at = due_at
     reminder.note = request.note
     await session.flush()
-    return _view(reminder, notice.title)
+    return _view(reminder, notice.title, deadline_at)
 
 
 async def list_reminders(session: AsyncSession, user_id: uuid.UUID) -> list[ReminderView]:
-    rows = await session.execute(
-        select(Reminder, Notice.title)
-        .join(Notice, Notice.id == Reminder.notice_id)
-        .where(Reminder.user_id == user_id)
-        .order_by(Reminder.due_at)
-    )
-    return [_view(reminder, title) for reminder, title in rows]
+    rows = (
+        await session.execute(
+            select(Reminder, Notice)
+            .join(Notice, Notice.id == Reminder.notice_id)
+            .where(Reminder.user_id == user_id)
+            .order_by(Reminder.due_at, Reminder.id)
+        )
+    ).all()
+    published = await published_checklists(session, list({notice.id for _, notice in rows}))
+    return [
+        _view(reminder, notice.title, _deadline_with(published, notice, reminder.kind))
+        for reminder, notice in rows
+    ]
+
+
+def _deadline_with(
+    published: Mapping[uuid.UUID, ChecklistRecord], notice: Notice, kind: str
+) -> datetime | None:
+    record = published.get(notice.id)
+    return reminder_deadline(notice, kind, checklist_payload(record) if record else None)
 
 
 async def delete_reminder(session: AsyncSession, user_id: uuid.UUID, reminder_id: uuid.UUID) -> None:
@@ -132,9 +179,9 @@ async def send_due_reminders(
         if row is None:
             continue  # sent or locked by another run
         reminder, user, notice = row
-        deadline = None if reminder.kind == "egen" else await deadline_for(session, notice, reminder.kind)
-        if deadline is not None and planned_due_at(deadline) > now:
-            reminder.due_at = planned_due_at(deadline)
+        deadline_at = await deadline_at_for(session, notice, reminder.kind)
+        if deadline_at is not None and planned_due_at(local_date(deadline_at)) > now:
+            reminder.due_at = planned_due_at(local_date(deadline_at))
             await session.commit()
             rescheduled += 1
             continue
@@ -144,9 +191,10 @@ async def send_due_reminders(
             notice_title=notice.title,
             notice_url=notice_url(settings.public_url, notice.id),
             kind=reminder.kind,
-            deadline=deadline,
+            deadline_at=deadline_at,
             note=reminder.note,
             organization=settings.organization_name,
+            reminders_url=page_url(settings.public_url, "paminnelser"),
         )
         try:
             await mailer.send(message)
@@ -191,7 +239,7 @@ async def reschedule_for_notice(session: AsyncSession, notice_id: uuid.UUID, now
     return moved
 
 
-async def _due_at(session: AsyncSession, notice: Notice, request: ReminderRequest, now: datetime) -> datetime:
+def _due_at(request: ReminderRequest, deadline_at: datetime | None, now: datetime) -> datetime:
     if request.kind == "egen":
         if request.due_at is None:
             raise InvalidInputError("Ange datum och tid för påminnelsen.")
@@ -201,17 +249,16 @@ async def _due_at(session: AsyncSession, notice: Notice, request: ReminderReques
         return due_at
 
     label = REMINDER_LABELS[request.kind]
-    deadline = await deadline_for(session, notice, request.kind)
-    if deadline is None:
+    if deadline_at is None:
         raise InvalidInputError(
             f"{label} finns inte i den publicerade checklistan. Skapa en egen påminnelse i stället."
         )
-    if deadline < local_date(now):
+    if deadline_at <= now:
         raise InvalidInputError(f"{label} har redan passerat.")
-    return derived_due_at(deadline, now)
+    return derived_due_at(local_date(deadline_at), now)
 
 
-def _view(reminder: Reminder, notice_title: str) -> ReminderView:
+def _view(reminder: Reminder, notice_title: str, deadline_at: datetime | None) -> ReminderView:
     return ReminderView.model_validate(
         {
             "id": reminder.id,
@@ -220,6 +267,7 @@ def _view(reminder: Reminder, notice_title: str) -> ReminderView:
             "kind": reminder.kind,
             "note": reminder.note,
             "due_at": reminder.due_at,
+            "deadline_at": deadline_at,
             "sent_at": reminder.sent_at,
         }
     )

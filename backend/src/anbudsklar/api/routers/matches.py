@@ -28,6 +28,14 @@ async def dismiss_match(match_id: uuid.UUID, session: SessionDep, user: CompanyU
     await session.commit()
 
 
+@router.post("/matches/{match_id}/restore", status_code=status.HTTP_204_NO_CONTENT)
+async def restore_match(match_id: uuid.UUID, session: SessionDep, user: CompanyUserDep) -> None:
+    """Undo "Inte intressant"."""
+
+    await matching.restore_match(session, Viewer.for_user(user), match_id)
+    await session.commit()
+
+
 @router.get("/upcoming")
 async def list_upcoming(
     session: SessionDep, viewer: ViewerDep, months: Annotated[int, Query(ge=1, le=36)] = 18

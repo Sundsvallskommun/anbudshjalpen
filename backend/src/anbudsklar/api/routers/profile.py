@@ -4,12 +4,27 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 
-from anbudsklar.api.deps import AiSlotsDep, CompanyUserDep, EngineDep, SessionDep, require_company_user
+from anbudsklar.api.deps import (
+    AiSlotsDep,
+    CompanyUserDep,
+    EngineDep,
+    MatchRefresherDep,
+    SessionDep,
+    SessionFactoryDep,
+    require_company_user,
+)
 from anbudsklar.api.limits import rate_limited
-from anbudsklar.api.schemas import CompanyUpdate, CompanyView, CpvHit, CpvSuggestionRequest, CpvSuggestionView
-from anbudsklar.services import profiles
+from anbudsklar.api.schemas import (
+    CompanyUpdate,
+    CompanyView,
+    CpvHit,
+    CpvSuggestionRequest,
+    CpvSuggestionView,
+    ProfileSaved,
+)
+from anbudsklar.services import matching, profiles
 from anbudsklar.services.access import Viewer
 
 router = APIRouter(tags=["profile"])
@@ -22,10 +37,28 @@ async def get_profile(session: SessionDep, user: CompanyUserDep) -> CompanyView:
 
 
 @router.put("/profile")
-async def update_profile(body: CompanyUpdate, session: SessionDep, user: CompanyUserDep) -> CompanyView:
+async def update_profile(
+    body: CompanyUpdate,
+    session: SessionDep,
+    user: CompanyUserDep,
+    engine: EngineDep,
+    background: BackgroundTasks,
+    session_factory: SessionFactoryDep,
+    refresher: MatchRefresherDep,
+) -> ProfileSaved:
+    """Save the profile and re-assess the company's matches against it.
+
+    The heuristic engine re-assesses them before the answer, which then says how many open
+    notices seem to fit (`fitting_notices`). A language model takes seconds per notice, so
+    with it the matches are re-assessed after the answer and `fitting_notices` is null.
+    """
+
     view = await profiles.update_profile(session, Viewer.for_user(user), body)
     await session.commit()
-    return view
+    fitting = await matching.rematch_quickly(session, engine, view.id)
+    if fitting is None:
+        background.add_task(refresher.run, session_factory, engine, view.id)
+    return ProfileSaved(**view.model_dump(), fitting_notices=fitting)
 
 
 @router.post(

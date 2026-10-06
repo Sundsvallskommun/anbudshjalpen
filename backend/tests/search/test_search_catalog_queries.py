@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.models import LouSection, Notice
 from anbudsklar.search.queries import (
+    count_notices_by_status,
+    cpv_labels,
     cpv_prefix,
     cpv_with_ancestors,
     get_lou_section,
@@ -176,6 +178,42 @@ async def test_status_source_and_deadline_filters(
 async def test_text_and_filters_combine(db_session: AsyncSession, notices: dict[str, Notice]) -> None:
     rows, total = await search_notices(db_session, text="förskola", cpv_prefixes=["90"], status="open")
     assert (total, _ids(rows, notices)) == (1, {"stad"})
+
+
+async def test_notices_by_deadline_put_the_soonest_first_and_undated_last(
+    db_session: AsyncSession, notices: dict[str, Notice]
+) -> None:
+    rows, _ = await search_notices(db_session, order="deadline")
+    keys = {notice.id: key for key, notice in notices.items()}
+    assert [keys[row.id] for row in rows] == ["frukt", "malning", "stad", "snorojning", "tak"]
+    rows, _ = await search_notices(db_session, text="förskola", order="deadline")
+    assert [keys[row.id] for row in rows] == ["malning", "stad"]
+    rows, _ = await search_notices(db_session, text="förskola", order="published")
+    assert [keys[row.id] for row in rows] == ["stad", "malning"]
+
+
+async def test_notice_counts_per_status(db_session: AsyncSession, notices: dict[str, Notice]) -> None:
+    assert await count_notices_by_status(db_session, ("open", "planned")) == ({"open": 2, "planned": 1}, 5)
+    assert await count_notices_by_status(db_session, ("open",), source="ted") == ({"open": 0}, 2)
+
+
+@pytest.mark.parametrize("text", ["förskola", "målning", "målningsarbete", "takrenovering", "kärnkraftverk"])
+async def test_notice_counts_match_what_each_status_lists(
+    db_session: AsyncSession, notices: dict[str, Notice], text: str
+) -> None:
+    """Full text first and similar titles when it finds nothing, for each status on its own."""
+
+    statuses = ("open", "planned", "closed", "awarded")
+    per_status, total = await count_notices_by_status(db_session, statuses, text=text)
+    for status in statuses:
+        assert per_status[status] == (await search_notices(db_session, text=text, status=status))[1], status
+    assert total == (await search_notices(db_session, text=text))[1]
+
+
+async def test_cpv_labels_by_code_as_given(db_session: AsyncSession, cpv_codes: None) -> None:
+    labels = await cpv_labels(db_session, ["45442110-1", "45442100", "99999999", "inte en kod"])
+    assert labels == {"45442110-1": "Målning av byggnader", "45442100": "Målning"}
+    assert await cpv_labels(db_session, []) == {}
 
 
 # --- CPV ------------------------------------------------------------------------------

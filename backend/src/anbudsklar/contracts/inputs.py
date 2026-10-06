@@ -24,6 +24,9 @@ class NoticeContext(ContractModel):
     buyer: str | None = None
     description: str | None = None
     cpv_codes: list[str] = Field(default_factory=list)
+    cpv_labels: dict[str, str] = Field(
+        default_factory=dict, description="Swedish labels of the CPV codes that have one, by code."
+    )
     procedure: str | None = None
     deadline_at: datetime | None = None
     url: str | None = None
@@ -56,6 +59,9 @@ class CompanyProfile(ContractModel):
     name: str
     description: str
     cpv_codes: list[str] = Field(default_factory=list)
+    cpv_labels: dict[str, str] = Field(
+        default_factory=dict, description="Swedish labels of the CPV codes that have one, by code."
+    )
     municipalities: list[str] = Field(default_factory=list)
     employees: int | None = None
     annual_turnover_sek: int | None = None

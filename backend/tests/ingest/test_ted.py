@@ -15,12 +15,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from anbudsklar.config import Settings
 from anbudsklar.ingest.common import IngestError
 from anbudsklar.ingest.ted import (
+    FIELDS,
     build_query,
     fetch_ted_notices,
     ingest_ted,
     map_ted_notice,
     months_before,
     parse_deadline,
+    reference_number,
 )
 from anbudsklar.models import Notice
 
@@ -161,6 +163,34 @@ def test_title_falls_back_to_notice_title_without_country_and_cpv_prefix() -> No
     }
 
     assert map_ted_notice(raw, now=RECORDED_AT).values.title == "Vinterväghållning 2027"
+
+
+def test_the_buyers_reference_is_the_procedures_internal_identifier(page: dict[str, Any]) -> None:
+    assert "internal-identifier-proc" in FIELDS  # TED only returns the fields a search asks for
+    with_reference = {**notice(page, "684405-2026"), "internal-identifier-proc": " KS 2026/0147 "}
+
+    assert map_ted_notice(with_reference, now=RECORDED_AT).values.reference_number == "KS 2026/0147"
+    # The recorded notices came from e-Avrop, which names no reference for the procedure.
+    assert {map_ted_notice(item, now=RECORDED_AT).values.reference_number for item in page["notices"]} == {
+        None
+    }
+
+
+@pytest.mark.parametrize(
+    ("fields", "expected"),
+    [
+        ({"internal-identifier-proc": ["SN-2026-12", "SN-2026-13"]}, "SN-2026-12"),
+        ({"internal-identifier-proc": {"swe": "Dnr 2026/88"}}, "Dnr 2026/88"),
+        # e-Avrop's own URNs are no reference people quote, at procedure or lot level.
+        ({"internal-identifier-proc": "urn:eavrop:mdn:ProcurementProject:122916"}, None),
+        ({"internal-identifier-lot": ["urn:eavrop:mdn:ProcurementProject:122916:Lot:1"]}, None),
+        ({"internal-identifier-lot": ["Dnr 2026/88"]}, None),  # a lot's identifier is not the procedure's
+        ({"internal-identifier-proc": ""}, None),
+        ({}, None),
+    ],
+)
+def test_reference_number_shapes(fields: dict[str, Any], expected: str | None) -> None:
+    assert reference_number(fields) == expected
 
 
 def test_values_in_other_currencies_are_not_stored_as_sek(page: dict[str, Any]) -> None:

@@ -122,13 +122,19 @@ def _line(label: str, value: object | None) -> str:
     return f"{label}: {value}"
 
 
+def _cpv(codes: Sequence[str], labels: dict[str, str]) -> list[str]:
+    """Codes with the CPV list's own words, "45442100 Målning", where the label is known."""
+
+    return [f"{code} {labels[code]}" if code in labels else code for code in codes]
+
+
 def _render_notice(notice: NoticeContext) -> str:
     lines = [
         _line("Upphandlings-id", notice.notice_id),
         _line("Titel", notice.title),
         _line("Köpare", notice.buyer),
         _line("Förfarande", notice.procedure),
-        _line("CPV-koder", notice.cpv_codes),
+        _line("CPV-koder", _cpv(notice.cpv_codes, notice.cpv_labels)),
         _line("Sista anbudsdag", _local_time(notice.deadline_at) if notice.deadline_at else None),
         _line("Länk till annonsen", notice.url),
         _line("Beskrivning", notice.description),
@@ -151,7 +157,7 @@ def _render_profile(profile: CompanyProfile) -> str:
     lines = [
         _line("Företag", profile.name),
         _line("Beskrivning", profile.description),
-        _line("CPV-koder", profile.cpv_codes),
+        _line("CPV-koder", _cpv(profile.cpv_codes, profile.cpv_labels)),
         _line("Verksamhetsorter", profile.municipalities),
         _line("Antal anställda", profile.employees),
         _line("Årsomsättning", turnover),

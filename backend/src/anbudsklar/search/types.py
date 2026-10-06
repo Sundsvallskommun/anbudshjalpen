@@ -8,8 +8,20 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from typing import Literal
 
 from anbudsklar.contracts import CitationCheck
+
+NoticeOrder = Literal["deadline", "published", "relevance"]
+"""How `search_notices` orders its rows (see its docstring)."""
+
+
+@dataclass(frozen=True, slots=True)
+class BuyerCount:
+    """A buyer named in the notices a search lists, and how many of them its name is in."""
+
+    name: str
+    count: int
 
 
 @dataclass(frozen=True, slots=True)

@@ -14,7 +14,7 @@ from anbudsklar.config import Settings
 from anbudsklar.db import get_session
 from anbudsklar.models import User
 from anbudsklar.services.access import ROLE_BUYER, ROLE_COMPANY, Viewer
-from anbudsklar.services.background import SessionFactory
+from anbudsklar.services.background import MatchRefresher, SessionFactory
 from anbudsklar.services.jobs import JobContext
 
 BUYER_DISABLED_MESSAGE = "Inköparens demovy är avstängd i den här miljön."
@@ -50,6 +50,12 @@ def get_ai_slots(request: Request) -> AiSlots:
     return request.app.state.ai_slots
 
 
+def get_match_refresher(request: Request) -> MatchRefresher:
+    """Re-assesses a company's matches after the response, one run per company at a time."""
+
+    return request.app.state.match_refresher
+
+
 def buyer_enabled(request: Request) -> bool:
     """Whether this deployment offers the buyer persona (`services.personas.buyer_persona_enabled`)."""
 
@@ -64,6 +70,7 @@ SessionFactoryDep = Annotated[SessionFactory, Depends(get_session_factory)]
 SessionStoreDep = Annotated[SessionStore, Depends(get_session_store)]
 ConversationStoreDep = Annotated[ConversationStore, Depends(get_conversation_store)]
 AiSlotsDep = Annotated[AiSlots, Depends(get_ai_slots)]
+MatchRefresherDep = Annotated[MatchRefresher, Depends(get_match_refresher)]
 BuyerEnabledDep = Annotated[bool, Depends(buyer_enabled)]
 
 

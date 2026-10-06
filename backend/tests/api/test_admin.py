@@ -16,7 +16,15 @@ from anbudsklar.services import jobs
 from anbudsklar.services.jobs import JobContext
 from anbudsklar.services.reminders import planned_due_at
 
-from .factories import Demo, add_checklist, add_document, add_notice, demo_checklist, login
+from .factories import (
+    Demo,
+    add_checklist,
+    add_document,
+    add_notice,
+    demo_checklist,
+    document_pages,
+    login,
+)
 
 
 async def test_admin_requires_a_buyer(client: httpx.AsyncClient, demo: Demo) -> None:
@@ -32,7 +40,32 @@ async def test_checklist_queue(client: httpx.AsyncClient, demo: Demo) -> None:
     assert [item["id"] for item in items] == [str(demo.checklist.id)]
     assert items[0]["requirement_count"] == 2
     assert items[0]["notice_title"] == demo.notice.title
+    assert datetime.fromisoformat(items[0]["deadline_at"]) == demo.notice.deadline_at
     assert (await client.get("/api/admin/checklists", params={"status": "draft"})).json() == []
+
+
+async def test_the_queue_is_sorted_on_the_tender_deadline(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    soon = await add_notice(
+        db_session,
+        title="Snöröjning (fiktiv)",
+        external_id="TEST-Q1",
+        deadline_at=datetime.now(UTC) + timedelta(days=3),
+    )
+    undated = await add_notice(db_session, title="Fönsterputs (fiktiv)", external_id="TEST-Q2")
+    pages = document_pages(demo.fragestopp, demo.deadline)
+    checklist = demo_checklist(demo.fragestopp, demo.deadline)
+    later = await add_checklist(
+        db_session, undated, await add_document(db_session, undated, pages), checklist
+    )
+    first = await add_checklist(
+        db_session, soon, await add_document(db_session, soon, pages), checklist, status="draft"
+    )
+    await login(client, "inkopare")
+    items = (await client.get("/api/admin/checklists")).json()
+    assert [item["id"] for item in items] == [str(first.id), str(demo.checklist.id), str(later.id)]
+    assert items[-1]["deadline_at"] is None
 
 
 async def test_approve_then_publish(client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo) -> None:
@@ -67,6 +100,53 @@ async def test_reject_with_a_note(client: httpx.AsyncClient, db_session: AsyncSe
     assert rejected["status"] == "rejected"
     assert rejected["reviewer_note"] == "Saknar krav på F-skatt."
     assert (await client.post(f"{base}/approve")).status_code == 409
+
+
+async def test_a_rejected_checklist_is_never_approved_until_it_is_opened_as_a_draft_again(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    draft = await add_checklist(
+        db_session, demo.notice, demo.document, demo_checklist(demo.fragestopp, demo.deadline), status="draft"
+    )
+    await login(client, "inkopare")
+    base = f"/api/admin/checklists/{draft.id}"
+    assert (await client.post(f"{base}/reopen")).status_code == 409  # only a rejected one
+    await client.post(f"{base}/reject", json={"note": "Saknar krav på F-skatt."})
+
+    refused = await client.post(f"{base}/approve")
+    assert refused.status_code == 409
+    assert "avvisad checklista kan inte godkännas" in refused.json()["detail"]
+    unpublished = await client.post(f"{base}/publish")
+    assert unpublished.status_code == 409
+    assert "avvisad checklista kan inte publiceras" in unpublished.json()["detail"]
+
+    reopened = await client.post(f"{base}/reopen")
+    assert reopened.status_code == 200, reopened.text
+    assert reopened.json()["status"] == "draft"
+    assert (
+        reopened.json()["reviewer_note"] == "Saknar krav på F-skatt."
+    )  # why it was rejected, until replaced
+    assert (await client.post(f"{base}/reopen")).status_code == 409
+    assert (await client.post(f"{base}/approve")).json()["status"] == "approved"
+    already = await client.post(f"{base}/approve")
+    assert (already.status_code, already.json()["detail"]) == (409, "Checklistan är redan godkänd.")
+
+
+async def test_a_withdrawn_checklist_reopens_as_an_unpublished_draft(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    await login(client, "inkopare")
+    base = f"/api/admin/checklists/{demo.checklist.id}"
+    assert (await client.post(f"{base}/reopen")).status_code == 409  # published: withdraw it first
+    await client.post(f"{base}/withdraw", json={"note": "Fel datum för frågestopp."})
+    reopened = (await client.post(f"{base}/reopen")).json()
+    assert (reopened["status"], reopened["approved_at"], reopened["published_at"]) == ("draft", None, None)
+    assert reopened["reviewer_note"] == "Fel datum för frågestopp."
+
+    await client.post("/api/session/logout")
+    assert (await client.get(f"/api/notices/{demo.notice.id}")).json()["checklist"] is None  # still not shown
+    await login(client, "foretagare")
+    assert (await client.post(f"{base}/reopen")).status_code == 403
 
 
 async def test_edits_are_verified_again_and_need_a_new_approval(
@@ -334,6 +414,21 @@ async def test_failed_interpretations_are_listed_and_can_be_run_again(
     assert again.status_code == 202  # a new draft next to the published checklist
     drafts = (await client.get("/api/admin/checklists", params={"status": "draft"})).json()
     assert {draft["notice_id"] for draft in drafts} == {str(notice.id), str(demo.notice.id)}
+
+
+async def test_manual_notices_keep_the_buyers_reference_number(client: httpx.AsyncClient, demo: Demo) -> None:
+    await login(client, "inkopare")
+    numbered = await client.post(
+        "/api/admin/notices", json={"title": "Snöröjning (fiktiv)", "reference_number": " KS 2026/0147 "}
+    )
+    assert numbered.status_code == 201, numbered.text
+    assert numbered.json()["reference_number"] == "KS 2026/0147"
+    blank = await client.post(
+        "/api/admin/notices", json={"title": "Snöröjning (fiktiv)", "reference_number": " "}
+    )
+    assert blank.json()["reference_number"] is None
+    unnumbered = await client.post("/api/admin/notices", json={"title": "Snöröjning (fiktiv)"})
+    assert unnumbered.json()["reference_number"] is None
 
 
 async def test_manual_notices_only_link_to_web_addresses(client: httpx.AsyncClient, demo: Demo) -> None:

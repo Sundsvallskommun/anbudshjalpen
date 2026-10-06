@@ -26,8 +26,9 @@ AI_DISCLOSURE = (
     "anbudsutkast. AI kan ha fel. Varje uppgift visar sida och citat så att du kan kontrollera den, "
     "och det är alltid förfrågningsunderlaget som gäller."
 )
+# Plain words for companies: "språkmodell" and "heuristik" are not words the company view uses.
 HEURISTIC_NOTE = (
-    " Just nu används en enkel regelbaserad motor utan språkmodell, så svaren är grövre än de blir med AI."
+    " Just nu tas svaren fram med fasta regler i stället för AI, så de är grövre än de blir med AI."
 )
 DEMO_NOTICE = (
     "Det här är en demo. Företag, personer och upphandlingar märkta Fiktiv är påhittade, och "

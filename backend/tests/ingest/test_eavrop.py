@@ -137,6 +137,7 @@ def test_advertised_row_maps_to_an_open_contract_notice() -> None:
 
     assert values.source == "eavrop"
     assert values.external_id == "73875"
+    assert values.reference_number == "73875"  # e-Avrop's id for the procurement
     assert (values.notice_type, values.status) == ("contract", "open")
     assert values.cpv_codes == ["30163000", "66000000"]
     assert values.published_at == datetime(2026, 9, 17, tzinfo=STOCKHOLM)
@@ -153,6 +154,7 @@ def test_planned_row_maps_to_a_planned_notice() -> None:
     values = map_planned(row, list_url=PLANNED_URL)
 
     assert values.external_id == "planned-133129"
+    assert values.reference_number is None  # a planned procurement has no id of its own yet
     assert values.title == "Skogsförvaltning"
     assert (values.notice_type, values.status) == ("planned", "planned")
     assert values.deadline_at is None

@@ -40,8 +40,8 @@ Beslut: [0004](decisions/0004-eneo-api-and-own-mcp-server.md) (Eneo och MCP),
    `interpret_pending` tar det som inte blivit klart. Med Eneo som motor går texten med sidmarkeringen `[SIDA n]` i en
    fråga till assistenten för uppgiften, och sessionen raderas efteråt. Ett misslyckat försök görs om med allt längre
    paus, och efter fem försök ger jobbet upp. Det ger upp direkt när samma underlag inte kan lyckas, till exempel när
-   det är för stort för modellen. Inköparen ser underlagen som saknar checklista i granskningskön och kan tolka dem
-   igen ([Drift](operations.md#schemalagda-jobb)).
+   det är för stort för modellen. Inköparen ser underlagen som saknar checklista under Inköp › Att granska och kan
+   tolka dem igen ([Drift](operations.md#schemalagda-jobb)).
 3. Svaret valideras mot uppgiftens JSON-kontrakt. Är det fel ber motorn modellen rätta det.
 4. Appen kontrollerar varje citat mot sidtexten: verifierat, på annan sida eller kunde inte kontrolleras. Ett datum
    eller en vikt i checklistan måste dessutom stå i sitt citat.
@@ -50,7 +50,8 @@ Beslut: [0004](decisions/0004-eneo-api-and-own-mcp-server.md) (Eneo och MCP),
 6. Visar sig en publicerad checklista vara fel kan inköparen dra tillbaka den med en motivering. Den blir avvisad,
    företagen ser den förra publicerade checklistan om det finns någon, matchningarna bedöms om, och checklistan kan
    rättas och publiceras igen. Inköparen gör det med knappen "Dra tillbaka" på checklistans sida
-   (`POST /api/admin/checklists/{id}/withdraw`).
+   (`POST /api/admin/checklists/{id}/withdraw`). En avvisad eller tillbakadragen checklista öppnas som utkast igen med
+   "Öppna som utkast igen" (`POST /api/admin/checklists/{id}/reopen`). Bara ett utkast kan godkännas.
 
 ### AI-motorn
 
@@ -61,6 +62,10 @@ All kod pratar med gränssnittet `AiEngine` i `backend/src/anbudsklar/ai/engine.
 | `eneo` | Anropar Eneos assistenter med en servicenyckel | Den riktiga vägen i PoC:n |
 | `openai` | Anropar ett OpenAI-kompatibelt API direkt | Det finns ingen Eneo-instans till hands |
 | `heuristic` | Plockar ut krav och datum med regler, utan språkmodell | Tester, demo utan nätverk och som jämförelse i kvalitetstestet |
+
+API:t ger varje resultat med motorns namn i fältet `engine`, och checklistor och matchningar sparas med det. Texterna
+har inget prefix om hur de togs fram. Webbappen namnger motorn en gång per automatiskt block, i ursprungsraden:
+regelbaserat för `heuristic` och AI via Eneo för `eneo` ([Design](design.md#delade-komponenter)).
 
 ### Delarna i koden
 
@@ -77,7 +82,7 @@ All kod pratar med gränssnittet `AiEngine` i `backend/src/anbudsklar/ai/engine.
 | `backend/src/anbudsklar/mcp/` | MCP-servern |
 | `backend/src/anbudsklar/worker/` | Schemaläggaren och mejlen |
 | `backend/src/anbudsklar/eval/` | Kvalitetstestet |
-| `frontend/` | Webbappen |
+| `frontend/` | Webbappen. Sidorna, de delade komponenterna och reglerna för text står i [Design](design.md) |
 | `data/` | CPV-listan och påhittade underlag, företag och avtal |
 | `deploy/dokploy/` | Compose-filer för Dokploy |
 
@@ -117,8 +122,8 @@ De egna delarna finns för det som Eneo saknar eller inte ska äga.
 | Uppgift | Indata | Svar |
 |---|---|---|
 | Tolka underlag | Underlaget med text per sida | Checklista med krav, bilagor, utvärdering och datum, var och en med citat och sida |
-| Bedöma matchning | Företagsprofil, annons och checklista | Passar, passar delvis eller passar inte, med skäl och citat |
-| Granska utkast | Utkastet och checklistan | Krav för krav: uppfyllt, obevisat, saknas eller oklart |
+| Bedöma matchning | Företagsprofil, annons och checklista | Passar, passar delvis eller passar inte, med skäl och citat. Webbappen säger Verkar passa, Passar delvis och Verkar inte passa |
+| Granska utkast | Utkastet och checklistan | Krav för krav: uppfyllt, obevisat, saknas eller oklart. Webbappen säger Ser bra ut, Bevis saknas, Hittades inte och Kontrollera själv |
 | Besvara fråga | Underlaget, frågan och tidigare frågor | Svar med citat, eller att det inte står i underlaget och bör frågas formellt |
 | Föreslå CPV | Företagets beskrivning och kandidater ur CPV-listan | Högst åtta koder med motivering |
 | Regelhjälpen | En allmän fråga om upphandlingsregler | Svar med källor: LOU-paragrafer och vägledningar |
@@ -131,7 +136,7 @@ Indata, kontrakt och kontroller för varje uppgift står i [AI-uppgifterna](ai-t
 |---|---|---|
 | Checklista och frågor | Hela underlaget i ett anrop, utan RAG | RAG hämtar bara de mest relevanta styckena och tappar krav när frågan är "lista alla skallkrav". 40–60 sidor får plats i kontexten |
 | Citat | Vår egen kontroll mot sidtexten | Modellen kan inte själv markera ett citat som kontrollerat |
-| Bevakning | Först fasta regler (CPV-prefix och nyckelord), sedan bedömer modellen mot kraven som plockats ut | Går att förklara och testa |
+| Matchning (företagarens Start) | Först fasta regler (CPV-prefix och nyckelord), sedan bedömer modellen mot kraven som plockats ut | Går att förklara och testa |
 | Prediktion | Datumräkning på avtalskatalogen. Modellen sammanfattar bara förra gångens krav | Mest unikt värde, minst AI |
 | Regelfrågor | En assistent i Eneo. Vägledningar ligger som kunskap, och LOU hämtas paragraf för paragraf via MCP | Hänvisningen blir kapitel och paragraf, inte ett helt dokument |
 | Sökning | Fulltext på svenska och trigram i Postgres | Filter, exakta termer och sidträffar utan en extra tjänst |
@@ -142,7 +147,7 @@ publicerade.
 
 ## Dataskydd i designen
 
-- Ett företag kommer bara åt sina egna profiler, bevakningar och svar.
+- Ett företag kommer bara åt sina egna profiler, träffar, påminnelser och svar.
 - Anbudsutkast sparas inte. Utkastet hanteras i minnet, skickas till motorn och slängs efter granskningen.
 - Frågor om ett underlag sparas för inköparens sammanställning, som aldrig visar vilket företag som frågade. Exempel på
   frågor visas först efter sista anbudsdag. Frågor som ställs efter sista anbudsdag sparas inte, och inte heller

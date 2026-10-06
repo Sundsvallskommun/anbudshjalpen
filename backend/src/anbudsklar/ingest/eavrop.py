@@ -261,6 +261,7 @@ def map_advertised(row: AdvertisedRow, *, now: datetime) -> NoticeValues:
         notice_type="contract",
         status=status_from_deadline(deadline, now),
         raw=raw,
+        reference_number=str(row.eavrop_id),  # the procurement's id in e-Avrop, as its address shows it
         cpv_codes=unique(entry.code for entry in row.cpv),
         published_at=start_of_day(row.published) if row.published else None,
         deadline_at=deadline,
@@ -270,6 +271,8 @@ def map_advertised(row: AdvertisedRow, *, now: datetime) -> NoticeValues:
 
 
 def map_planned(row: PlannedRow, *, list_url: str) -> NoticeValues:
+    """A planned procurement. It has no reference number yet: the list only names its row."""
+
     period = parse_period(row.period)
     raw = _raw(row) | {"list": "planned"}
     if period:

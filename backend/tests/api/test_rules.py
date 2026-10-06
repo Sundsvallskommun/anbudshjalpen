@@ -20,7 +20,8 @@ from anbudsklar.ai.engine import (
 from anbudsklar.ai.heuristic import HeuristicEngine
 from anbudsklar.api.app import ENGINE_CONFIG_MESSAGE, ENGINE_OUTPUT_MESSAGE
 from anbudsklar.api.security import RULES_COOKIE
-from anbudsklar.contracts import RulesAnswer
+from anbudsklar.contracts import RulesAnswer, RuleSource
+from anbudsklar.services.rules import ask_rules
 
 from .factories import PUBLIC_URL, add_lou_section
 
@@ -72,6 +73,33 @@ async def test_rules_question_is_answered_from_lou(
     assert "LOU 4 kap. 1 §" in references
     urls = [source["url"] for source in body["answer"]["sources"] if source["reference"] == "LOU 4 kap. 1 §"]
     assert urls == ["https://data.riksdagen.se/dokument/sfs-2016-1145.html#K4P1"]
+    # The law's own words for the card, and no word about how the answer was made.
+    [excerpt] = [s["excerpt"] for s in body["answer"]["sources"] if s["reference"] == "LOU 4 kap. 1 §"]
+    assert excerpt == PRINCIPLES
+    assert "språkmodell" not in body["answer"]["answer"]
+
+
+class NamingEngine(HeuristicEngine):
+    """Names sources like Eneo does: references only, no excerpts."""
+
+    async def answer_rules(
+        self, question: str, session_id: str | None, context: list[RuleContext]
+    ) -> tuple[RulesAnswer, EngineRun]:
+        sources = [
+            RuleSource(title="Principer", reference="LOU 4 kap. 1 §"),
+            RuleSource(title="Avtalsspärr", reference="LOU 20 kap. 1 §"),  # not in our copy
+            RuleSource(title="Lämna anbud", url="https://www.upphandlingsmyndigheten.se/"),
+            RuleSource(title="Annan lag", reference="LUF 4 kap. 1 §"),
+        ]
+        return RulesAnswer(answer="Behandla alla lika (LOU 4 kap. 1 §).", sources=sources), EngineRun("eneo")
+
+
+async def test_lou_sources_get_the_law_text_from_our_own_copy(db_session: AsyncSession) -> None:
+    await add_lou_section(
+        db_session, chapter="4", section="1", heading="Principer för offentlig upphandling", text=PRINCIPLES
+    )
+    view = await ask_rules(db_session, NamingEngine(), "Hur ska leverantörer behandlas?", None)
+    assert [source.excerpt for source in view.answer.sources] == [PRINCIPLES, None, None, None]
 
 
 async def test_rules_question_is_validated(client: httpx.AsyncClient) -> None:

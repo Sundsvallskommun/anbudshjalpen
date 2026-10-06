@@ -17,6 +17,7 @@ from anbudsklar.services.dates import end_of_local_day
 from .factories import (
     Demo,
     add_checklist,
+    add_cpv_codes,
     add_document,
     add_notice,
     demo_checklist,
@@ -282,3 +283,222 @@ async def test_an_open_notice_past_its_deadline_is_shown_as_closed(
     assert detail["status"] == "closed"
     items = (await client.get("/api/notices")).json()["items"]
     assert next(item for item in items if item["id"] == str(demo.notice.id))["status"] == "closed"
+
+
+async def _status_mix(session: AsyncSession, demo: Demo) -> dict[str, str]:
+    """Next to the demo notice (open, deadline in 30 days): two more open, one planned, one closed."""
+
+    soon = await add_notice(
+        session,
+        title="Fönsterputs vid förskolor (fiktiv)",
+        external_id="TEST-SOON",
+        deadline_at=datetime.now(UTC) + timedelta(days=5),
+    )
+    undated = await add_notice(
+        session, title="Vinterväghållning (fiktiv)", external_id="TEST-UNDATED", cpv_codes=["90620000"]
+    )
+    planned = await add_notice(
+        session, title="Takrenovering av förskola (fiktiv)", external_id="TEST-PLANNED", status="planned"
+    )
+    closed = await add_notice(
+        session,
+        title="Ommålning av skola (fiktiv)",
+        external_id="TEST-CLOSED",
+        status="closed",
+        deadline_at=datetime.now(UTC) - timedelta(days=10),
+    )
+    return {
+        "demo": str(demo.notice.id),
+        "soon": str(soon.id),
+        "undated": str(undated.id),
+        "planned": str(planned.id),
+        "closed": str(closed.id),
+    }
+
+
+async def test_open_notices_come_soonest_deadline_first_with_counts_per_status(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    ids = await _status_mix(db_session, demo)
+
+    body = (await client.get("/api/notices", params={"status": "open"})).json()
+    assert body["sort"] == "deadline"
+    assert [item["id"] for item in body["items"]] == [ids["soon"], ids["demo"], ids["undated"]]  # none last
+    assert body["total"] == 3
+    # The same counts whichever status is chosen: they ignore the status filter.
+    assert body["counts"] == {"open": 3, "planned": 1, "all": 5}
+
+    everything = (await client.get("/api/notices")).json()
+    assert everything["sort"] == "published"
+    assert everything["counts"] == body["counts"]
+    assert everything["total"] == 5
+
+
+async def test_counts_follow_the_other_filters_and_sort_can_be_chosen(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    ids = await _status_mix(db_session, demo)
+
+    searched = (await client.get("/api/notices", params={"q": "takrenovering"})).json()
+    assert searched["sort"] == "relevance"
+    assert searched["counts"] == {"open": 0, "planned": 1, "all": 1}
+    # Each count is what choosing that status lists, also when the search falls back to similar
+    # titles ("målningsarbete" is in no text, but close to "Ommålning").
+    for q in ("takrenovering", "förskola", "fönsterputs", "målningsarbete"):
+        counts = (await client.get("/api/notices", params={"q": q})).json()["counts"]
+        for status in ("open", "planned"):
+            listed = (await client.get("/api/notices", params={"q": q, "status": status})).json()
+            assert listed["total"] == counts[status], (q, status)
+        assert (await client.get("/api/notices", params={"q": q})).json()["total"] == counts["all"], q
+
+    by_cpv = (await client.get("/api/notices", params={"cpv": "4544", "status": "planned"})).json()
+    assert by_cpv["counts"] == {"open": 2, "planned": 1, "all": 4}  # not the snow clearing
+    assert [item["id"] for item in by_cpv["items"]] == [ids["planned"]]
+
+    newest = (await client.get("/api/notices", params={"status": "open", "sort": "published"})).json()
+    assert newest["sort"] == "published"
+    # Relevance means nothing without text, so the list says it is newest first.
+    assert (await client.get("/api/notices", params={"sort": "relevance"})).json()["sort"] == "published"
+    assert (await client.get("/api/notices", params={"sort": "price"})).status_code == 422
+
+
+async def test_notices_name_their_cpv_codes(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    await add_cpv_codes(db_session, {"45442110": "Målning av byggnader", "45442100": "Målning"})
+    demo.notice.cpv_codes = ["45442110", "45442100", "45442180"]  # the last one is not in the list
+    await db_session.flush()
+
+    [item] = [
+        item
+        for item in (await client.get("/api/notices")).json()["items"]
+        if item["id"] == str(demo.notice.id)
+    ]
+    assert item["cpv_label"] == "Målning av byggnader"  # the main code is the first
+    detail = (await client.get(f"/api/notices/{demo.notice.id}")).json()
+    assert detail["cpv_label"] == "Målning av byggnader"
+    assert detail["cpv_labels"] == {"45442110": "Målning av byggnader", "45442100": "Målning"}
+
+    unknown = await add_notice(db_session, external_id="TEST-UNKNOWN-CPV", cpv_codes=["99999999"])
+    assert (await client.get(f"/api/notices/{unknown.id}")).json()["cpv_label"] is None
+
+
+async def test_the_match_says_which_engine_made_it(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    await _match(db_session, demo)
+    await login(client, "foretagare")
+    body = (await client.get(f"/api/notices/{demo.notice.id}")).json()
+    assert body["match"]["engine"] == "heuristic"
+
+
+async def test_lists_carry_the_question_deadline_of_the_published_checklist(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    """The Start page's "Nästa frist" needs frågestopp for every match, without a request per notice."""
+
+    draft_only = await add_notice(db_session, title="Städtjänster (fiktiv)", external_id="TEST-DRAFT-ONLY")
+    document = await add_document(db_session, draft_only, document_pages(demo.fragestopp, demo.deadline))
+    await add_checklist(
+        db_session, draft_only, document, demo_checklist(demo.fragestopp, demo.deadline), status="draft"
+    )
+    items = {item["id"]: item for item in (await client.get("/api/notices")).json()["items"]}
+    published = datetime.fromisoformat(items[str(demo.notice.id)]["question_deadline"])
+    assert published == end_of_local_day(demo.fragestopp)  # the last day for questions lasts until it ends
+    assert items[str(draft_only.id)]["question_deadline"] is None  # not reviewed by inköp yet
+
+    detail = (await client.get(f"/api/notices/{demo.notice.id}")).json()
+    assert datetime.fromisoformat(detail["question_deadline"]) == end_of_local_day(demo.fragestopp)
+
+
+async def test_notices_carry_the_reference_number(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    """The notice header reads "Sundsvalls kommun · DEMO-2026-0147"."""
+
+    demo.notice.reference_number = "DEMO-2026-0147"
+    unnumbered = await add_notice(db_session, title="Städtjänster (fiktiv)", external_id="TEST-NO-REF")
+    await db_session.flush()
+
+    items = {item["id"]: item for item in (await client.get("/api/notices")).json()["items"]}
+    assert items[str(demo.notice.id)]["reference_number"] == "DEMO-2026-0147"
+    assert items[str(unnumbered.id)]["reference_number"] is None
+    detail = (await client.get(f"/api/notices/{demo.notice.id}")).json()
+    assert detail["reference_number"] == "DEMO-2026-0147"
+
+
+async def _buyer_mix(session: AsyncSession, demo: Demo) -> dict[str, str]:
+    """Next to the demo notice (Sundsvalls kommun, open): joint procurements and other buyers."""
+
+    joint = await add_notice(
+        session, title="Vinterväghållning (fiktiv)", external_id="TEST-JOINT", cpv_codes=["90620000"]
+    )
+    joint.buyer = "Timrå kommun, Sundsvalls kommun"
+    region = await add_notice(session, title="Takrenovering av förskola (fiktiv)", external_id="TEST-REGION")
+    region.buyer = "Region Västernorrland, Sundsvalls Kommun"  # another spelling of the same buyer
+    planned = await add_notice(
+        session, title="Fönsterputs vid förskolor (fiktiv)", external_id="TEST-MITTHEM", status="planned"
+    )
+    planned.buyer = "Mitthem AB"
+    unnamed = await add_notice(session, title="Snöröjning (fiktiv)", external_id="TEST-NO-BUYER")
+    unnamed.buyer = None
+    await session.flush()
+    return {"demo": str(demo.notice.id), "joint": str(joint.id), "region": str(region.id)}
+
+
+async def test_buyers_are_listed_one_by_one_with_counts(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    await _buyer_mix(db_session, demo)
+
+    response = await client.get("/api/notices/buyers")  # not taken for a notice id
+    assert response.status_code == 200, response.text
+    assert response.json()["items"] == [
+        {"name": "Sundsvalls kommun", "count": 3},  # as most notices spell it
+        {"name": "Mitthem AB", "count": 1},
+        {"name": "Region Västernorrland", "count": 1},
+        {"name": "Timrå kommun", "count": 1},
+    ]
+    open_only = (await client.get("/api/notices/buyers", params={"status": "open"})).json()["items"]
+    assert "Mitthem AB" not in {buyer["name"] for buyer in open_only}
+
+
+async def test_the_buyer_filter_matches_part_of_the_name_and_the_counts_follow_it(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    ids = await _buyer_mix(db_session, demo)
+
+    body = (await client.get("/api/notices", params={"buyer": " sundsvalls KOMMUN "})).json()
+    assert {item["id"] for item in body["items"]} == {ids["demo"], ids["joint"], ids["region"]}
+    assert body["counts"] == {"open": 3, "planned": 0, "all": 3}
+    timra = (await client.get("/api/notices", params={"buyer": "Timrå", "status": "open"})).json()
+    assert [item["id"] for item in timra["items"]] == [ids["joint"]]
+    assert timra["counts"] == {"open": 1, "planned": 0, "all": 1}
+    assert (await client.get("/api/notices", params={"buyer": "TIMRÅ"})).json()["total"] == 1  # å and Å
+    assert (await client.get("/api/notices", params={"buyer": "x" * 301})).status_code == 422
+    assert (await client.get("/api/notices", params={"buyer": "100%"})).json()["total"] == 0
+
+
+async def test_each_buyers_count_is_what_filtering_on_it_lists(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    await _buyer_mix(db_session, demo)
+
+    # "målningsarbete" is in no text, so the search falls back to similar titles ("Ommålning").
+    for filters in (
+        {},
+        {"status": "open"},
+        {"q": "förskola"},
+        {"q": "målningsarbete"},
+        {"q": "kärnkraftverk"},
+        {"cpv": "4544"},
+        {"source": "fixture", "status": "planned"},
+    ):
+        buyers = (await client.get("/api/notices/buyers", params=filters)).json()["items"]
+        for buyer in buyers:
+            listed = (await client.get("/api/notices", params={**filters, "buyer": buyer["name"]})).json()
+            assert listed["total"] == buyer["count"], (filters, buyer)
+        if filters.get("q") == "kärnkraftverk":
+            assert buyers == []
+        else:
+            assert buyers, filters

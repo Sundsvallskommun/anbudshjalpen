@@ -3,9 +3,10 @@
 Status moves draft -> approved -> published, or to rejected. A published checklist that
 turns out to be wrong can be withdrawn: it becomes rejected with the buyer's reason, can
 be corrected and published again, and companies meanwhile see the previous published
-checklist, if any. Companies only ever see published checklists; buyers see the latest
-one in any state. This is the human review checkpoint that an Eneo Flow would have in
-production.
+checklist, if any. A rejected checklist is never approved as it is: the buyer opens it
+as a draft again (`reopen_checklist`) or corrects it, and approves that draft. Companies
+only ever see published checklists; buyers see the latest one in any state. This is the
+human review checkpoint that an Eneo Flow would have in production.
 
 Interpretation failures are recorded on the document. The worker retries with growing
 pauses and gives up after a few attempts, or at once when the failure will not go away
@@ -332,22 +333,31 @@ def interpretation_state(document: Document) -> InterpretationState:
 async def list_admin_checklists(
     session: AsyncSession, status: ChecklistStatus | None
 ) -> list[ChecklistAdminItem]:
-    query = select(ChecklistRecord, Notice.title).join(Notice, Notice.id == ChecklistRecord.notice_id)
+    """The review queue: the soonest tender deadline first, then the newest interpretation."""
+
+    query = select(ChecklistRecord, Notice.title, Notice.deadline_at).join(
+        Notice, Notice.id == ChecklistRecord.notice_id
+    )
     if status is not None:
         query = query.where(ChecklistRecord.status == status)
-    rows = await session.execute(query.order_by(ChecklistRecord.created_at.desc()))
+    rows = await session.execute(
+        query.order_by(
+            Notice.deadline_at.asc().nulls_last(), ChecklistRecord.created_at.desc(), ChecklistRecord.id
+        )
+    )
     return [
         ChecklistAdminItem(
             id=record.id,
             notice_id=record.notice_id,
             notice_title=title,
+            deadline_at=deadline_at,
             status=_status(record.status),
             engine=record.engine,
             created_at=record.created_at,
             verification=VerificationSummary.model_validate(record.verification or {}),
             requirement_count=len(record.payload.get("requirements", [])),
         )
-        for record, title in rows
+        for record, title, deadline_at in rows
     ]
 
 
@@ -381,12 +391,25 @@ async def update_checklist(
     return record
 
 
+_NOT_APPROVABLE: dict[str, str] = {
+    APPROVED: "Checklistan är redan godkänd.",
+    PUBLISHED: "Checklistan är redan publicerad.",
+    REJECTED: "En avvisad checklista kan inte godkännas. Öppna den som utkast igen och granska den först.",
+}
+_NOT_PUBLISHABLE: dict[str, str] = {
+    PUBLISHED: "Checklistan är redan publicerad.",
+    REJECTED: "En avvisad checklista kan inte publiceras. Öppna den som utkast igen och granska den först.",
+}
+
+
 async def approve_checklist(
     session: AsyncSession, checklist_id: uuid.UUID, user_id: uuid.UUID
 ) -> ChecklistRecord:
+    """Only a draft is approved, so a rejection is never overturned without a new review."""
+
     record = await get_checklist(session, checklist_id)
     if record.status != DRAFT:
-        raise ConflictError("Bara ett utkast kan godkännas.")
+        raise ConflictError(_NOT_APPROVABLE.get(record.status, "Bara ett utkast kan godkännas."))
     record.status = APPROVED
     record.approved_by = user_id
     record.approved_at = utcnow()
@@ -397,9 +420,31 @@ async def approve_checklist(
 async def publish_checklist(session: AsyncSession, checklist_id: uuid.UUID) -> ChecklistRecord:
     record = await get_checklist(session, checklist_id)
     if record.status != APPROVED:
-        raise ConflictError("Checklistan måste godkännas innan den publiceras.")
+        raise ConflictError(
+            _NOT_PUBLISHABLE.get(record.status, "Checklistan måste godkännas innan den publiceras.")
+        )
     record.status = PUBLISHED
     record.published_at = utcnow()
+    await session.flush()
+    return record
+
+
+async def reopen_checklist(session: AsyncSession, checklist_id: uuid.UUID) -> ChecklistRecord:
+    """A rejected or withdrawn checklist becomes a draft again, to be corrected and approved.
+
+    The reviewer's note is kept: it is the reason for the rejection, which is what the
+    buyer now corrects, and it stays until the buyer saves the checklist with a note of
+    their own. Approval and publication are cleared, because the draft needs a new review;
+    companies keep seeing whatever published checklist they saw before.
+    """
+
+    record = await get_checklist(session, checklist_id)
+    if record.status != REJECTED:
+        raise ConflictError("Bara en avvisad eller tillbakadragen checklista kan öppnas som utkast igen.")
+    record.status = DRAFT
+    record.approved_by = None
+    record.approved_at = None
+    record.published_at = None
     await session.flush()
     return record
 

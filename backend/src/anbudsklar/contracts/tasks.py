@@ -173,6 +173,11 @@ class RuleSource(ContractModel):
     title: str
     reference: str | None = Field(default=None, description="E.g. 'LOU 20 kap. 1 §'.")
     url: str | None = None
+    excerpt: str | None = Field(
+        default=None,
+        description="Set by our code from its own copy of the law: the start of the section's text, "
+        "cut after a whole sentence.",
+    )
 
 
 class RulesAnswer(ContractModel):

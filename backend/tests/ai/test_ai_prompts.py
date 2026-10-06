@@ -137,6 +137,19 @@ def test_match_message_renders_profile_and_checklist() -> None:
     assert "Det finns ingen checklista ännu" in without
 
 
+def test_cpv_codes_are_rendered_with_their_labels_when_known() -> None:
+    profile = CompanyProfile(
+        name="Målerifirman (fiktiv)",
+        description="Vi målar.",
+        cpv_codes=["45442100", "45442180"],
+        cpv_labels={"45442100": "Målning"},
+    )
+    notice = _notice().model_copy(update={"cpv_labels": {"45442100": "Målning"}})
+    message = render_task_message(Task.ASSESS_MATCH, profile=profile, notice=notice, checklist=None)
+    assert "CPV-koder: 45442100 Målning\n" in message  # the notice
+    assert "CPV-koder: 45442100 Målning, 45442180\n" in message  # the profile; an unknown code stays a code
+
+
 def test_cpv_and_rules_messages() -> None:
     cpv = render_task_message(
         Task.SUGGEST_CPV,

@@ -7,7 +7,7 @@ import datetime as dt
 import pytest
 
 from anbudsklar.ai.engine import RuleContext
-from anbudsklar.ai.heuristic import HEURISTIC_PREFIX, HeuristicEngine, running_lines, split_sentences
+from anbudsklar.ai.heuristic import ANSWER_LEAD, HeuristicEngine, running_lines, split_sentences
 from anbudsklar.contracts import (
     Checklist,
     Citation,
@@ -18,10 +18,19 @@ from anbudsklar.contracts import (
     RequiredAttachment,
     Requirement,
 )
+from anbudsklar.contracts.tasks import RequirementKind
 from anbudsklar.documents.citations import verify_answer, verify_checklist, verify_review
 from anbudsklar.services.matching import prefilter_score
 
 NOTICE = NoticeContext(notice_id="n1", title="Ommålning av förskola", cpv_codes=["45442100"])
+
+
+def assert_plain_text(text: str) -> None:
+    """How a result was made is carried by `engine`; the text itself carries no prefix about it."""
+
+    assert "språkmodell" not in text.lower()
+    assert not text.startswith("Automatisk")
+
 
 # Fictitious procurement document (not real tender text).
 PAGES = [
@@ -59,7 +68,11 @@ async def test_interpret_document_quotes_verify_on_the_cited_page() -> None:
     _, summary = verify_checklist(checklist, PAGES)
     assert summary.citations_total > 0
     assert summary.citations_verified == summary.citations_total
-    assert checklist.summary.startswith(HEURISTIC_PREFIX)
+    assert checklist.summary == (
+        "Underlaget har 3 sidor. Listan har 8 krav, 2 bilagor, 2 utvärderingskriterier och 3 datum, "
+        "alla som utdrag ur texten. Kontrollera mot underlaget innan du använder listan."
+    )
+    assert_plain_text(checklist.summary)
     assert run.engine == "heuristic"
 
 
@@ -100,6 +113,7 @@ async def test_interpret_document_reports_what_it_could_not_find() -> None:
     )
     assert checklist.requirements == []
     assert len(checklist.open_questions) == 3
+    assert checklist.summary.startswith("Underlaget har 1 sida. Listan har 0 krav, 0 bilagor,")
 
 
 def _checklist() -> Checklist:
@@ -156,7 +170,8 @@ async def test_review_draft_flags_missing_proof_and_missing_requirements() -> No
     assert attachments == {"Bilaga 3 Referensblankett": "saknas", "Prisbilaga": "oklart"}
     verified = verify_review(review, draft_pages)
     assert all(check.draft_check == "verified" for check in verified.checks if check.draft_quote)
-    assert review.summary.startswith(HEURISTIC_PREFIX)
+    assert review.summary.startswith("I utkastet ser 1 av 3 krav bra ut.")
+    assert_plain_text(review.summary)
 
 
 async def test_answer_question_cites_the_best_sentences() -> None:
@@ -166,6 +181,11 @@ async def test_answer_question_cites_the_best_sentences() -> None:
     assert answer.found_in_document is True
     assert answer.suggest_formal_question is False
     assert answer.citations[0].page == 2
+    # The first line is the lead the web app shows in bold, then one line per citation.
+    lead, *lines = answer.answer.splitlines()
+    assert lead == ANSWER_LEAD
+    assert len(lines) == len(answer.citations)
+    assert lines[0].endswith("(sida 2)")
     verified = verify_answer(answer, PAGES)
     assert all(citation.check == "verified" for citation in verified.citations)
 
@@ -178,6 +198,8 @@ async def test_answer_question_suggests_formal_question_when_not_found() -> None
     assert answer.suggest_formal_question is True
     assert answer.citations == []
     assert "e-Avrop" in answer.answer
+    assert "samma svar" in answer.answer  # the formal question reaches every supplier
+    assert_plain_text(answer.answer)
 
 
 async def test_assess_match_uses_cpv_and_flags_unclear_requirements() -> None:
@@ -209,7 +231,7 @@ async def test_suggest_cpv_ranks_by_shared_words_and_skips_bad_codes() -> None:
     result, _ = await HeuristicEngine().suggest_cpv("Vi utför målning av byggnader inomhus.", candidates)
     # Ranked by shared words; ties keep the search order. Codes without eight digits are skipped.
     assert [suggestion.code for suggestion in result.suggestions] == ["45442110", "45000000", "45442100"]
-    assert "målning" in result.suggestions[0].reason
+    assert result.suggestions[0].reason == "Beskrivningen nämner målning och byggnader."
 
 
 async def test_answer_rules_summarises_context() -> None:
@@ -219,11 +241,14 @@ async def test_answer_rules_summarises_context() -> None:
         )
     ]
     answer, _ = await HeuristicEngine().answer_rules("Vad gäller?", None, context)
-    assert answer.answer.startswith(HEURISTIC_PREFIX)
+    assert_plain_text(answer.answer)
     assert answer.sources[0].reference == "LOU 4 kap. 1 §"
+    assert answer.sources[0].excerpt == "Upphandlande myndigheter ska behandla …"
+    assert "LOU 4 kap. 1 § – Principer: Upphandlande myndigheter ska behandla …" in answer.answer
     empty, _ = await HeuristicEngine().answer_rules("Vad gäller?", None, [])
     assert empty.sources == []
     assert "frågeportal" in empty.answer
+    assert_plain_text(empty.answer)
 
 
 # --- Precision of tolka_underlag (sentences adapted from the fictitious fixtures) ---------
@@ -457,3 +482,149 @@ async def test_assess_match_reads_cpv_codes_like_the_matching_prefilter(
     near = any(reason.kind == "styrka" for reason in cpv_reasons)
     # The engine calls the codes near exactly when matching's prefilter would admit them on CPV alone.
     assert near is (prefilter_score(profile_codes, notice_codes, None) is not None)
+
+
+# --- what the profile says about the checklist's requirements ------------------------------
+
+SILENT_PROFILE = CompanyProfile(name="Målerifirman (fiktiv)", description="Målning.", cpv_codes=["45442100"])
+
+
+def _one_requirement(sentence: str, kind: RequirementKind = "kvalificeringskrav") -> Checklist:
+    return Checklist(
+        summary="s",
+        requirements=[
+            Requirement(
+                id="K1",
+                kind=kind,
+                title=sentence,
+                plain_language=sentence,
+                citation=Citation(page=1, quote=sentence),
+            )
+        ],
+    )
+
+
+@pytest.mark.parametrize(
+    ("sentence", "topic"),
+    [
+        ("Leverantören ska ha en ansvarsförsäkring om minst 5 000 000 kronor.", "försäkring"),
+        ("Leverantören ska ha en produktansvarsförsäkring.", "försäkring"),
+        ("Försäkringsbevis ska bifogas anbudet.", "försäkring"),
+        ("Anbudsgivaren ska ha betalat skatter och socialförsäkringsavgifter.", None),
+        ("Intyg från Försäkringskassan ska bifogas vid behov.", None),
+        ("Anbudsgivaren ska redovisa två referensuppdrag.", "referensuppdrag"),
+        ("Referenserna ska avse uppdrag åt offentliga beställare.", "referensuppdrag"),
+        ("Fakturan ska ange kommunens referens.", None),
+        ("Referenspriset ska justeras en gång per år.", None),
+        ("Anbudsgivaren ska ha en årsomsättning om minst 2 000 000 kronor.", "företagets ekonomi"),
+        ("Anbudsgivaren ska ha en så stabil ekonomi att uppdraget kan genomföras.", "företagets ekonomi"),
+        ("Anbudsgivaren ska ha god ekonomisk och finansiell ställning.", "företagets ekonomi"),
+        ("Kommunen ska anta det ekonomiskt mest fördelaktiga anbudet.", None),
+        ("Leverantören ska redovisa personalomsättningen varje år.", None),
+        ("Leverantören ska vara certifierad enligt ISO 9001.", "certifiering"),
+    ],
+)
+async def test_requirement_topics_are_whole_words_not_look_alikes(sentence: str, topic: str | None) -> None:
+    assessment, _ = await HeuristicEngine().assess_match(SILENT_PROFILE, NOTICE, _one_requirement(sentence))
+    unclear = [reason.text for reason in assessment.reasons if reason.kind == "oklart"]
+    expected = [f"Underlaget ställer krav på {topic}, men er profil säger inget om det."] if topic else []
+    assert unclear == expected
+
+
+async def test_a_requirement_on_the_company_is_cited_before_a_contract_term_on_the_same_topic() -> None:
+    term = "Leverantören ska ha kvar sin ansvarsförsäkring under hela avtalstiden."
+    requirement = "Leverantören ska ha en ansvarsförsäkring om minst 5 000 000 kronor."
+    checklist = Checklist(
+        summary="s",
+        requirements=[
+            *_one_requirement(term, "avtalsvillkor").requirements,
+            _one_requirement(requirement).requirements[0].model_copy(update={"id": "K2"}),
+        ],
+    )
+    profile = SILENT_PROFILE.model_copy(update={"insurance": "Ansvarsförsäkring 5 000 000 kronor"})
+    assessment, _ = await HeuristicEngine().assess_match(profile, NOTICE, checklist)
+    [insurance] = [reason for reason in assessment.reasons if reason.requirement_id]
+    assert insurance.requirement_id == "K2"
+    assert insurance.text == "Ni har angett en försäkring i profilen. Kontrollera att den räcker för kravet."
+
+
+# --- reasons in the CPV list's words --------------------------------------------------------
+
+LABELS = {
+    "45442100": "Målning",
+    "45442110": "Målning av byggnader",
+    "45453100": "Renoveringsarbete",
+    "90910000": "Rengöring",
+    "72000000": "IT-tjänster: konsultverksamhet, programvaruutveckling, Internet och support",
+}
+
+
+def _labelled_profile(codes: list[str]) -> CompanyProfile:
+    return PAINTER.model_copy(
+        update={
+            "cpv_codes": codes,
+            "cpv_labels": {code: LABELS[code] for code in codes},
+            "description": "Vi.",
+        }
+    )
+
+
+def _labelled_notice(codes: list[str]) -> NoticeContext:
+    return NoticeContext(
+        notice_id="n6",
+        title="Uppdrag (fiktiv)",
+        cpv_codes=codes,
+        cpv_labels={code: LABELS[code] for code in codes},
+    )
+
+
+@pytest.mark.parametrize(
+    ("own", "theirs", "kind", "text"),
+    [
+        (["45442100"], ["45442110"], "styrka", "Upphandlingen gäller målning av byggnader – det gör ni."),
+        (["45442110"], ["45442110"], "styrka", "Upphandlingen gäller målning av byggnader – det gör ni."),
+        (
+            ["45442100"],
+            ["45453100"],
+            "styrka",
+            "Upphandlingen gäller renoveringsarbete, nära det ni gör (målning).",
+        ),
+        (
+            ["90910000"],
+            ["45442100"],
+            "hinder",
+            "Upphandlingen gäller målning, som inte ligger nära det ni gör enligt profilen.",
+        ),
+        (
+            ["45442100"],
+            ["72000000"],
+            "hinder",
+            "Upphandlingen gäller IT-tjänster: konsultverksamhet, programvaruutveckling, Internet och "
+            "support, som inte ligger nära det ni gör enligt profilen.",
+        ),
+    ],
+)
+async def test_cpv_reasons_use_the_labels_never_bare_codes(
+    own: list[str], theirs: list[str], kind: str, text: str
+) -> None:
+    assessment, _ = await HeuristicEngine().assess_match(
+        _labelled_profile(own), _labelled_notice(theirs), None
+    )
+    assert (assessment.reasons[0].kind, assessment.reasons[0].text) == (kind, text)
+    assert not any(code in reason.text for reason in assessment.reasons for code in [*own, *theirs])
+
+
+async def test_cpv_reasons_without_labels_still_name_no_codes() -> None:
+    profile = PAINTER.model_copy(update={"cpv_codes": ["45442100"], "description": "Vi."})
+    assessment, _ = await HeuristicEngine().assess_match(profile, NOTICE, None)
+    assert assessment.reasons[0].text == "Upphandlingens CPV-koder ligger nära era."
+    assert "45442100" not in assessment.reasons[0].text
+
+
+async def test_shared_words_are_listed_in_running_text() -> None:
+    notice = NoticeContext(
+        notice_id="n7", title="Ommålning av fasader och invändig målning (fiktiv)", cpv_codes=["45442100"]
+    )
+    assessment, _ = await HeuristicEngine().assess_match(PAINTER, notice, None)
+    words = [reason.text for reason in assessment.reasons if reason.text.startswith("Ni och annonsen")]
+    assert words == ["Ni och annonsen använder samma ord: fasader och invändig."]

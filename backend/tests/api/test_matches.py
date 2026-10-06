@@ -25,6 +25,8 @@ async def test_matches_are_scoped_to_the_company(
     match = matches[0]
     assert match["fit"] in {"passar", "passar_delvis", "passar_inte"}
     assert match["notice"]["fit"] == match["fit"]
+    assert match["engine"] == "heuristic"  # provenance for the card; matches are never reviewed by inköp
+    assert "språkmodell" not in match["assessment"]["summary"]
 
     await client.post("/api/session/logout")
     await login_as_other_company(client, db_session, demo)
@@ -50,6 +52,21 @@ async def test_dismissed_matches_disappear(
     [match] = (await client.get("/api/matches")).json()
     assert (await client.post(f"/api/matches/{match['id']}/dismiss")).status_code == 204
     assert (await client.get("/api/matches")).json() == []
+
+
+async def test_a_dismissal_can_be_undone(
+    client: httpx.AsyncClient, db_session: AsyncSession, engine: AiEngine, demo: Demo
+) -> None:
+    await match_all(db_session, engine)
+    await login(client, "foretagare")
+    [match] = (await client.get("/api/matches")).json()
+    await client.post(f"/api/matches/{match['id']}/dismiss")
+    assert (await client.post(f"/api/matches/{match['id']}/restore")).status_code == 204  # "Ångra"
+    assert [item["id"] for item in (await client.get("/api/matches")).json()] == [match["id"]]
+
+    await client.post("/api/session/logout")
+    await login_as_other_company(client, db_session, demo)
+    assert (await client.post(f"/api/matches/{match['id']}/restore")).status_code == 404
 
 
 async def test_upcoming_procurements(client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo) -> None:

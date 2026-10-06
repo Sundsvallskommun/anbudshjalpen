@@ -33,6 +33,12 @@ Kontaktpersoners namn, e-post och telefonnummer i annonser sparas inte.
   resten blir `closed`. Hela svaret från TED sparas i `raw`. När sista anbudsdag passerar sparar jobbet
   `close_expired` `closed` på annonsen inom en kvart, för annonser från alla källor, och API:t visar den som stängd
   redan från sista anbudsdagen.
+- **Referensnummer:** köparens eget nummer för upphandlingen (eForms BT-22, fältet `internal-identifier-proc`) sparas
+  som `reference_number`. Det visas efter köparen på upphandlingens sida och i MCP-verktyget
+  `hamta_upphandling`. Annonser som e-Avrop har skickat till TED saknar det: den 2026-10-05 gällde det alla 165
+  annonser från Sundsvalls köpare. De har bara e-Avrops URN:er per delområde (`urn:…`), som inte räknas som
+  referensnummer. Annonser ur e-Avrops lista Aktuella får e-Avrops id, de påhittade sitt DEMO-nummer, och inköparen kan
+  ange ett för en upphandling som läggs in för hand. Sökningen hittar inte annonser på referensnumret.
 - **Villkor:** TED:s annonser får återanvändas fritt, kommersiellt och icke-kommersiellt.
 - **Begränsning:** TED har bara upphandlingar över tröskelvärdena. Den 2026-10-05 fanns 9 öppna annonser från Sundsvalls
   köpare i TED och 13 i e-Avrop.
@@ -94,8 +100,9 @@ inköp kan lämna ett.
 - Ett avtal vars efterföljare redan är annonserad visas inte. Efterföljaren är en öppen annons med samma titel, eller en
   som delar en CPV-kod på fem signifikanta siffror och ett ord i titeln med avtalet.
 - Ett avtal vars fönster på 9–6 månader har passerat utan en sådan annons visas ändå, märkt `announcement_overdue` i
-  API:t: upphandlingen borde redan ha annonserats, så läsaren bör leta bland annonserna. Webbappen visar inte
-  märkningen än.
+  API:t: upphandlingen borde redan ha annonserats, så läsaren bör leta bland annonserna. På Start står ett sådant avtal
+  som "borde redan ha annonserats", med en länk som söker bland upphandlingarna. Högerspalten i listan Upphandlingar
+  visar det inte.
 
 ## Påhittade underlag och demoföretag
 

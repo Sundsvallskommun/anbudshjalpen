@@ -16,21 +16,21 @@ from __future__ import annotations
 
 import re
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Any
 from zoneinfo import ZoneInfo
 
 from rapidfuzz import fuzz
-from sqlalchemy import ColumnElement, Text, any_, false, func, literal, literal_column, or_, select
+from sqlalchemy import ColumnElement, Text, any_, false, func, literal, literal_column, or_, select, true
 from sqlalchemy.dialects.postgresql import array
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.cpv import CPV_CODE, cpv_digits, cpv_prefix
 from anbudsklar.documents.citations import HIGHLIGHT, PageIndex, QuoteMatch, excerpt, match_quote
 from anbudsklar.models import CpvCode, Document, DocumentPage, LouSection, Notice
-from anbudsklar.search.types import PageHit, PageText, QuoteCheck
+from anbudsklar.search.types import BuyerCount, NoticeOrder, PageHit, PageText, QuoteCheck
 
 SWEDISH = literal_column("'swedish'::regconfig")
 STOCKHOLM = ZoneInfo("Europe/Stockholm")
@@ -160,6 +160,28 @@ def _cpv_code_query(query: str) -> str | None:
     return cpv_prefix(compact) if CPV_CODE.match(compact) else compact
 
 
+async def cpv_labels(session: AsyncSession, codes: Iterable[str]) -> dict[str, str]:
+    """Swedish labels of the codes that are in the CPV list, keyed by the code as given.
+
+    A code with check digit ("45442110-1") gets the label of its eight digits; codes that
+    are malformed or unknown are left out, so a caller never shows a made-up label.
+    """
+
+    digits: dict[str, str] = {}
+    for code in codes:
+        try:
+            digits[code] = cpv_digits(code)
+        except ValueError:
+            continue
+    if not digits:
+        return {}
+    rows = await session.execute(
+        select(CpvCode.code, CpvCode.label_sv).where(CpvCode.code.in_(set(digits.values())))
+    )
+    labels: dict[str, str] = {code: label for code, label in rows}
+    return {code: labels[eight] for code, eight in digits.items() if eight in labels}
+
+
 async def search_cpv(session: AsyncSession, query: str, limit: int = 20) -> list[CpvCode]:
     """CPV codes by code prefix (digits) or by label words (full text plus trigrams).
 
@@ -199,6 +221,7 @@ def _notice_filters(
     status: str | None,
     source: str | None,
     deadline_after: date | datetime | None,
+    buyer: str | None = None,
 ) -> list[ColumnElement[bool]]:
     conditions: list[ColumnElement[bool]] = []
     if cpv_prefixes:
@@ -209,7 +232,19 @@ def _notice_filters(
         conditions.append(Notice.source == source)
     if deadline_after is not None:
         conditions.append(Notice.deadline_at >= _as_datetime(deadline_after))
+    if buyer:
+        conditions.append(_buyer_condition(buyer))
     return conditions
+
+
+def _buyer_condition(buyer: str) -> ColumnElement[bool]:
+    """The buyer field contains the text, whatever its case.
+
+    A joint procurement lists all its buyers in one field ("Timrå kommun, Sundsvalls kommun"),
+    so containment finds it under each of them. `count_notices_by_buyer` counts the same way.
+    """
+
+    return func.strpos(func.lower(Notice.buyer), func.lower(buyer)) > 0
 
 
 async def _notice_page(
@@ -226,6 +261,36 @@ async def _notice_page(
     return list(await session.scalars(stmt)), total
 
 
+_NEWEST_FIRST = (Notice.published_at.desc().nulls_last(), Notice.created_at.desc(), Notice.id)
+_SOONEST_DEADLINE_FIRST = (
+    Notice.deadline_at.asc().nulls_last(),
+    Notice.published_at.desc().nulls_last(),
+    Notice.id,
+)
+
+
+def notice_order(order: NoticeOrder | None, text: str | None) -> NoticeOrder:
+    """The order `search_notices` applies: relevance only means something with text."""
+
+    has_text = bool((text or "").strip())
+    if order is None:
+        return "relevance" if has_text else "published"
+    return "published" if order == "relevance" and not has_text else order
+
+
+def _fixed_order(order: NoticeOrder) -> tuple[Any, ...]:
+    return _SOONEST_DEADLINE_FIRST if order == "deadline" else _NEWEST_FIRST
+
+
+def _text_conditions(query: str) -> tuple[ColumnElement[bool], ColumnElement[bool]]:
+    """The full-text match, and the title similarity `search_notices` falls back to."""
+
+    return (
+        Notice.search.op("@@")(_tsquery(query)),
+        func.word_similarity(query, Notice.title) >= NOTICE_TITLE_SIMILARITY,
+    )
+
+
 async def search_notices(
     session: AsyncSession,
     *,
@@ -234,41 +299,158 @@ async def search_notices(
     status: str | None = None,
     source: str | None = None,
     deadline_after: date | datetime | None = None,
+    buyer: str | None = None,
+    order: NoticeOrder | None = None,
     limit: int = 20,
     offset: int = 0,
 ) -> tuple[list[Notice], int]:
     """Notices matching the filters, as (page of rows, total count).
 
     `cpv_prefixes` takes code prefixes ("45", "4544") or full codes; a full code also
-    matches its descendants ("45440000" matches "45442110"). Without `text`, the newest
-    notices come first. With `text`, full-text matches are ranked by relevance; when
-    there are none, titles similar to the text (trigrams) are returned instead.
-    Relationships (documents, checklists) are not loaded.
+    matches its descendants ("45440000" matches "45442110"). With `text`, full-text
+    matches are returned; when there are none, titles similar to the text (trigrams).
+    `buyer` keeps notices whose buyer contains it, ignoring case.
+
+    `order` (see `notice_order` for the default): "deadline" puts the soonest sista
+    anbudsdag first and notices without one last, "published" the newest first, and
+    "relevance" the best text match first. Relationships (documents, checklists) are not
+    loaded.
     """
 
     offset = max(0, offset)
     conditions = _notice_filters(
-        cpv_prefixes=cpv_prefixes, status=status, source=source, deadline_after=deadline_after
+        cpv_prefixes=cpv_prefixes, status=status, source=source, deadline_after=deadline_after, buyer=buyer
     )
     query = (text or "").strip()
+    applied = notice_order(order, query)
     if not query:
-        newest_first = (Notice.published_at.desc().nulls_last(), Notice.created_at.desc(), Notice.id)
-        return await _notice_page(session, conditions, newest_first, limit, offset)
+        return await _notice_page(session, conditions, _fixed_order(applied), limit, offset)
 
-    tsquery = _tsquery(query)
+    fulltext, similar = _text_conditions(query)
     relevance = (
-        func.ts_rank_cd(Notice.search, tsquery).desc(),
+        func.ts_rank_cd(Notice.search, _tsquery(query)).desc(),
         Notice.deadline_at.asc().nulls_last(),
         Notice.id,
     )
     rows, total = await _notice_page(
-        session, [*conditions, Notice.search.op("@@")(tsquery)], relevance, limit, offset
+        session,
+        [*conditions, fulltext],
+        relevance if applied == "relevance" else _fixed_order(applied),
+        limit,
+        offset,
     )
     if total:
         return rows, total
     similarity = func.word_similarity(query, Notice.title)
-    similar = [*conditions, similarity >= NOTICE_TITLE_SIMILARITY]
-    return await _notice_page(session, similar, (similarity.desc(), Notice.id), limit, offset)
+    similar_order = (similarity.desc(), Notice.id) if applied == "relevance" else _fixed_order(applied)
+    return await _notice_page(session, [*conditions, similar], similar_order, limit, offset)
+
+
+async def _status_counts(session: AsyncSession, conditions: Sequence[ColumnElement[bool]]) -> dict[str, int]:
+    rows = await session.execute(
+        select(Notice.status, func.count()).where(*conditions).group_by(Notice.status)
+    )
+    return {status: count for status, count in rows}
+
+
+async def count_notices_by_status(
+    session: AsyncSession,
+    statuses: Sequence[str],
+    *,
+    text: str | None = None,
+    cpv_prefixes: Sequence[str] | None = None,
+    source: str | None = None,
+    deadline_after: date | datetime | None = None,
+    buyer: str | None = None,
+) -> tuple[dict[str, int], int]:
+    """How many notices `search_notices` gives with each of `statuses`, and with no status.
+
+    Returns (count per status, count for all statuses) for the same filters, so a list can
+    show what each status choice holds before it is made. Every count falls back to title
+    similarity on its own, exactly as `search_notices` does when its full-text search
+    finds nothing for that status.
+    """
+
+    conditions = _notice_filters(
+        cpv_prefixes=cpv_prefixes, status=None, source=source, deadline_after=deadline_after, buyer=buyer
+    )
+    query = (text or "").strip()
+    if not query:
+        counts = await _status_counts(session, conditions)
+        return {status: counts.get(status, 0) for status in statuses}, sum(counts.values())
+
+    fulltext, similar = _text_conditions(query)
+    found = await _status_counts(session, [*conditions, fulltext])
+    per_status = {status: found.get(status, 0) for status in statuses}
+    total = sum(found.values())
+    if total and all(per_status.values()):
+        return per_status, total
+    near = await _status_counts(session, [*conditions, similar])
+    return (
+        {status: count or near.get(status, 0) for status, count in per_status.items()},
+        total or sum(near.values()),
+    )
+
+
+_BUYER_SEPARATOR = r"\s*,\s*"
+"""Between the buyers of a joint procurement; ingestion joins TED's buyer list with ", "."""
+
+
+async def count_notices_by_buyer(
+    session: AsyncSession,
+    *,
+    text: str | None = None,
+    cpv_prefixes: Sequence[str] | None = None,
+    status: str | None = None,
+    source: str | None = None,
+    deadline_after: date | datetime | None = None,
+) -> list[BuyerCount]:
+    """The buyers of the notices `search_notices` lists with these filters, and their counts.
+
+    The buyers of a joint procurement are listed one by one, grouped regardless of case and
+    spelled as most notices spell them. A buyer's count is the total `search_notices` gives
+    with `buyer` set to that name and the same filters: it counts every notice whose buyer
+    contains the name, and with text it falls back to similar titles for that buyer alone,
+    as the search does when the full-text search finds nothing for it. Buyers with the most
+    notices come first, then by name.
+    """
+
+    conditions = _notice_filters(
+        cpv_prefixes=cpv_prefixes, status=status, source=source, deadline_after=deadline_after
+    )
+    query = (text or "").strip()
+    found: ColumnElement[bool] = true()
+    near: ColumnElement[bool] = false()
+    if query:
+        found, near = _text_conditions(query)
+        conditions.append(or_(found, near))
+    listed = (
+        select(Notice.buyer, found.label("found"), near.label("near"))
+        .where(*conditions, Notice.buyer.is_not(None))
+        .cte("listed")
+    )
+    parts = select(
+        func.btrim(func.regexp_split_to_table(listed.c.buyer, _BUYER_SEPARATOR)).label("name")
+    ).subquery("parts")
+    key = func.lower(parts.c.name)
+    names = (
+        select(key.label("key"), func.mode().within_group(parts.c.name).label("name"))
+        .where(parts.c.name != "")
+        .group_by(key)
+        .subquery("names")
+    )
+    stmt = (
+        select(names.c.name, func.count().filter(listed.c.found), func.count().filter(listed.c.near))
+        .select_from(names)
+        .join(listed, func.strpos(func.lower(listed.c.buyer), names.c.key) > 0)
+        .group_by(names.c.key, names.c.name)
+    )
+    counts = [
+        BuyerCount(name=name, count=in_text or similar)
+        for name, in_text, similar in await session.execute(stmt)
+        if in_text or similar
+    ]
+    return sorted(counts, key=lambda buyer: (-buyer.count, buyer.name.casefold()))
 
 
 # --- Document pages -------------------------------------------------------------------

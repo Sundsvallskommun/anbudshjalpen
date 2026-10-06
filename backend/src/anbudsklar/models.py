@@ -86,6 +86,9 @@ class Notice(Base):
     title: Mapped[str] = mapped_column(Text)
     description: Mapped[str | None] = mapped_column(Text)
     buyer: Mapped[str | None] = mapped_column(Text)
+    # The reference people quote for the procurement: the buyer's own identifier in TED
+    # (eForms BT-22), e-Avrop's id, or the fixture's diarienummer ("DEMO-2026-0147").
+    reference_number: Mapped[str | None] = mapped_column(Text)
     cpv_codes: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list)
     notice_type: Mapped[str | None] = mapped_column(String(64))  # contract | award | planned | ...
     procedure: Mapped[str | None] = mapped_column(Text)
@@ -326,6 +329,9 @@ class MatchRecord(Base):
     fit: Mapped[str] = mapped_column(String(16))
     prefilter_score: Mapped[float | None] = mapped_column()
     engine: Mapped[str] = mapped_column(String(32))
+    # The rules and prompt version it was made under (services.matching.ASSESSMENT_VERSION);
+    # one made under another version is made again, so stored texts follow the current wording.
+    assessment_version: Mapped[str | None] = mapped_column(String(32))
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
     dismissed: Mapped[bool] = mapped_column(Boolean, default=False)
     stale: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())

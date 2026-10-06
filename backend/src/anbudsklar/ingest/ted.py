@@ -86,6 +86,7 @@ FIELDS: tuple[str, ...] = (
     "notice-identifier",
     "notice-version",
     "procedure-identifier",
+    "internal-identifier-proc",
     "notice-type",
     "form-type",
     "notice-title",
@@ -251,6 +252,7 @@ def map_ted_notice(notice: Mapping[str, Any], *, now: datetime) -> TedRecord:
         raw=dict(notice),
         description=_description(notice),
         buyer=", ".join(_texts(notice.get("buyer-name"))) or None,
+        reference_number=reference_number(notice),
         cpv_codes=_cpv_codes(notice),
         procedure=_procedure(notice.get("procedure-type")),
         published_at=_publication_date(notice.get("publication-date")),
@@ -366,6 +368,24 @@ def _title(notice: Mapping[str, Any]) -> str | None:
 
 def _description(notice: Mapping[str, Any]) -> str | None:
     return _text(notice.get("description-proc")) or _text(notice.get("description-lot"))
+
+
+def reference_number(notice: Mapping[str, Any]) -> str | None:
+    """The buyer's own reference for the procedure: eForms BT-22 ("internal identifier").
+
+    Only the procedure's identifier counts. e-Avrop, which publishes Sundsvall's notices,
+    leaves it empty and gives each lot a URN of its own ("urn:eavrop:mdn:…:Lot:1"); a URN is
+    no reference anyone quotes, so it is not taken for one.
+    """
+
+    value = notice.get("internal-identifier-proc")
+    if isinstance(value, Mapping):
+        candidates = _texts(value)
+    elif isinstance(value, list):
+        candidates = [str(item).strip() for item in value if item]
+    else:
+        candidates = [str(value).strip()] if value else []
+    return next((item for item in candidates if item and not item.lower().startswith("urn:")), None)
 
 
 def _cpv_codes(notice: Mapping[str, Any]) -> list[str]:
