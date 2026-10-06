@@ -23,5 +23,7 @@ export default defineConfig({
     setupFiles: ["src/test/setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
     restoreMocks: true,
+    // Room for several of findBy*'s 3 s waits on a slow runner (src/test/setup.ts).
+    testTimeout: 10_000,
   },
 });

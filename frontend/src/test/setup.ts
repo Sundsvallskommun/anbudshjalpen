@@ -1,6 +1,10 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup } from "@testing-library/react";
+import { cleanup, configure } from "@testing-library/react";
 import { afterEach } from "vitest";
+
+// A CI runner is slower than a laptop: inköp's review table takes over a second to render there. findBy* and waitFor
+// wait up to 3 s instead of 1; a passing test still moves on as soon as its element is there.
+configure({ asyncUtilTimeout: 3000 });
 
 // jsdom lacks a few browser APIs the design system calls on mount; minimal stand-ins keep components
 // rendering. Nothing here changes behaviour under test.

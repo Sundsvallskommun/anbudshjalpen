@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type { UserView } from "../api/types";
@@ -42,7 +42,8 @@ describe("LoginPage", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Fortsätt som Anna, företagare" }));
 
-    expect(await screen.findByTestId("location")).toHaveTextContent(/^\/start$/);
+    // The probe is there from the start; wait until the login has moved it, which takes longer on a busy runner.
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent(/^\/start$/));
     expect(calls.find((call) => call.path === "/api/session/login")?.body).toEqual({ persona: "foretagare" });
   });
 
