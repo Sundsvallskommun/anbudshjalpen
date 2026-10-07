@@ -24,17 +24,6 @@ function StrokeIcon({ children, ...props }: IconSvgProps) {
   );
 }
 
-/** Anbudsklar's mark: a document with a folded corner and a check (direction.md, section 5). */
-export function LogoMark(props: IconSvgProps) {
-  return (
-    <StrokeIcon {...props}>
-      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
-      <path d="M14 3v5h5" />
-      <path d="m9 14 2 2 4-4" />
-    </StrokeIcon>
-  );
-}
-
 /** A document: the procurement documents ("Underlaget · 17 sidor"), an attachment. */
 export function DocumentIcon(props: IconSvgProps) {
   return (

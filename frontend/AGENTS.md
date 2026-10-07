@@ -36,6 +36,9 @@ The design as built is in `docs/design.md`. Comments that cite "direction.md, se
   `PageText`, and `sourceTarget.ts`, the address that opens a source), `AiProvenance` (with `basis="law"` for
   Regelhjälpen), `StatTile`, `ResultSummary`, `NextStepCard` and `AccentCard`, `RequirementRow`, `CollapsibleSection`,
   `StepNav`, and the app's own glyphs (`icons.tsx`, among them `DownloadIcon` and `UploadIcon`).
+- `public/favicon.svg` is the mark (Gnistan), shown by the top bar's `Brand` and the browser tab. `npm run icons`
+  (`scripts/icons.mjs`) builds `favicon.ico`, the home-screen and manifest icons and the README logo from it; rerun it
+  after changing the mark, and never edit the generated files by hand.
 - `src/components/` also holds the status tokens (`tokens.tsx`), `states.tsx` (loading and errors), `TermText`,
   `RowList`, `UrlTabs`, `NoticeRow`, `FormalQuestionAdvice`, `DocumentUpload` and the checklist's sections
   (`checklist/`). `src/lib/` has pure helpers: dates and numbers (`format.ts`), the Swedish words for the contract's

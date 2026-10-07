@@ -11,6 +11,7 @@
     "test": "vitest run",
     "theme:build": "npm run astryx -- theme build src/theme/eneo.theme.ts -o src/theme/built/eneo.css",
     "theme:check": "npm run astryx -- theme build src/theme/eneo.theme.ts -o src/theme/built/eneo.css --check",
+    "icons": "node scripts/icons.mjs",
     "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs",
     "gate": "playwright test"
   },

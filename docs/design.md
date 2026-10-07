@@ -86,7 +86,12 @@ Varje sida visas i ramen `AppFrame` i `frontend/src/shell/`:
   ska laddas upp.
 - **Toppnaven** (`FrameHeader`, `MainNav`, `AccountMenu` och `Brand`) är 64 px hög på bredare skärmar och följer
   sidbehållarens bredd. Vald menypunkt har accentfärgad text i semibold och en accentlinje på 2 px under. Logomärket är
-  ett dokument med vikt hörn och en bock i accentfärg. Kommunvapnet används inte utan klartecken.
+  Gnistan: coachens vita pratbubbla med en bock, på en blå ruta, och en gul gnista i hörnet som står för AI. Rutan har
+  egen bakgrund och ser likadan ut i ljust och mörkt läge. Gult finns bara i märket, aldrig som statusfärg.
+  Kommunvapnet används inte utan klartecken.
+- **Märket** är filen `frontend/public/favicon.svg`, som både toppnaven och webbläsarfliken visar. Från den bygger
+  `npm run icons` (från `frontend/`) reservikonen `favicon.ico`, hemskärmsikonerna och manifestets ikoner i
+  `frontend/public/` och README-loggan i `docs/assets/`. Ändras märket körs skriptet igen.
 - **Sidan** (`Page`) har sidans enda h1, som får fokus efter en navigering i appen. Över h1 kan brödsmulor (bara på
   bredare skärmar) och en kort rad som "Granska checklista" stå. I rubrikraden kan en knapp stå, under den en ingress,
   och bredvid innehållet en högerspalt.
@@ -255,7 +260,7 @@ Byggstenarna som omgörningen lade till ligger i `frontend/src/components/ui/`. 
 | `ResultSummary` | Ett utlåtande: rubrik med siffran, framstegsstapel och statistikrutor som filtrerar raderna under |
 | `StatTile` | En siffra att agera på, med etikett och stödrad. Antingen en länk (ett ankare som öppnar sitt avsnitt) eller ett filter |
 | `StepNav` | Upphandlingens fyra steg som en sticky flikrad, med steget i adressen (`?flik=`). Ett steg monteras första gången det öppnas och behålls sedan. `useStepNav().goTo` byter steg och flyttar fokus till steget |
-| `icons.tsx` | Appens egna ikoner där Astryx semantiska ikoner saknar en: logomärket, dokument, papperskorg, pil framåt, `DownloadIcon` ("Ladda ned") och `UploadIcon` ("Granska en ny version" och "Ladda upp"). De ritas med `Icon` som alla andra |
+| `icons.tsx` | Appens egna ikoner där Astryx semantiska ikoner saknar en: dokument, papperskorg, pil framåt, `DownloadIcon` ("Ladda ned") och `UploadIcon` ("Granska en ny version" och "Ladda upp"). De ritas med `Icon` som alla andra |
 | `source/SourceLink` | Källan till ett påstående: "s. 5" som en diskret länk. Bara avvikelser får en token: "s. 9 (AI angav 7)" i blått och "Hittades inte i underlaget" i gult. Namnet säger vad källan belägger: "Visa källan för ”Anbudet är skrivet på svenska”, s. 5" |
 | `source/SourceDialog` och `SourceDialogProvider` | Appens enda källdialog, se [Källdialogen](#källdialogen). Den öppnas med `useSourceDialog()`, och `useSourceDeepLink` öppnar den från adressen |
 | `source/PageText` | En sida ur underlaget som papper: cirka 72 tecken per rad, numrerade avsnittsrubriker i semibold och citatet markerat och inskrollat. Används i källdialogen och i inköparens granskning |
