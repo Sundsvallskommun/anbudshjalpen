@@ -231,7 +231,8 @@ tillbaka till länken när dialogen stängs.
   anbudsdag med annonsen utan varnar om de är samma dag. Ett äldre utkast märks "Ersatt av
   nyare tolkning". Där tabellen inte får plats, under 1 100 px, står uppgifterna under rubriken, med "Granska" bredvid.
   "Ny upphandling" står i sidhuvudet och har ett fält för referensnummer (diarienummer), som visas under upphandlingens
-  rubrik.
+  rubrik, och valet "Datumet gäller: Anbud · Anbudsansökan", som ger datumfältet namnet "Sista anbudsdag" eller "Sista
+  dag för anbudsansökan".
 - **Företagens frågor** är en tabell per upphandling: antal frågor, hur många underlaget inte svarade på och hur många
   som hänvisades till e-Avrop. Frågorna själva visas först efter sista anbudsdag, och inget företag namnges. Under
   760 px står fristen och de andra antalen under rubriken, och bara antalet frågor har en egen kolumn.

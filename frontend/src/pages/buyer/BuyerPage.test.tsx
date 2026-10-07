@@ -181,7 +181,25 @@ describe("Inköp: Ny upphandling", () => {
       buyer: "Sundsvalls kommun",
       reference_number: "DEMO-2026-0201",
     });
+    expect(sent.deadline_kind).toBe("tender");
     expect(within(dialog).getByRole("button", { name: "Ladda upp" })).toBeInTheDocument();
+  });
+
+  it("names the date by what it is for, and sends it", async () => {
+    const calls = mockApi(
+      routes([], [{ method: "POST", path: "/api/admin/notices", body: (body: unknown) => ({ ...noticeDetail, title: (body as NoticeCreate).title }) }]),
+    );
+    renderApp("/inkop?flik=ny");
+
+    const dialog = await screen.findByRole("dialog", { name: "Ny upphandling" });
+    expect(within(dialog).getByText("Sista anbudsdag")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("radio", { name: "Anbudsansökan" }));
+    expect(within(dialog).getByText("Sista dag för anbudsansökan")).toBeInTheDocument();
+
+    await userEvent.type(within(dialog).getByRole("textbox", { name: /Rubrik/ }), "Fasadrenovering av Hedbergska");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Skapa upphandlingen" }));
+    expect(await within(dialog).findByText("Upphandlingen är skapad.")).toBeInTheDocument();
+    expect((calls.find((call) => call.method === "POST")?.body as NoticeCreate).deadline_kind).toBe("request");
   });
 
   it("opens from the old address and offers today's procedure names only", async () => {

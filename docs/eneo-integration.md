@@ -111,6 +111,11 @@ instruktion, ett kontrakt eller ett MCP-verktyg.
 > träffar ([Drift](operations.md#uppdatera)). De nya fälten `cpv_labels` i motorernas indata och `excerpt` i
 > Regelhjälpens källor sätts av appen vid varje anrop och kräver ingen ny körning.
 
+> **Kör det igen efter ändringen 2026-10-07.** Instruktionen för `tolka_underlag` säger nu att sista dag för
+> anbudsansökan i ett selektivt förfarande är `annat` och inte `sista_anbudsdag`. Fältet `deadline_kind` i
+> `NoticeContext` sätts av appen vid varje anrop: annonsblocket heter då "Sista dag för anbudsansökan" i stället för
+> "Sista anbudsdag", och det kräver ingen ny körning.
+
 ## Nycklar
 
 | Nyckel | Används av | Finns i | Behörighet |
@@ -239,7 +244,7 @@ Tänk på:
 
 | Verktyg | Gör |
 |---|---|
-| `sok_upphandlingar` | Söker annonser på fritext, CPV, status och sista anbudsdag |
+| `sok_upphandlingar` | Söker annonser på fritext, CPV, status och sista anbudsdag. Filtret gäller annonsens datum, som i ett selektivt förfarande är sista dag för anbudsansökan; svaret säger vilket det är |
 | `hamta_upphandling` | Visar en annons med datum, CPV-koder och underlag |
 | `sok_i_underlag` | Söker i underlaget till en annons, med avsnitt och sidintervall |
 | `lasa_sidor` | Läser högst fem sidor ur ett underlag |

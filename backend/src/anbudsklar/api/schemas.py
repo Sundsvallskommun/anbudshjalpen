@@ -376,6 +376,7 @@ class NoticeCreate(ApiModel):
     cpv_codes: list[CpvCodeIn] = Field(default_factory=list, max_length=30)
     procedure: str | None = Field(default=None, max_length=300)
     deadline_at: datetime | None = None
+    deadline_kind: DeadlineKind = "tender"  # what `deadline_at` is the last day for, as NoticeSummary has it
     url: str | None = Field(default=None, max_length=2000)
 
     @field_validator("url")

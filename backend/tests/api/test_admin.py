@@ -456,6 +456,25 @@ async def test_manual_notices_keep_the_buyers_reference_number(client: httpx.Asy
     assert unnumbered.json()["reference_number"] is None
 
 
+async def test_manual_notices_say_what_their_deadline_is_for(client: httpx.AsyncClient, demo: Demo) -> None:
+    await login(client, "inkopare")
+    deadline = (datetime.now(UTC) + timedelta(days=20)).isoformat()
+    request = await client.post(
+        "/api/admin/notices",
+        json={"title": "Fasadrenovering (fiktiv)", "deadline_at": deadline, "deadline_kind": "request"},
+    )
+    assert request.status_code == 201, request.text
+    assert request.json()["deadline_kind"] == "request"
+    tender = await client.post(
+        "/api/admin/notices", json={"title": "Snöröjning (fiktiv)", "deadline_at": deadline}
+    )
+    assert tender.json()["deadline_kind"] == "tender"
+    wrong = await client.post(
+        "/api/admin/notices", json={"title": "Snöröjning (fiktiv)", "deadline_kind": "offer"}
+    )
+    assert wrong.status_code == 422
+
+
 async def test_manual_notices_only_link_to_web_addresses(client: httpx.AsyncClient, demo: Demo) -> None:
     await login(client, "inkopare")
     bad = await client.post(

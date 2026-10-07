@@ -7,6 +7,7 @@ import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
 import { Layout, LayoutContent, LayoutFooter } from "@astryxdesign/core/Layout";
 import { Link } from "@astryxdesign/core/Link";
+import { RadioList, RadioListItem } from "@astryxdesign/core/RadioList";
 import { Selector } from "@astryxdesign/core/Selector";
 import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
@@ -14,10 +15,11 @@ import { TextInput } from "@astryxdesign/core/TextInput";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useState, type FormEvent } from "react";
 import { useConfig, useCreateNotice } from "../../api/queries";
-import type { NoticeCreate, NoticeDetail } from "../../api/types";
+import type { NoticeCreate, NoticeDeadlineKind, NoticeDetail } from "../../api/types";
 import { DocumentUpload } from "../../components/DocumentUpload";
 import { ErrorNotice } from "../../components/states";
 import { splitList, swedishTimeToIso } from "../../lib/format";
+import { noticeDeadlineLabel } from "../../lib/labels";
 
 /** Today's names in LOU. "Förenklat förfarande" and "urvalsförfarande" left the law on 1 February 2022. */
 export const PROCEDURES = [
@@ -48,6 +50,8 @@ export interface NoticeDraft {
   cpv: string;
   procedure: string | null;
   deadline: ISODateString | undefined;
+  /** What the date is the last day for: tenders, or requests to participate in a restricted procedure. */
+  deadlineKind: NoticeDeadlineKind;
   url: string;
 }
 
@@ -59,6 +63,7 @@ export const EMPTY_DRAFT: NoticeDraft = {
   cpv: "",
   procedure: null,
   deadline: undefined,
+  deadlineKind: "tender",
   url: "",
 };
 
@@ -91,6 +96,7 @@ export function noticeRequest(draft: NoticeDraft, organisation: string | undefin
     procedure: draft.procedure,
     // A picked day closes at 23:59 Swedish time.
     deadline_at: draft.deadline ? swedishTimeToIso(draft.deadline, "23:59") : null,
+    deadline_kind: draft.deadlineKind,
     url: draft.url.trim() || null,
   };
 }
@@ -231,8 +237,18 @@ export function NewNoticeDialog({ isOpen, onClose }: { isOpen: boolean; onClose:
                           onChange={(procedure) => set({ procedure })}
                           hasClear
                         />
+                        <RadioList
+                          label="Datumet gäller"
+                          description="I ett selektivt förfarande anger annonsen sista dag för anbudsansökan. Sista anbudsdag står då i inbjudan."
+                          orientation="horizontal"
+                          value={draft.deadlineKind}
+                          onChange={(kind) => set({ deadlineKind: kind === "request" ? "request" : "tender" })}
+                        >
+                          <RadioListItem label="Anbud" value="tender" />
+                          <RadioListItem label="Anbudsansökan" value="request" />
+                        </RadioList>
                         <DateInput
-                          label="Sista anbudsdag"
+                          label={noticeDeadlineLabel({ deadline_kind: draft.deadlineKind })}
                           description="Dagen gäller till kl. 23:59."
                           value={draft.deadline}
                           onChange={(deadline) => set({ deadline })}

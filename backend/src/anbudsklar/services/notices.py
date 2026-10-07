@@ -291,6 +291,7 @@ async def create_notice(session: AsyncSession, data: NoticeCreate) -> Notice:
         status=OPEN if data.deadline_at is None or data.deadline_at > now else CLOSED,
         published_at=now,
         deadline_at=data.deadline_at,
+        deadline_kind=data.deadline_kind,
         url=data.url,
         raw={},
     )

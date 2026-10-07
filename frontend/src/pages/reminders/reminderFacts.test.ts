@@ -95,4 +95,12 @@ describe("deadlineSuggestions", () => {
       "sista_anbudsdag",
     ]);
   });
+
+  it("offers a restricted procedure's deadline as the last day for anbudsansökan", () => {
+    const restricted: MatchView = {
+      ...matchView,
+      notice: { ...noticeSummary, question_deadline: null, deadline_kind: "request" },
+    };
+    expect(deadlineSuggestions([restricted], NOW).map((item) => item.kind)).toEqual(["anbudsansokan"]);
+  });
 });

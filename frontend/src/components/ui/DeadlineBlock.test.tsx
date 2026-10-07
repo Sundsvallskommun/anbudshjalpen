@@ -46,4 +46,23 @@ describe("DeadlineBlock", () => {
     expect(screen.getByText("9 nov 2026 kl. 23:59")).toBeInTheDocument();
     expect(screen.getByText("om 35 dagar")).toBeInTheDocument();
   });
+
+  it("shows a note above the date where the label is only for screen readers, and hides it from them", () => {
+    render(
+      <DeadlineBlock
+        deadline="2026-10-30T23:59:59+01:00"
+        label="Sista dag för anbudsansökan"
+        note="Anbudsansökan"
+        variant="compact"
+        now={now}
+      />,
+    );
+    expect(screen.getByText("Anbudsansökan")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByText("Sista dag för anbudsansökan")).toBeInTheDocument();
+  });
+
+  it("leaves the note out where the label is shown", () => {
+    render(<DeadlineBlock deadline="2026-10-30" label="Sista dag för anbudsansökan" note="Anbudsansökan" now={now} />);
+    expect(screen.queryByText("Anbudsansökan")).not.toBeInTheDocument();
+  });
 });

@@ -510,6 +510,8 @@ export interface NoticeCreate {
   cpv_codes: string[];
   procedure: string | null;
   deadline_at: IsoDateTime | null;
+  /** What `deadline_at` is the last day for; "tender" when left out. */
+  deadline_kind?: NoticeDeadlineKind;
   url: string | null;
 }
 
