@@ -75,6 +75,7 @@ export const noticeSummary: NoticeSummary = {
   status: "open",
   published_at: "2026-09-21T08:00:00+02:00",
   deadline_at: "2026-10-26T23:59:00+01:00",
+  deadline_kind: "tender",
   // The published checklist's frågestopp (2026-10-16) as the end of that day.
   question_deadline: "2026-10-16T23:59:59+02:00",
   cpv_codes: ["45442100"],
@@ -287,6 +288,7 @@ export const checklistAdminItem: ChecklistAdminItem = {
   notice_id: NOTICE_ID,
   notice_title: noticeSummary.title,
   deadline_at: noticeSummary.deadline_at,
+  deadline_kind: noticeSummary.deadline_kind,
   status: "draft",
   engine: "heuristic",
   created_at: "2026-09-22T09:00:00+02:00",

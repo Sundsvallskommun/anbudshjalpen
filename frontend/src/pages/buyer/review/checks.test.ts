@@ -50,6 +50,25 @@ describe("the deadline check", () => {
   });
 });
 
+describe("the deadline check of a restricted procedure", () => {
+  const request = (checklist: Checklist): CheckContext => ({ ...context(checklist), noticeDeadlineKind: "request" });
+
+  it("does not offer the notice's date, which is the last day for anbudsansökan", () => {
+    const check = autoChecks(request(base)).find((item) => item.id === "deadline");
+    expect(check).toMatchObject({ tone: "warning" });
+    expect(check?.text).toContain("Annonsen anger bara sista dag för anbudsansökan, 26 oktober 2026.");
+    expect(check?.action).toBeUndefined();
+  });
+
+  it("flags sista anbudsdag on the same day as anbudsansökan, and accepts a later one from the document", () => {
+    const same = autoChecks(request(deadline("2026-10-26"))).find((item) => item.id === "deadline");
+    expect(same).toMatchObject({ tone: "warning", action: { label: "Ändra" } });
+    const later = autoChecks(request(deadline("2026-12-01"))).find((item) => item.id === "deadline");
+    expect(later).toMatchObject({ tone: "ok" });
+    expect(later?.text).toContain("Sista anbudsdag i checklistan, 1 december 2026, kommer från underlaget.");
+  });
+});
+
 describe("the other checks", () => {
   it("asks for evaluation criteria when there are none", () => {
     const check = autoChecks(context({ ...base, evaluation: [] })).find((item) => item.id === "evaluation");

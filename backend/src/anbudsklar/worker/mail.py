@@ -13,6 +13,7 @@ from typing import Protocol
 import aiosmtplib
 
 from anbudsklar.config import Settings
+from anbudsklar.contracts import DEADLINE_LABELS, DeadlineKind
 from anbudsklar.services.dates import STOCKHOLM
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ _MONTHS = (
 REMINDER_LABELS = {
     "fragestopp": "Sista dag för frågor",
     "sista_anbudsdag": "Sista anbudsdag",
+    "anbudsansokan": "Sista dag för anbudsansökan",
     "egen": "Påminnelse",
 }
 # The fit words of the web app ("Verkar passa", "Passar delvis"): the assessment compares
@@ -99,9 +101,9 @@ def format_datetime(moment: datetime) -> str:
 
 
 def format_deadline(kind: str, deadline_at: datetime) -> str:
-    """Sista anbudsdag has a time of day; frågestopp is the last day for questions, a date."""
+    """The notice's deadlines have a time of day; frågestopp is the last day for questions, a date."""
 
-    if kind == "sista_anbudsdag":
+    if kind in ("sista_anbudsdag", "anbudsansokan"):
         return format_datetime(deadline_at)
     return format_date(deadline_at.astimezone(STOCKHOLM).date())
 
@@ -155,6 +157,7 @@ def match_message(
     summary: str,
     deadline_at: datetime | None,
     organization: str,
+    deadline_kind: DeadlineKind = "tender",
     engine: str = "heuristic",
     start_url: str | None = None,
 ) -> MailMessage:
@@ -163,7 +166,8 @@ def match_message(
     sentence = FIT_SENTENCES.get(fit, OTHER_FIT_SENTENCE)
     lines = [sentence.format(company=company_name, title=notice_title), f"Bedömning: {summary}"]
     if deadline_at is not None:
-        lines.append(f"Sista anbudsdag: {format_datetime(deadline_at)}.")
+        label = DEADLINE_LABELS[deadline_kind]
+        lines.append(f"{label}: {format_datetime(deadline_at)}.")
     made_by = "automatiskt med fasta regler" if engine == "heuristic" else "av AI"
     lines.append(
         f"Bedömningen är gjord {made_by} och är inte granskad av inköp. Den kan vara fel, "

@@ -8,6 +8,7 @@ import { TermText } from "../../../components/TermText";
 import { DeadlineBlock } from "../../../components/ui/DeadlineBlock";
 import { ReminderState } from "../../../components/ui/ReminderState";
 import { formatSek } from "../../../lib/format";
+import { noticeDeadlineReminder, REMINDER_KIND, REMINDER_SUBJECT } from "../../../lib/labels";
 import { useIsPhone } from "../../../lib/usePhone";
 import { procedureFact, questionDeadlineDate, reminderDeadline } from "../noticeData";
 
@@ -48,7 +49,8 @@ function OnValueLine({ children }: { children: ReactNode }) {
 }
 
 /**
- * The four facts a supplier decides on (direction.md, section 4 "sidhuvud"): sista anbudsdag and sista dag för frågor
+ * The four facts a supplier decides on (direction.md, section 4 "sidhuvud"): sista anbudsdag (or, in a restricted
+ * procedure, sista dag för anbudsansökan) and sista dag för frågor
  * as deadline blocks with their reminders, the estimated value with the place, and the procedure in plain words with
  * its term explained. Four columns on a card; two by two on a phone, without the place and the law, so the steps
  * start on the first screen (both are under "Om upphandlingen").
@@ -57,7 +59,9 @@ export function KeyFacts({ notice }: { notice: NoticeDetail }) {
   const isPhone = useIsPhone();
   const year = isPhone ? "auto" : "always";
   const isOpen = notice.status === "open";
-  const tenderReminder = isOpen ? reminderDeadline(notice, "sista_anbudsdag") : null;
+  // The notice's own deadline: sista anbudsdag, or in a restricted procedure the last day for anbudsansökan.
+  const deadlineKind = noticeDeadlineReminder(notice);
+  const deadlineReminder = isOpen ? reminderDeadline(notice, deadlineKind) : null;
   const questionDate = questionDeadlineDate(notice);
   const procedure = procedureFact(notice.procedure);
   const value = notice.estimated_value_sek;
@@ -69,12 +73,17 @@ export function KeyFacts({ notice }: { notice: NoticeDetail }) {
         key="anbud"
         isDense={isPhone}
         action={
-          tenderReminder ? (
-            <ReminderState noticeId={notice.id} kind="sista_anbudsdag" deadline={tenderReminder} subject="sista anbudsdag" />
+          deadlineReminder ? (
+            <ReminderState
+              noticeId={notice.id}
+              kind={deadlineKind}
+              deadline={deadlineReminder}
+              subject={REMINDER_SUBJECT[deadlineKind]}
+            />
           ) : undefined
         }
       >
-        <DeadlineBlock deadline={notice.deadline_at} label="Sista anbudsdag" year={year} />
+        <DeadlineBlock deadline={notice.deadline_at} label={REMINDER_KIND[deadlineKind]} year={year} />
       </Fact>,
     );
   }

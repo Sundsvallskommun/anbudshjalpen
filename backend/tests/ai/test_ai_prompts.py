@@ -83,6 +83,13 @@ def test_interpret_message_has_blocks_and_ends_with_instruction() -> None:
     assert message.rstrip().endswith("Svara med JSON-objektet.")
 
 
+def test_a_request_deadline_is_named_as_such_in_the_notice_block() -> None:
+    notice = _notice().model_copy(update={"deadline_kind": "request"})
+    message = render_task_message(Task.INTERPRET_DOCUMENT, notice=notice, document=_document())
+    assert "Sista dag för anbudsansökan: 2026-11-02 kl. 12:00" in message
+    assert "Sista anbudsdag" not in message.split("<underlag>")[0]
+
+
 def test_question_message_puts_history_before_question() -> None:
     history = [QuestionTurn(question="Får vi lämna anbud tillsammans?", answer="Ja, enligt sida 3.")]
     message = render_task_message(

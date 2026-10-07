@@ -10,11 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.ai.engine import AiEngine, QuestionTurn
 from anbudsklar.api.schemas import AnswerView, QuestionRequest, QuestionTurnIn
+from anbudsklar.contracts import Checklist
 from anbudsklar.documents.citations import verify_answer
 from anbudsklar.documents.store import load_paged_document
 from anbudsklar.models import Document, Notice, QuestionLog
 from anbudsklar.services.access import Viewer
-from anbudsklar.services.checklists import checklist_payload, key_date, visible_checklist
+from anbudsklar.services.checklists import checklist_payload, key_date, tender_deadline, visible_checklist
 from anbudsklar.services.contexts import notice_context
 from anbudsklar.services.dates import end_of_local_day, utcnow
 from anbudsklar.services.errors import ConflictError
@@ -41,7 +42,9 @@ async def ask_question(
     page links in the answer open that same document; without a checklist the first
     document is used. Anonymous visitors may ask; their log row has no company. Buyers'
     own test questions are not logged, and neither are questions asked after the tender
-    deadline, so that insights only reflect suppliers during the tender period.
+    deadline, so that insights only reflect suppliers during the tender period. A company
+    sees the published checklist, which is the one that can name a restricted procedure's
+    tender deadline (`tender_deadline`).
     """
 
     notice = await get_notice(session, notice_id)
@@ -58,7 +61,8 @@ async def ask_question(
     )
     verified = verify_answer(answer, paged.pages)
 
-    if not viewer.is_buyer and _tender_period_running(notice, utcnow()):
+    payload = checklist_payload(checklist) if checklist else None
+    if not viewer.is_buyer and _tender_period_running(notice, payload, utcnow()):
         session.add(
             QuestionLog(
                 notice_id=notice.id,
@@ -70,7 +74,7 @@ async def ask_question(
         )
         await session.flush()
 
-    deadline = key_date(checklist_payload(checklist), "fragestopp") if checklist else None
+    deadline = key_date(payload, "fragestopp") if payload else None
     return AnswerView(
         answer=verified,
         engine=run.engine,
@@ -93,5 +97,6 @@ def bounded_history(turns: Sequence[QuestionTurnIn]) -> list[QuestionTurn]:
     return kept[::-1]
 
 
-def _tender_period_running(notice: Notice, now: datetime) -> bool:
-    return notice.deadline_at is None or notice.deadline_at > now
+def _tender_period_running(notice: Notice, checklist: Checklist | None, now: datetime) -> bool:
+    deadline = tender_deadline(notice, checklist)
+    return deadline is None or deadline > now

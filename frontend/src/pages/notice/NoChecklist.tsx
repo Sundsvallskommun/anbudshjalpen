@@ -9,6 +9,7 @@ import { useSearchParams } from "react-router";
 import type { NoticeDetail, UserView } from "../../api/types";
 import { DocumentUpload } from "../../components/DocumentUpload";
 import { STEP_PARAM } from "../../components/ui/StepNav";
+import { noticeDeadlineLabel } from "../../lib/labels";
 import { externalLink, noticeLinkText, type ExternalLink } from "../../lib/links";
 import { outsideDocumentsText } from "./header/Documents";
 import { QUESTION_HEADING_ID, QuestionStep } from "./steps/question/QuestionStep";
@@ -22,7 +23,7 @@ function isOver(notice: NoticeDetail): boolean {
 
 function reason(notice: NoticeDetail, user: UserView | null, outsideDocuments: ExternalLink | null): string {
   if (isOver(notice)) {
-    const why = notice.status === "awarded" ? "Tilldelningsbeslutet är fattat" : "Sista anbudsdag har passerat";
+    const why = notice.status === "awarded" ? "Tilldelningsbeslutet är fattat" : `${noticeDeadlineLabel(notice)} har passerat`;
     return `${why}, och det finns ingen granskad checklista för upphandlingen.${externalLink(notice.url) ? " Läs mer i annonsen." : ""}`;
   }
   if (user?.role === "inkopare") {

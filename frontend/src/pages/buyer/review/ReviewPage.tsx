@@ -124,6 +124,7 @@ export function ReviewPage({ view, notice }: ReviewPageProps) {
   const { rows, checks, states, defaultKey } = useReviewModel({
     checklist,
     noticeDeadline: notice?.deadline_at ?? null,
+    noticeDeadlineKind: notice?.deadline_kind ?? "tender",
     headings,
     evaluationSection,
     changed,

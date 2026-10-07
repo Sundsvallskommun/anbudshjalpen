@@ -67,6 +67,15 @@ describe("nextDeadlines", () => {
     expect(nextDeadlines([match("x", "passar", { question_deadline: null, deadline_at: null })], NOW)).toBeNull();
     expect(nextDeadlines([], NOW)).toBeNull();
   });
+
+  it("calls a restricted procedure's deadline the last day for anbudsansökan", () => {
+    const restricted = match("r", "passar", {
+      question_deadline: null,
+      deadline_at: "2026-10-30T23:59:59+01:00",
+      deadline_kind: "request",
+    });
+    expect(nextDeadlines([restricted], NOW)?.next).toMatchObject({ kind: "anbudsansokan", at: "2026-10-30T23:59:59+01:00" });
+  });
 });
 
 describe("upcoming procurements", () => {

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from anbudsklar.contracts import CompanyProfile, NoticeContext
+from anbudsklar.contracts import CompanyProfile, NoticeContext, deadline_kind
 from anbudsklar.models import Company, Notice
 
 
@@ -25,6 +25,7 @@ def notice_context(notice: Notice, cpv_labels: Mapping[str, str] | None = None) 
         cpv_labels=_own_labels(codes, cpv_labels),
         procedure=notice.procedure,
         deadline_at=notice.deadline_at,
+        deadline_kind=deadline_kind(notice.deadline_kind),
         url=notice.url,
     )
 

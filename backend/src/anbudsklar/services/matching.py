@@ -1,7 +1,8 @@
 """Matching notices to companies (bedom_matchning).
 
 Two steps, so that the result can be explained and tested (docs/architecture.md):
-1. Fixed rules pick candidates: the notice's deadline has not passed, it is open or has
+1. Fixed rules pick candidates: the notice's deadline has not passed (for a restricted
+   procedure that is the last day for anbudsansökan, after which no new supplier can join), it is open or has
    a published checklist, and it shares a CPV group (three digits or more, or a code the
    company's broader code covers) with the company. Without a CPV match, the company's
    own words must occur in the notice (Swedish full-text search): at least two distinct
@@ -32,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from anbudsklar.ai.engine import AiEngine, EngineError
 from anbudsklar.api.schemas import MatchView
 from anbudsklar.config import Settings
+from anbudsklar.contracts import deadline_kind
 from anbudsklar.cpv import CPV_DIGITS, MIN_GROUP_DIGITS, best_cpv_overlap
 from anbudsklar.documents.citations import verify_match
 from anbudsklar.documents.store import load_paged_document
@@ -349,6 +351,7 @@ async def _send_match_mail(
         fit=record.fit,
         summary=str(record.payload.get("summary", "")),
         deadline_at=notice.deadline_at,
+        deadline_kind=deadline_kind(notice.deadline_kind),
         organization=settings.organization_name,
         engine=record.engine,
         start_url=page_url(settings.public_url, "start"),

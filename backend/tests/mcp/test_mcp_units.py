@@ -27,7 +27,9 @@ from anbudsklar.mcp.output import (
 )
 from anbudsklar.mcp.server import allowed_hosts
 from anbudsklar.mcp.tools.common import cpv_overlaps, cpv_prefix, trimmed
+from anbudsklar.mcp.tools.notices import _notice_line as notice_line
 from anbudsklar.mcp.tools.notices import _upcoming_line as upcoming_line
+from anbudsklar.models import Notice
 
 
 def test_fit_count_keeps_leading_items_within_the_budget() -> None:
@@ -194,3 +196,21 @@ def test_an_overdue_announcement_points_to_the_notices() -> None:
     assert "ny upphandling väntas annonseras" in upcoming_line(
         item.model_copy(update={"announcement_overdue": False})
     )
+
+
+@pytest.mark.parametrize(
+    ("kind", "label"), [("tender", "sista anbudsdag: "), ("request", "sista dag för anbudsansökan: ")]
+)
+def test_a_notice_line_names_its_kind_of_deadline(kind: str, label: str) -> None:
+    notice = Notice(
+        id=uuid.uuid4(),
+        title="Fasadrenovering",
+        status="open",
+        cpv_codes=["45454100"],
+        deadline_at=datetime(2026, 10, 30, 22, 59, tzinfo=UTC),
+        deadline_kind=kind,
+        is_fictitious=False,
+    )
+    line = notice_line(notice)
+    assert f"{label}2026-10-30 kl. 23:59" in line
+    assert ("går att lämna anbudsansökan" in line) is (kind == "request")

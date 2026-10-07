@@ -391,6 +391,21 @@ async def test_a_second_question_deadline_is_kept_as_another_date() -> None:
     ]
 
 
+async def test_the_last_day_for_anbudsansokan_is_not_sista_anbudsdag() -> None:
+    pages = [
+        "Sista dag för anbudsansökan är 2026-10-30.\n"
+        "Ansökan om att få delta ska ha kommit in senast den 30 oktober 2026.\n"
+        "Anbud ska ha kommit in senast 2026-12-01."
+    ]
+    checklist, _ = await HeuristicEngine().interpret_document(
+        NOTICE, PagedDocument(filename="u.pdf", pages=pages)
+    )
+    assert {(item.kind, item.date) for item in checklist.dates} == {
+        ("annat", dt.date(2026, 10, 30)),
+        ("sista_anbudsdag", dt.date(2026, 12, 1)),
+    }
+
+
 async def test_current_procedure_names_win_over_the_repealed_ones() -> None:
     pages = [
         "Förfarandet motsvarar det som tidigare kallades förenklat förfarande.\n"

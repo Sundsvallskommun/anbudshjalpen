@@ -8,12 +8,28 @@ numbers that our citation verification checks against.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import Field
 
 from anbudsklar.contracts.common import ContractModel
 
 PAGE_MARKER = "[SIDA {page}]"
+
+# What a notice's deadline is the last day for: tenders, or requests to participate
+# (anbudsansökan), which is all a restricted procedure's notice gives (eForms BT-1311).
+DeadlineKind = Literal["tender", "request"]
+# What each kind is called, in the web app's words.
+DEADLINE_LABELS: dict[DeadlineKind, str] = {
+    "tender": "Sista anbudsdag",
+    "request": "Sista dag för anbudsansökan",
+}
+
+
+def deadline_kind(value: object) -> DeadlineKind:
+    """The kind of a stored deadline; anything but "request" is the usual tender deadline."""
+
+    return "request" if value == "request" else "tender"
 
 
 class NoticeContext(ContractModel):
@@ -29,6 +45,10 @@ class NoticeContext(ContractModel):
     )
     procedure: str | None = None
     deadline_at: datetime | None = None
+    deadline_kind: DeadlineKind = Field(
+        default="tender",
+        description="tender: sista anbudsdag. request: sista dag för anbudsansökan (selektivt förfarande).",
+    )
     url: str | None = None
 
 

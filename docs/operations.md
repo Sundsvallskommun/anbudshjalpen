@@ -126,7 +126,7 @@ Worker kör jobben med APScheduler, i svensk tid. Varje körning sparas i tabell
 | `ingest_ted` | Varje dag 06:15 | Hämtar annonser från TED |
 | `ingest_eavrop` | Varje dag 06:30 | Hämtar från e-Avrop, men bara om `robots.txt` tillåter det. Se [Datakällor](data-sources.md) |
 | `ingest_lou` | Måndagar 05:00 | Hämtar LOU från Riksdagen |
-| `close_expired` | Var 15:e minut | Sparar `closed` på öppna annonser vars sista anbudsdag har passerat, oavsett källa |
+| `close_expired` | Var 15:e minut | Sparar `closed` på öppna annonser vars sista dag har passerat (sista anbudsdag, eller sista dag för anbudsansökan i ett selektivt förfarande), oavsett källa |
 | `interpret_pending` | Var femte minut | Tolkar nya underlag till checklistor, högst fem per körning. Ett misslyckat försök görs om efter 15 minuter, 30 minuter, 1 timme och 2 timmar, och efter fem försök ger jobbet upp. Det ger upp direkt när samma underlag inte kan lyckas: ett underlag utan läsbar text, en modell som fortsätter att bryta mot kontraktet, ett underlag som är för stort för modellen och en förfrågan som modelleverantören eller Eneo avvisar eller inte kan läsa |
 | `match_all` | Var 30:e minut | Bedömer annonser mot företagens profiler. En bedömning görs om när annonsen, profilen eller den publicerade checklistan har ändrats, eller när bedömningsversionen (`ASSESSMENT_VERSION` i `services/matching.py`) har bytts. När ett företag sparar sin profil bedömer appen just det företagets träffar direkt, se [AI-uppgifterna](ai-tasks.md#bedöma-matchning-bedom_matchning) |
 | `send_reminders` | Varje minut | Skickar påminnelser som är på tur, med länk till upphandlingen och till sidan Påminnelser |

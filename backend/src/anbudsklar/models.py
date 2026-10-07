@@ -95,6 +95,9 @@ class Notice(Base):
     status: Mapped[str] = mapped_column(String(32), default="open")  # open | closed | awarded | planned
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # What `deadline_at` is the last day for: "tender" (sista anbudsdag) or "request" (sista
+    # dag för anbudsansökan), when a restricted procedure's notice only gives that one.
+    deadline_kind: Mapped[str] = mapped_column(String(16), default="tender", server_default="tender")
     estimated_value_sek: Mapped[int | None] = mapped_column(BigInteger)
     place: Mapped[str | None] = mapped_column(Text)
     url: Mapped[str | None] = mapped_column(Text)
@@ -383,7 +386,7 @@ class Reminder(Base):
     id: Mapped[uuid.UUID] = _uuid_pk()
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     notice_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("notices.id", ondelete="CASCADE"))
-    kind: Mapped[str] = mapped_column(String(32))  # fragestopp | sista_anbudsdag | egen
+    kind: Mapped[str] = mapped_column(String(32))  # fragestopp | sista_anbudsdag | anbudsansokan | egen
     note: Mapped[str | None] = mapped_column(Text)
     due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

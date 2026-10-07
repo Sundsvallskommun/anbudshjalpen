@@ -376,6 +376,7 @@ def _summary(
             "status": status,
             "published_at": notice.published_at,
             "deadline_at": notice.deadline_at,
+            "deadline_kind": notice.deadline_kind,
             "question_deadline": question_deadline,
             "cpv_codes": list(notice.cpv_codes or []),
             "cpv_label": cpv_label,

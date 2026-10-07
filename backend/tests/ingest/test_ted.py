@@ -16,6 +16,7 @@ from anbudsklar.config import Settings
 from anbudsklar.ingest.common import IngestError
 from anbudsklar.ingest.ted import (
     FIELDS,
+    Deadline,
     build_query,
     fetch_ted_notices,
     ingest_ted,
@@ -99,8 +100,53 @@ def test_restricted_procedure_uses_the_request_deadline_and_unescapes_titles(pag
     assert values.title == "Hedbergska skolan - Fasad & tak restaurering"
     assert values.procedure == "Selektivt förfarande"
     assert values.deadline_at == datetime(2026, 10, 30, 23, 59, 59, tzinfo=CET)
+    assert values.deadline_kind == "request"  # sista dag för anbudsansökan, not for tenders
     assert values.cpv_codes[0] == "45454100"  # main classification first, duplicates removed
     assert len(values.cpv_codes) == len(set(values.cpv_codes))
+
+
+def test_recorded_restricted_notice_gives_only_the_request_deadline() -> None:
+    """The notice on its own, recorded for this case (eForms BT-1311, no BT-131)."""
+
+    [restricted] = json.loads(read_sample("ted_notice_restricted.json"))["notices"]
+
+    assert restricted["procedure-type"] == "restricted"
+    assert "deadline-receipt-tender-date-lot" not in restricted
+    record = map_ted_notice(restricted, now=RECORDED_AT)
+    assert (record.values.deadline_at, record.values.deadline_kind) == (
+        datetime(2026, 10, 30, 23, 59, 59, tzinfo=CET),
+        "request",
+    )
+    assert record.values.status == "open"
+
+
+def test_open_procedure_has_a_tender_deadline(page: dict[str, Any]) -> None:
+    assert map_ted_notice(notice(page, "684405-2026"), now=RECORDED_AT).values.deadline_kind == "tender"
+
+
+# Synthetic field sets, so that these run without the recorded samples.
+@pytest.mark.parametrize(
+    ("fields", "expected"),
+    [
+        (
+            {
+                "deadline-receipt-request-date-lot": ["2026-10-31+01:00"],
+                "deadline-receipt-request-time-lot": ["00:00:00+01:00"],
+            },
+            Deadline(datetime(2026, 10, 30, 23, 59, 59, tzinfo=CET), "request"),
+        ),
+        (
+            {
+                "deadline-receipt-request-date-lot": ["2026-10-20+02:00"],
+                "deadline-receipt-tender-date-lot": ["2026-11-03+01:00"],
+            },
+            Deadline(datetime(2026, 11, 3, 23, 59, 59, tzinfo=CET), "tender"),  # the tender deadline wins
+        ),
+        ({"deadline-receipt-tender-date-lot": []}, None),
+    ],
+)
+def test_deadline_kind_says_which_date_it_is(fields: dict[str, Any], expected: Deadline | None) -> None:
+    assert parse_deadline(fields) == expected
 
 
 def test_award_notice_is_awarded_without_deadline(page: dict[str, Any]) -> None:
@@ -141,7 +187,7 @@ def test_recorded_page_has_open_closed_and_awarded_notices(page: dict[str, Any])
 def test_deadline_without_time_means_end_of_that_day() -> None:
     deadline = parse_deadline({"deadline-receipt-tender-date-lot": ["2026-11-03+01:00"]})
 
-    assert deadline == datetime(2026, 11, 3, 23, 59, 59, tzinfo=CET)
+    assert deadline == Deadline(datetime(2026, 11, 3, 23, 59, 59, tzinfo=CET), "tender")
 
 
 def test_earliest_lot_deadline_wins() -> None:
@@ -152,7 +198,7 @@ def test_earliest_lot_deadline_wins() -> None:
         }
     )
 
-    assert deadline == datetime(2026, 11, 3, 10, 0, tzinfo=CET)
+    assert deadline == Deadline(datetime(2026, 11, 3, 10, 0, tzinfo=CET), "tender")
 
 
 def test_title_falls_back_to_notice_title_without_country_and_cpv_prefix() -> None:
@@ -257,6 +303,7 @@ async def test_ingest_inserts_then_reports_unchanged_on_rerun(
     assert stored is not None
     assert stored.title == "Hedbergska skolan - Fasad & tak restaurering"
     assert stored.raw["procedure-type"] == "restricted"
+    assert stored.deadline_kind == "request"
     assert stored.is_fictitious is False
 
 

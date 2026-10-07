@@ -573,12 +573,15 @@ _PERIOD = re.compile(r"\b\d+\s+(?:dagar|månader)\b", re.IGNORECASE)
 # januari 2029" gives one contract start and one other date. The first pattern that
 # matches wins: the buyer's own steps and the site visit come first, so "Sista dag för
 # kommunens svar på frågor" and "Anmälan görs via frågefunktionen … senast" are not the
-# question deadline.
+# question deadline, and a restricted procedure's "sista dag för anbudsansökan" is not
+# sista anbudsdag.
 _DATE_KINDS: tuple[tuple[DateKind, re.Pattern[str]], ...] = (
     (
         "annat",
         re.compile(
-            r"\bsvar\w*\s+på\s+frågor|\bbesvara\w*|\bpublicera\w*|\banmäl\w*|platsbesök", re.IGNORECASE
+            r"\bsvar\w*\s+på\s+frågor|\bbesvara\w*|\bpublicera\w*|\banmäl\w*|platsbesök"
+            r"|anbudsansök\w*|ansökan\s+om\s+(?:att\s+(?:få\s+)?)?delta",
+            re.IGNORECASE,
         ),
     ),
     (

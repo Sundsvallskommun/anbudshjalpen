@@ -15,6 +15,7 @@ import { ErrorNotice, Loading } from "../../components/states";
 import { FictitiousToken, FitToken } from "../../components/tokens";
 import { DeadlineBlock } from "../../components/ui/DeadlineBlock";
 import { plural } from "../../lib/format";
+import { noticeDeadlineLabel, noticeDeadlineNote } from "../../lib/labels";
 import { CardHeading, HeadingCount } from "../start/CardHeading";
 import { ForwardLink } from "../start/ForwardLink";
 import { isFitting, sortMatches } from "../start/start";
@@ -76,7 +77,8 @@ function FitCard({ companyName }: { companyName: string }) {
                         <RowEnd>
                           <DeadlineBlock
                             deadline={match.notice.deadline_at}
-                            label="Sista anbudsdag"
+                            label={noticeDeadlineLabel(match.notice)}
+                            note={noticeDeadlineNote(match.notice.deadline_kind)}
                             variant="compact"
                             align="end"
                           />

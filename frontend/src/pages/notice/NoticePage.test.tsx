@@ -371,6 +371,18 @@ describe("NoticePage key dates", () => {
     expect(await within(facts).findByRole("button", { name: "Påminn mig före sista anbudsdag 9 november 2026" })).toBeInTheDocument();
   });
 
+  it("names a restricted procedure's deadline as the last day for anbudsansökan, and reminds about that", async () => {
+    mockApi([...baseRoutes(companyUser), noticeWith({ deadline_kind: "request" })]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    const facts = await screen.findByRole("region", { name: "Nyckeltal" });
+    expect(within(facts).getByText("Sista dag för anbudsansökan")).toBeInTheDocument();
+    expect(within(facts).queryByText("Sista anbudsdag")).not.toBeInTheDocument();
+    expect(
+      await within(facts).findByRole("button", { name: "Påminn mig före sista dag för anbudsansökan 26 oktober 2026" }),
+    ).toBeInTheDocument();
+  });
+
   it("marks passed dates and offers no reminder for them", async () => {
     vi.setSystemTime(new Date("2026-11-01T10:00:00+01:00"));
     mockApi([...baseRoutes(companyUser), withDates]);

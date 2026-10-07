@@ -25,6 +25,7 @@ sidan. Ändras en term här, ändra den där också. Förklarar en checklista sj
 | BAS-U | Byggarbetsmiljösamordnare för utförandet: den som samordnar arbetsmiljön på en byggarbetsplats medan arbetet pågår (arbetsmiljölagen 3 kap.) |
 | Frågestopp | Sista dagen att ställa frågor om underlaget. Svaren publiceras för alla anbudsgivare |
 | Sista anbudsdag | Sista dagen att lämna anbud |
+| Anbudsansökan | En ansökan om att få lämna anbud, i ett selektivt förfarande. Köparen väljer ut leverantörer bland dem som har ansökt och bjuder in dem att lämna anbud. Därför kommer sista dag för anbudsansökan före sista anbudsdag, som står i inbjudan |
 | Förfarande | Hur upphandlingen genomförs enligt lagen, till exempel öppet förfarande. Under EU:s beloppsgränser gäller 19 kap. LOU, och underlaget beskriver hur upphandlingen går till. Namnen förenklat förfarande och urvalsförfarande togs bort ur LOU den 1 februari 2022, men äldre underlag använder dem |
 | Tilldelningsbeslut | Beslutet om vem eller vilka som vinner upphandlingen |
 | Avtalsspärr | En väntetid efter tilldelningsbeslutet då avtal inte får tecknas: 10 dagar om beslutet skickas elektroniskt, annars 15 dagar. Under den kan beslutet begäras överprövat |

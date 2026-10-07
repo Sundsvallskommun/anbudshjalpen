@@ -56,6 +56,22 @@ def test_a_tender_deadline_reminder_names_the_deadline_with_its_time() -> None:
     assert "Ändra eller ta bort" not in message.text  # no link without the page's address
 
 
+def test_an_anbudsansokan_reminder_names_that_deadline() -> None:
+    message = reminder_message(
+        to="anna@example.test",
+        recipient_name="Anna",
+        notice_title="Fasadrenovering",
+        notice_url="http://anbudsklar.test/upphandlingar/1",
+        kind="anbudsansokan",
+        deadline_at=datetime(2026, 10, 30, 23, 59, tzinfo=STOCKHOLM),
+        note=None,
+        organization="Sundsvalls kommun",
+    )
+    assert message.subject == "Sista dag för anbudsansökan 30 oktober 2026: Fasadrenovering"
+    assert "Sista dag för anbudsansökan: 30 oktober 2026 kl. 23:59." in message.text
+    assert "Sista anbudsdag" not in message.text
+
+
 def test_own_reminder_without_deadline() -> None:
     message = reminder_message(
         to="a@example.test",
@@ -166,3 +182,20 @@ async def test_smtp_errors_become_mail_errors(monkeypatch: pytest.MonkeyPatch) -
                 organization="E",
             )
         )
+
+
+def test_match_message_names_a_request_deadline_as_such() -> None:
+    message = match_message(
+        to="anna@example.test",
+        recipient_name="Anna",
+        company_name="Fasadfirman",
+        notice_title="Fasadrenovering",
+        notice_url="http://anbudsklar.test/upphandlingar/4",
+        fit="passar",
+        summary="Upphandlingen verkar passa er.",
+        deadline_at=datetime(2026, 10, 30, 23, 59, tzinfo=STOCKHOLM),
+        organization="Sundsvalls kommun",
+        deadline_kind="request",
+    )
+    assert "Sista dag för anbudsansökan: 30 oktober 2026 kl. 23:59." in message.text
+    assert "Sista anbudsdag" not in message.text

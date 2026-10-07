@@ -19,13 +19,14 @@ import logging
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta, tzinfo
-from typing import Any
+from typing import Any, NamedTuple
 
 import httpx
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.config import Settings
+from anbudsklar.contracts import DeadlineKind
 from anbudsklar.ingest.common import IngestError, IngestStats
 from anbudsklar.ingest.http import ensure_ok, send
 from anbudsklar.ingest.notices import (
@@ -112,6 +113,13 @@ FIELDS: tuple[str, ...] = (
     "links",
 )
 
+# Where a notice's deadline is, in order of preference: tenders (BT-131), then requests to
+# participate (BT-1311).
+DEADLINE_FIELDS: tuple[tuple[DeadlineKind, str, str], ...] = (
+    ("tender", "deadline-receipt-tender-date-lot", "deadline-receipt-tender-time-lot"),
+    ("request", "deadline-receipt-request-date-lot", "deadline-receipt-request-time-lot"),
+)
+
 PROCEDURE_LABELS: dict[str, str] = {
     "open": "Öppet förfarande",
     "restricted": "Selektivt förfarande",
@@ -150,6 +158,13 @@ NUTS_LABELS: dict[str, str] = {
 }
 
 LANGUAGE_PREFERENCE = ("swe", "eng", "mul")
+
+
+class Deadline(NamedTuple):
+    """A notice's deadline and what it is the last day for."""
+
+    at: datetime
+    kind: DeadlineKind
 
 
 @dataclass(frozen=True)
@@ -243,12 +258,13 @@ def map_ted_notice(notice: Mapping[str, Any], *, now: datetime) -> TedRecord:
     publication_number = str(notice["publication-number"])
     kind = notice_kind(str(notice.get("notice-type", "")))
     deadline = parse_deadline(notice)
+    deadline_at = deadline.at if deadline else None
     values = NoticeValues(
         source=SOURCE,
         external_id=publication_number,
         title=_title(notice) or f"TED-annons {publication_number}",
         notice_type=kind,
-        status=_status(kind, deadline, now),
+        status=_status(kind, deadline_at, now),
         raw=dict(notice),
         description=_description(notice),
         buyer=", ".join(_texts(notice.get("buyer-name"))) or None,
@@ -256,7 +272,8 @@ def map_ted_notice(notice: Mapping[str, Any], *, now: datetime) -> TedRecord:
         cpv_codes=_cpv_codes(notice),
         procedure=_procedure(notice.get("procedure-type")),
         published_at=_publication_date(notice.get("publication-date")),
-        deadline_at=deadline,
+        deadline_at=deadline_at,
+        deadline_kind=deadline.kind if deadline else "tender",
         estimated_value_sek=_estimated_value_sek(notice),
         place=_place(notice.get("place-of-performance-subdiv-lot")),
         url=_notice_url(notice, publication_number),
@@ -288,8 +305,12 @@ def _status(kind: NoticeKind, deadline: datetime | None, now: datetime) -> Notic
     return status_from_deadline(deadline, now)
 
 
-def parse_deadline(notice: Mapping[str, Any]) -> datetime | None:
-    """The earliest tender deadline, or the request deadline for restricted procedures.
+def parse_deadline(notice: Mapping[str, Any]) -> Deadline | None:
+    """The earliest tender deadline, or else the earliest deadline for requests to participate.
+
+    A restricted procedure's notice gives only the last day for anbudsansökan (eForms
+    BT-1311, `cac:ParticipationRequestReceptionPeriod`): the tender deadline comes later, in
+    the invitation to the chosen candidates. The kind says which of the two the date is.
 
     TED writes most deadlines as midnight at the start of the day after the last day
     (e-Avrop shows that previous day as the deadline). We store midnight as 23:59:59 on
@@ -297,17 +318,14 @@ def parse_deadline(notice: Mapping[str, Any]) -> datetime | None:
     then matches e-Avrop. A date without a time means the end of that day.
     """
 
-    for date_field, time_field in (
-        ("deadline-receipt-tender-date-lot", "deadline-receipt-tender-time-lot"),
-        ("deadline-receipt-request-date-lot", "deadline-receipt-request-time-lot"),
-    ):
+    for kind, date_field, time_field in DEADLINE_FIELDS:
         dates: list[str] = list(notice.get(date_field) or [])
         times: list[str] = list(notice.get(time_field) or [])
         moments = [
             _combine(day, times[index] if index < len(times) else None) for index, day in enumerate(dates)
         ]
         if moments:
-            return min(moments)
+            return Deadline(min(moments), kind)
     return None
 
 

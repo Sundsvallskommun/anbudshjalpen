@@ -7,10 +7,13 @@ from anbudsklar.contracts.common import (
     model_output_schema,
 )
 from anbudsklar.contracts.inputs import (
+    DEADLINE_LABELS,
     CompanyProfile,
     CpvCandidate,
+    DeadlineKind,
     NoticeContext,
     PagedDocument,
+    deadline_kind,
 )
 from anbudsklar.contracts.tasks import (
     CONTRACT_VERSION,
@@ -36,6 +39,7 @@ from anbudsklar.contracts.tasks import (
 
 __all__ = [
     "CONTRACT_VERSION",
+    "DEADLINE_LABELS",
     "TASK_OUTPUTS",
     "Answer",
     "AttachmentCheck",
@@ -47,6 +51,7 @@ __all__ = [
     "CpvCandidate",
     "CpvSuggestion",
     "CpvSuggestions",
+    "DeadlineKind",
     "EvaluationCriterion",
     "KeyDate",
     "MatchAssessment",
@@ -61,5 +66,6 @@ __all__ = [
     "RulesAnswer",
     "Task",
     "TermExplanation",
+    "deadline_kind",
     "model_output_schema",
 ]

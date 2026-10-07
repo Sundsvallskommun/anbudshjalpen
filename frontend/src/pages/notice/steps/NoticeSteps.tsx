@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useReviewDraft } from "../../../api/queries";
 import type { ChecklistView, NoticeDetail, UserView } from "../../../api/types";
 import { DeadlineBlock } from "../../../components/ui/DeadlineBlock";
+import { noticeDeadlineLabel } from "../../../lib/labels";
 import { ArrowRightIcon } from "../../../components/ui/icons";
 import { NextStepCard } from "../../../components/ui/NextStepCard";
 import { StepNav, useStepNav, type StepMark, type StepValue } from "../../../components/ui/StepNav";
@@ -65,7 +66,11 @@ export function NoticeSteps({ notice, view, user }: { notice: NoticeDetail; view
   return (
     <StepNav
       marks={marks}
-      end={notice.deadline_at ? <DeadlineBlock deadline={notice.deadline_at} label="Sista anbudsdag" variant="inline" /> : undefined}
+      end={
+        notice.deadline_at ? (
+          <DeadlineBlock deadline={notice.deadline_at} label={noticeDeadlineLabel(notice)} variant="inline" />
+        ) : undefined
+      }
       panels={{
         checklista: () => <RequirementsStep notice={notice} view={view} user={user} />,
         fraga: () => <QuestionStep notice={notice} nextStep={<QuestionStepEnd />} />,

@@ -24,6 +24,7 @@ from zoneinfo import ZoneInfo
 
 from anbudsklar.ai.engine import QuestionTurn, RuleContext
 from anbudsklar.contracts import (
+    DEADLINE_LABELS,
     TASK_OUTPUTS,
     Checklist,
     CompanyProfile,
@@ -135,7 +136,10 @@ def _render_notice(notice: NoticeContext) -> str:
         _line("Köpare", notice.buyer),
         _line("Förfarande", notice.procedure),
         _line("CPV-koder", _cpv(notice.cpv_codes, notice.cpv_labels)),
-        _line("Sista anbudsdag", _local_time(notice.deadline_at) if notice.deadline_at else None),
+        _line(
+            DEADLINE_LABELS[notice.deadline_kind],
+            _local_time(notice.deadline_at) if notice.deadline_at else None,
+        ),
         _line("Länk till annonsen", notice.url),
         _line("Beskrivning", notice.description),
     ]

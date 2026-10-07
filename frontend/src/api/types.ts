@@ -206,6 +206,12 @@ export interface AppConfig {
  */
 export type NoticeSort = "deadline" | "published" | "relevance";
 
+/**
+ * What a notice's `deadline_at` is the last day for: "tender" (sista anbudsdag) or "request" (sista dag för
+ * anbudsansökan), which is all a restricted procedure's notice in TED gives; its tender deadline comes later.
+ */
+export type NoticeDeadlineKind = "tender" | "request";
+
 export interface NoticeSummary {
   id: Uuid;
   title: string;
@@ -220,6 +226,7 @@ export interface NoticeSummary {
   status: NoticeStatus;
   published_at: IsoDateTime | null;
   deadline_at: IsoDateTime | null;
+  deadline_kind: NoticeDeadlineKind;
   /**
    * Frågestopp from the published checklist, as the end of that day in Swedish time (like
    * AnswerView.question_deadline): a date, so show it as one. Null without a published checklist that names it.
@@ -355,7 +362,11 @@ export interface ReviewView {
   stored: false;
 }
 
-export type ReminderKind = "fragestopp" | "sista_anbudsdag" | "egen";
+/**
+ * "anbudsansokan" follows the notice's deadline when it is one for requests to participate (`deadline_kind`
+ * "request"); "sista_anbudsdag" then follows the published checklist only.
+ */
+export type ReminderKind = "fragestopp" | "sista_anbudsdag" | "anbudsansokan" | "egen";
 
 export interface ReminderRequest {
   kind: ReminderKind;
@@ -373,8 +384,9 @@ export interface ReminderView {
   due_at: IsoDateTime;
   /**
    * The deadline the reminder is about, as the backend follows it: for sista_anbudsdag the notice's own deadline with
-   * its time when it falls on that day, otherwise the end of the deadline's day in Swedish time (frågestopp is always
-   * a date: show it as one). Null for "egen" reminders and when the deadline is no longer known.
+   * its time when it falls on that day, for anbudsansokan the notice's own deadline, otherwise the end of the
+   * deadline's day in Swedish time (frågestopp is always a date: show it as one). Null for "egen" reminders and when
+   * the deadline is no longer known.
    */
   deadline_at: IsoDateTime | null;
   sent_at: IsoDateTime | null;
@@ -470,8 +482,9 @@ export interface ChecklistAdminItem {
   id: Uuid;
   notice_id: Uuid;
   notice_title: string;
-  /** The notice's sista anbudsdag. */
+  /** The notice's deadline, as NoticeSummary has it. */
   deadline_at: IsoDateTime | null;
+  deadline_kind: NoticeDeadlineKind;
   status: ChecklistStatus;
   engine: string;
   created_at: IsoDateTime;
@@ -519,6 +532,10 @@ export interface InterpretationView {
 export interface InsightItem {
   notice_id: Uuid;
   notice_title: string;
+  /**
+   * Sista anbudsdag, when the tender period ends: the notice's own deadline, or for a notice that only gives the last
+   * day for anbudsansökan the published checklist's; null when nobody knows it yet.
+   */
   deadline_at: IsoDateTime | null;
   question_count: number;
   not_in_document_count: number;

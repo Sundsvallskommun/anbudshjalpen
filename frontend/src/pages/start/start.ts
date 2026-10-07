@@ -1,6 +1,7 @@
 /** What Start shows first: the company's matches in order and the next deadline among them. */
 import type { Fit, IsoDateTime, MatchView, NoticeSummary } from "../../api/types";
 import { calendarDateOf, isPassed } from "../../lib/format";
+import { noticeDeadlineReminder } from "../../lib/labels";
 
 const FIT_ORDER: Record<Fit, number> = { passar: 0, passar_delvis: 1, passar_inte: 2 };
 
@@ -32,7 +33,7 @@ export function sortMatches<T extends Pick<MatchView, "fit" | "notice">>(matches
   );
 }
 
-export type DeadlineKind = "fragestopp" | "sista_anbudsdag";
+export type DeadlineKind = "fragestopp" | "sista_anbudsdag" | "anbudsansokan";
 
 /** One deadline of a matched notice. */
 export interface DeadlineEntry {
@@ -43,12 +44,15 @@ export interface DeadlineEntry {
   at: IsoDateTime;
 }
 
-/** The notice's deadlines that have not passed: sista dag för frågor, then sista anbudsdag. */
+/**
+ * The notice's deadlines that have not passed: sista dag för frågor, then the notice's own deadline (sista anbudsdag,
+ * or sista dag för anbudsansökan in a restricted procedure).
+ */
 export function deadlinesOf(match: Pick<MatchView, "notice" | "fit">, now: Date = new Date()): DeadlineEntry[] {
   const { notice, fit } = match;
   const entries: DeadlineEntry[] = [];
   if (notice.question_deadline) entries.push({ notice, fit, kind: "fragestopp", at: notice.question_deadline });
-  if (notice.deadline_at) entries.push({ notice, fit, kind: "sista_anbudsdag", at: notice.deadline_at });
+  if (notice.deadline_at) entries.push({ notice, fit, kind: noticeDeadlineReminder(notice), at: notice.deadline_at });
   return entries.filter((entry) => !isPassed(entry.at, now));
 }
 

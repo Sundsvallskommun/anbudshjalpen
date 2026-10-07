@@ -8,15 +8,9 @@ import { AccentCard } from "../../components/ui/AccentCard";
 import { DeadlineBlock } from "../../components/ui/DeadlineBlock";
 import { ReminderState } from "../../components/ui/ReminderState";
 import { calendarDateOf, formatClock, formatShortDate, relativeDays } from "../../lib/format";
-import { DATE_KIND } from "../../lib/labels";
+import { REMINDER_KIND, REMINDER_SUBJECT } from "../../lib/labels";
 import { useIsPhone } from "../../lib/usePhone";
 import type { DeadlineEntry, NextDeadlines } from "./start";
-
-/** The deadline as running text names it, for the reminder button ("Påminn mig före sista dag för frågor …"). */
-const SUBJECT: Record<DeadlineEntry["kind"], string> = {
-  fragestopp: "sista dag för frågor",
-  sista_anbudsdag: "sista anbudsdag",
-};
 
 function DeadlineReminder({ entry, isBlock = false }: { entry: DeadlineEntry; isBlock?: boolean }) {
   return (
@@ -24,7 +18,7 @@ function DeadlineReminder({ entry, isBlock = false }: { entry: DeadlineEntry; is
       noticeId={entry.notice.id}
       kind={entry.kind}
       deadline={calendarDateOf(entry.at)}
-      subject={SUBJECT[entry.kind]}
+      subject={REMINDER_SUBJECT[entry.kind]}
       appearance={isBlock ? "block" : "ghost"}
     />
   );
@@ -38,7 +32,7 @@ function ThenLine({ entry }: { entry: DeadlineEntry }) {
     <>
       <Divider />
       <HStack gap={2} vAlign="center" wrap="wrap">
-        <Text type="supporting">{`Därefter: ${DATE_KIND[entry.kind]} ${when} · ${relativeDays(entry.at)}`}</Text>
+        <Text type="supporting">{`Därefter: ${REMINDER_KIND[entry.kind]} ${when} · ${relativeDays(entry.at)}`}</Text>
         <DeadlineReminder entry={entry} />
       </HStack>
     </>
@@ -59,14 +53,14 @@ function DeadlineSubject({ entry }: { entry: DeadlineEntry }) {
   if (isPhone) {
     return (
       <VStack gap={0.5}>
-        <Text weight="semibold">{DATE_KIND[entry.kind]}</Text>
+        <Text weight="semibold">{REMINDER_KIND[entry.kind]}</Text>
         <Text>{link}</Text>
       </VStack>
     );
   }
   return (
     <Text>
-      <Text weight="semibold">{DATE_KIND[entry.kind]}</Text>
+      <Text weight="semibold">{REMINDER_KIND[entry.kind]}</Text>
       <Text color="secondary" aria-hidden="true">
         {" · "}
       </Text>

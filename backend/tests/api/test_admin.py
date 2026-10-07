@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.models import ChecklistRecord, JobRun, Reminder
 from anbudsklar.services import jobs
+from anbudsklar.services.dates import end_of_local_day
 from anbudsklar.services.jobs import JobContext
 from anbudsklar.services.reminders import planned_due_at
 
@@ -252,6 +253,30 @@ async def test_insights_hide_questions_until_the_deadline(
         "Får vi använda underleverantörer till byggställningar?",
     }
     assert "company" not in str(item)
+
+
+async def test_insights_of_a_restricted_procedure_wait_for_sista_anbudsdag(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    """Past the last day for anbudsansökan the tender period still runs, until the checklist's date."""
+
+    await client.post(
+        f"/api/notices/{demo.notice.id}/questions", json={"question": "Vilken försäkring krävs?"}
+    )
+    demo.notice.deadline_kind = "request"
+    demo.notice.deadline_at = datetime.now(UTC) - timedelta(hours=1)
+    await db_session.flush()
+
+    await login(client, "inkopare")
+    [item] = (await client.get("/api/admin/insights")).json()
+    assert item["visible"] is False
+    assert item["sample_questions"] == []
+    assert datetime.fromisoformat(item["deadline_at"]) == end_of_local_day(demo.deadline)
+
+    demo.checklist.status = "approved"  # no published checklist: nobody knows when tenders close
+    await db_session.flush()
+    [item] = (await client.get("/api/admin/insights")).json()
+    assert (item["visible"], item["deadline_at"]) == (False, None)
 
 
 @pytest.fixture

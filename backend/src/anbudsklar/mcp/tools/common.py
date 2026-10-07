@@ -134,6 +134,8 @@ NOTICE_STATUS_LABELS = {
     "closed": "avslutad",
     "awarded": "tilldelad",
 }
+# An open restricted procedure takes requests to participate, not tenders, until its deadline.
+OPEN_FOR_REQUESTS_LABEL = "öppen, går att lämna anbudsansökan"
 FICTITIOUS_NOTICE = "FIKTIV UPPHANDLING – endast för demonstration"
 
 

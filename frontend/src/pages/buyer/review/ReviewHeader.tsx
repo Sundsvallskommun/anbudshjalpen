@@ -13,7 +13,7 @@ import type { Checklist, ChecklistStatus, ChecklistView, DocumentInfo, NoticeDet
 import { DeadlineBlock } from "../../../components/ui/DeadlineBlock";
 import { formatClock, formatNumber, formatShortDate, plural } from "../../../lib/format";
 import { keyDateIndex } from "../../../lib/keyDates";
-import { engineLabel } from "../../../lib/labels";
+import { engineLabel, noticeDeadlineLabel } from "../../../lib/labels";
 import { useIsPhone } from "../../../lib/usePhone";
 import styles from "./ReviewHeader.module.css";
 import { WIDE_QUERY } from "./Workbench";
@@ -117,7 +117,7 @@ export function ReviewFacts({
   return (
     <Card>
       <MetadataList columns={isWide ? 5 : isPhone ? 2 : "multi"}>
-        <MetadataListItem label="Sista anbudsdag">
+        <MetadataListItem label={notice ? noticeDeadlineLabel(notice) : "Sista anbudsdag"}>
           {notice?.deadline_at ? (
             <DeadlineBlock deadline={notice.deadline_at} variant="compact" />
           ) : (

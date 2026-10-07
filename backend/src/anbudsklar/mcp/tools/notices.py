@@ -9,6 +9,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from anbudsklar.api.schemas import UpcomingProcurement
+from anbudsklar.contracts import DEADLINE_LABELS, deadline_kind
 from anbudsklar.mcp.context import ToolContext
 from anbudsklar.mcp.output import (
     MISSING,
@@ -25,6 +26,7 @@ from anbudsklar.mcp.reads import cpv_labels, has_published_checklist, list_docum
 from anbudsklar.mcp.tools.common import (
     FICTITIOUS_NOTICE,
     NOTICE_STATUS_LABELS,
+    OPEN_FOR_REQUESTS_LABEL,
     READ_ONLY,
     CpvKoder,
     Offset,
@@ -186,13 +188,25 @@ def _render_notice_list(notices: list[Notice], total: int, offset: int, budget: 
     return "\n".join(parts) + "\n"
 
 
+def _deadline_label(notice: Notice) -> str:
+    """Sista anbudsdag, or sista dag för anbudsansökan when that is all the notice gives."""
+
+    return DEADLINE_LABELS[deadline_kind(notice.deadline_kind)]
+
+
+def _status_label(notice: Notice) -> str:
+    if notice.status == "open" and deadline_kind(notice.deadline_kind) == "request":
+        return OPEN_FOR_REQUESTS_LABEL
+    return NOTICE_STATUS_LABELS.get(notice.status, notice.status)
+
+
 def _notice_line(notice: Notice) -> str:
     fields = [
         f"upphandling_id: {notice.id}",
         notice.title,
         f"köpare: {notice.buyer or MISSING}",
-        f"status: {NOTICE_STATUS_LABELS.get(notice.status, notice.status)}",
-        f"sista anbudsdag: {format_datetime(notice.deadline_at)}",
+        f"status: {_status_label(notice)}",
+        f"{_deadline_label(notice).lower()}: {format_datetime(notice.deadline_at)}",
         f"CPV: {', '.join(notice.cpv_codes) or MISSING}",
     ]
     if notice.url:
@@ -213,10 +227,10 @@ def _render_notice(
     if notice.reference_number:
         lines.append(f"Referensnummer: {notice.reference_number}")  # as the buyer and e-Avrop name it
     lines += [
-        f"Status: {NOTICE_STATUS_LABELS.get(notice.status, notice.status)}",
+        f"Status: {_status_label(notice)}",
         f"Förfarande: {notice.procedure or MISSING}",
         f"Publicerad: {format_datetime(notice.published_at)}",
-        f"Sista anbudsdag: {format_datetime(notice.deadline_at)}",
+        f"{_deadline_label(notice)}: {format_datetime(notice.deadline_at)}",
         f"Plats: {notice.place or MISSING}",
         f"Uppskattat värde: {format_sek(notice.estimated_value_sek)}",
         f"CPV: {cpv}",

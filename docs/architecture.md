@@ -151,7 +151,8 @@ publicerade.
 - Anbudsutkast sparas inte. Utkastet hanteras i minnet, skickas till motorn och slängs efter granskningen.
 - Frågor om ett underlag sparas för inköparens sammanställning, som aldrig visar vilket företag som frågade. Exempel på
   frågor visas först efter sista anbudsdag. Frågor som ställs efter sista anbudsdag sparas inte, och inte heller
-  inköparens egna provfrågor.
+  inköparens egna provfrågor. I ett selektivt förfarande pågår anbudstiden efter sista dag för anbudsansökan, så där
+  gäller den publicerade checklistans sista anbudsdag, och utan den visas inga frågor.
 - Anbudsklars assistenter ligger i ett eget space i Eneo, med Insights avstängt och lagringstiden en dag. Appen
   använder en `sk_`-nyckel som ägs av ett servicekonto och bara gäller det spacet, och raderar varje session efter
   anropet.

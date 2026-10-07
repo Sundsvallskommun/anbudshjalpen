@@ -33,13 +33,13 @@ from anbudsklar.api.schemas import (
     InterpretationView,
     VerificationSummary,
 )
-from anbudsklar.contracts import CONTRACT_VERSION, Checklist
+from anbudsklar.contracts import CONTRACT_VERSION, Checklist, deadline_kind
 from anbudsklar.documents.citations import verify_checklist
 from anbudsklar.documents.store import load_paged_document
 from anbudsklar.models import ChecklistRecord, Document, Notice
 from anbudsklar.services.access import Viewer
 from anbudsklar.services.contexts import notice_context
-from anbudsklar.services.dates import utcnow
+from anbudsklar.services.dates import end_of_local_day, utcnow
 from anbudsklar.services.errors import ConflictError, InvalidInputError, NotFoundError
 
 logger = logging.getLogger(__name__)
@@ -85,6 +85,20 @@ def key_date(checklist: Checklist, kind: str) -> date | None:
     """First dated entry of a kind (fragestopp, sista_anbudsdag, ...)."""
 
     return next((item.date for item in checklist.dates if item.kind == kind and item.date), None)
+
+
+def tender_deadline(notice: Notice, checklist: Checklist | None) -> datetime | None:
+    """When the tender period ends, or None while nobody knows.
+
+    Usually the notice's deadline. A restricted procedure's notice only gives the last day
+    for anbudsansökan; its tender deadline comes later, so only a checklist that names
+    sista anbudsdag tells it, as the end of that day.
+    """
+
+    if deadline_kind(notice.deadline_kind) == "tender":
+        return notice.deadline_at
+    day = key_date(checklist, "sista_anbudsdag") if checklist else None
+    return end_of_local_day(day) if day else None
 
 
 async def published_checklist(session: AsyncSession, notice_id: uuid.UUID) -> ChecklistRecord | None:
@@ -335,7 +349,7 @@ async def list_admin_checklists(
 ) -> list[ChecklistAdminItem]:
     """The review queue: the soonest tender deadline first, then the newest interpretation."""
 
-    query = select(ChecklistRecord, Notice.title, Notice.deadline_at).join(
+    query = select(ChecklistRecord, Notice.title, Notice.deadline_at, Notice.deadline_kind).join(
         Notice, Notice.id == ChecklistRecord.notice_id
     )
     if status is not None:
@@ -351,13 +365,14 @@ async def list_admin_checklists(
             notice_id=record.notice_id,
             notice_title=title,
             deadline_at=deadline_at,
+            deadline_kind=deadline_kind(kind),
             status=_status(record.status),
             engine=record.engine,
             created_at=record.created_at,
             verification=VerificationSummary.model_validate(record.verification or {}),
             requirement_count=len(record.payload.get("requirements", [])),
         )
-        for record, title, deadline_at in rows
+        for record, title, deadline_at, kind in rows
     ]
 
 

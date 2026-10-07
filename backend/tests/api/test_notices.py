@@ -262,6 +262,25 @@ async def test_questions_after_the_deadline_are_answered_but_not_logged(
     assert (await db_session.scalars(select(QuestionLog))).all() == []
 
 
+async def test_a_restricted_procedure_says_its_deadline_is_for_anbudsansokan(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    """The tender period runs on past that day, so questions asked then are still logged."""
+
+    url = f"/api/notices/{demo.notice.id}"
+    assert (await client.get(url)).json()["deadline_kind"] == "tender"
+    demo.notice.deadline_kind = "request"
+    demo.notice.deadline_at = datetime.now(UTC) - timedelta(hours=1)
+    await db_session.flush()
+
+    detail = (await client.get(url)).json()
+    listed = (await client.get("/api/notices")).json()["items"]
+    assert detail["deadline_kind"] == "request"
+    assert [item["deadline_kind"] for item in listed if item["id"] == str(demo.notice.id)] == ["request"]
+    await client.post(f"{url}/questions", json={"question": "Vilken ansvarsförsäkring krävs?"})
+    assert len((await db_session.scalars(select(QuestionLog))).all()) == 1
+
+
 async def test_long_conversations_are_accepted(client: httpx.AsyncClient, demo: Demo) -> None:
     """The app sends up to ten earlier turns; the backend keeps the latest that fit."""
 

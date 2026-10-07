@@ -17,7 +17,7 @@ import { ErrorNotice, Loading } from "../../components/states";
 import { ChecklistStatusToken } from "../../components/tokens";
 import { DeadlineBlock } from "../../components/ui/DeadlineBlock";
 import { formatClock, formatNumber, formatShortDate, plural } from "../../lib/format";
-import { engineLabel } from "../../lib/labels";
+import { engineLabel, noticeDeadlineLabel, noticeDeadlineNote } from "../../lib/labels";
 
 import { Interpretations } from "./Interpretations";
 import { itemsInView, needsHandling, QUEUE_VIEWS, sourceCounts, supersededIds, type QueueView } from "./queue";
@@ -95,7 +95,7 @@ const COLUMNS: TableColumn<QueueRow>[] = [
     width: pixel(152),
     renderCell: ({ item }) =>
       item.deadline_at ? (
-        <DeadlineBlock deadline={item.deadline_at} variant="compact" />
+        <DeadlineBlock deadline={item.deadline_at} variant="compact" note={noticeDeadlineNote(item.deadline_kind)} />
       ) : (
         <Text color="secondary">Anges inte</Text>
       ),
@@ -135,7 +135,7 @@ function NarrowSummary({ item, isSuperseded }: QueueRow) {
       <Link href={`/inkop/checklistor/${item.id}`}>{item.notice_title}</Link>
       <Status item={item} isSuperseded={isSuperseded} />
       {item.deadline_at ? (
-        <DeadlineBlock deadline={item.deadline_at} variant="inline" label="Sista anbudsdag" />
+        <DeadlineBlock deadline={item.deadline_at} variant="inline" label={noticeDeadlineLabel(item)} />
       ) : (
         <Text type="supporting">Sista anbudsdag anges inte</Text>
       )}

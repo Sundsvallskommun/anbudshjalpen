@@ -52,6 +52,21 @@ describe("key dates", () => {
     expect(questionDeadlineDate({ question_deadline: "2026-10-16T23:59:59+02:00" })).toBe("2026-10-16");
     expect(questionDeadlineDate({ question_deadline: null })).toBeNull();
   });
+
+  it("keeps a restricted procedure's last day for anbudsansökan apart from sista anbudsdag", () => {
+    const request = { deadline_at: "2026-10-30T22:59:59Z", deadline_kind: "request" as const };
+    const withoutDate = withDates([dated("fragestopp", "2026-10-20")], checklistView, request);
+    expect(reminderDeadline(withoutDate, "anbudsansokan")).toBe("2026-10-30");
+    expect(reminderDeadline(withoutDate, "sista_anbudsdag")).toBeNull();
+    expect(tenderDeadlineDate(withoutDate)).toBeNull();
+
+    const withDate = withDates([dated("sista_anbudsdag", "2026-12-01")], checklistView, request);
+    expect(reminderDeadline(withDate, "sista_anbudsdag")).toBe("2026-12-01");
+    expect(reminderDeadline(withDate, "anbudsansokan")).toBe("2026-10-30");
+    expect(tenderDeadlineDate(withDate)).toBe("2026-12-01");
+    // A notice whose deadline is for tenders has no anbudsansökan to remind about.
+    expect(reminderDeadline(noticeDetail, "anbudsansokan")).toBeNull();
+  });
 });
 
 describe("documents", () => {

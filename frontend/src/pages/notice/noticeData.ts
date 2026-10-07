@@ -5,7 +5,7 @@
 import type { ChecklistView, DateKind, IsoDate, NoticeDetail, ReminderKind } from "../../api/types";
 import { calendarDateOf, swedishDate } from "../../lib/format";
 import { keyDateIndex } from "../../lib/keyDates";
-import { sourceLabel } from "../../lib/labels";
+import { noticeDeadlineReminder, sourceLabel } from "../../lib/labels";
 import { splitTitleAndBody } from "../../lib/text";
 
 export { primaryDocumentId } from "../../components/ui/source/sourceTarget";
@@ -25,20 +25,23 @@ export function checklistDate(notice: NoticeDetail, kind: DateKind): IsoDate | n
 }
 
 /**
- * The date a reminder of this kind is for, by the backend's rule (services/reminders.deadline_for): the
- * published checklist's key date, and for sista anbudsdag the notice's own deadline when the checklist has
- * none. Null when the backend would refuse the reminder.
+ * The date a reminder of this kind is for, by the backend's rule (services/reminders.reminder_deadline): the
+ * published checklist's key date, and the notice's own deadline for the reminder that follows it (sista anbudsdag, or
+ * anbudsansökan in a restricted procedure, which no checklist names). Null when the backend would refuse the reminder.
  */
 export function reminderDeadline(notice: NoticeDetail, kind: DeadlineKind): IsoDate | null {
+  const own = kind === noticeDeadlineReminder(notice) && notice.deadline_at ? swedishDate(notice.deadline_at) : null;
+  if (kind === "anbudsansokan") return own;
   const fromChecklist = publishedChecklist(notice) ? checklistDate(notice, kind) : null;
-  if (fromChecklist) return fromChecklist;
-  if (kind === "sista_anbudsdag" && notice.deadline_at) return swedishDate(notice.deadline_at);
-  return null;
+  return fromChecklist ?? own;
 }
 
-/** The calendar date of sista anbudsdag, where the key dates split into before and after the tender. */
+/**
+ * The calendar date of sista anbudsdag, where the key dates split into before and after the tender. A restricted
+ * procedure's notice only gives the last day for anbudsansökan, so its sista anbudsdag comes from the checklist.
+ */
 export function tenderDeadlineDate(notice: NoticeDetail): IsoDate | null {
-  if (notice.deadline_at) return swedishDate(notice.deadline_at);
+  if (notice.deadline_at && notice.deadline_kind !== "request") return swedishDate(notice.deadline_at);
   return checklistDate(notice, "sista_anbudsdag");
 }
 

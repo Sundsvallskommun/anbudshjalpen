@@ -4,7 +4,7 @@
  * headings, sources to look at, and a summary still in the engine's words. Each check says what it found and what the
  * buyer can do; the same findings flag the rows ("Flaggade"). Pure functions, tested without rendering.
  */
-import type { Checklist, DateKind, RequirementKind } from "../../../api/types";
+import type { Checklist, DateKind, NoticeDeadlineKind, RequirementKind } from "../../../api/types";
 import { calendarDateOf, formatLongDate, formatNumber } from "../../../lib/format";
 import { keyDateIndex } from "../../../lib/keyDates";
 import { REQUIREMENT_KINDS } from "../../../lib/labels";
@@ -31,8 +31,10 @@ export interface AutoCheck {
 export interface CheckContext {
   checklist: Checklist;
   rows: readonly ReviewRow[];
-  /** The notice's sista anbudsdag. */
+  /** The notice's deadline: sista anbudsdag, or in a restricted procedure the last day for anbudsansökan. */
   noticeDeadline: string | null;
+  /** What `noticeDeadline` is (NoticeSummary.deadline_kind); sista anbudsdag when left out. */
+  noticeDeadlineKind?: NoticeDeadlineKind;
   /** The section heading each requirement stands under, by requirement id, as far as the pages are known. */
   headings: ReadonlyMap<string, string>;
   /** The document's heading about evaluation, when the pages read so far have one. */
@@ -97,6 +99,7 @@ function deadlineDisagreement(context: CheckContext): { notice: string; checklis
 function deadlineCheck(context: CheckContext): AutoCheck | null {
   const dates = deadlineDisagreement(context);
   if (!dates) return null;
+  if (context.noticeDeadlineKind === "request") return requestDeadlineCheck(context, dates);
   const notice = formatLongDate(dates.notice);
   if (!dates.checklist) {
     return {
@@ -119,6 +122,37 @@ function deadlineCheck(context: CheckContext): AutoCheck | null {
     };
   }
   return { id: "deadline", tone: "ok", text: `Sista anbudsdag i checklistan stämmer med annonsen: ${notice}.` };
+}
+
+/**
+ * A restricted procedure's notice gives only the last day for anbudsansökan, so sista anbudsdag can only come from the
+ * document. The check says so, and flags a checklist whose sista anbudsdag is that same day, which is likely the
+ * request deadline read as the tender deadline.
+ */
+function requestDeadlineCheck(context: CheckContext, dates: { notice: string; checklist: string | null }): AutoCheck {
+  const notice = formatLongDate(dates.notice);
+  const request = `Annonsen anger bara sista dag för anbudsansökan, ${notice}.`;
+  if (!dates.checklist) {
+    return {
+      id: "deadline",
+      tone: "warning",
+      text: `Checklistan saknar sista anbudsdag. ${request} Ta sista anbudsdag från underlaget, om det anger den.`,
+    };
+  }
+  if (dates.checklist === dates.notice) {
+    const row = deadlineRow(context)!;
+    return {
+      id: "deadline",
+      tone: "warning",
+      text: `Sista anbudsdag i checklistan är samma dag som sista dag för anbudsansökan i annonsen, ${notice}. Kontrollera att det är dagen för anbuden.`,
+      action: { label: "Ändra", target: { kind: "edit", key: row.key } },
+    };
+  }
+  return {
+    id: "deadline",
+    tone: "ok",
+    text: `${request} Sista anbudsdag i checklistan, ${formatLongDate(dates.checklist)}, kommer från underlaget.`,
+  };
 }
 
 /** A heading kept on one line with its number in a sentence ("4 Utvärdering"), as a page is with its number. */

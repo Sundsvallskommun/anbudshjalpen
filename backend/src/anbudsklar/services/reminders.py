@@ -1,6 +1,6 @@
 """Deadline reminders: created by a user, sent by the worker as e-mail.
 
-A reminder for frågestopp or sista anbudsdag follows its deadline: when a newly
+A reminder for frågestopp, sista anbudsdag or anbudsansökan follows its deadline: when a newly
 published or withdrawn checklist (or a corrected notice) moves the date, the send time
 moves with it, both when the checklist changes and again just before sending. The send
 time (`due_at`) and the deadline itself (`ReminderView.deadline_at`) are two different
@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.api.schemas import ReminderRequest, ReminderView
 from anbudsklar.config import Settings
-from anbudsklar.contracts import Checklist
+from anbudsklar.contracts import Checklist, deadline_kind
 from anbudsklar.models import ChecklistRecord, Notice, Reminder, User
 from anbudsklar.services.checklists import (
     checklist_payload,
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 REMINDER_LEAD = timedelta(days=2)
 REMINDER_TIME = time(8, 0)
 SEND_BATCH_SIZE = 100
-DERIVED_KINDS = ("fragestopp", "sista_anbudsdag")
+DERIVED_KINDS = ("fragestopp", "sista_anbudsdag", "anbudsansokan")
 
 
 def planned_due_at(deadline: date) -> datetime:
@@ -59,12 +59,18 @@ def reminder_deadline(notice: Notice, kind: str, checklist: Checklist | None) ->
     notice's own deadline backs up sista anbudsdag, and gives it its time of day when it
     falls on the same day. A date without a time of day lasts until that day ends in
     Stockholm, since it names the last day on which something may be done.
+
+    When the notice's deadline is the last day for anbudsansökan, only an "anbudsansokan"
+    reminder follows it, and sista anbudsdag is known from the checklist alone.
     """
 
     if kind not in DERIVED_KINDS:
         return None
+    own_kind = "sista_anbudsdag" if deadline_kind(notice.deadline_kind) == "tender" else "anbudsansokan"
+    own = notice.deadline_at if kind == own_kind else None
+    if kind == "anbudsansokan":
+        return own  # no checklist names it
     day = key_date(checklist, kind) if checklist else None
-    own = notice.deadline_at if kind == "sista_anbudsdag" else None
     if day is None:
         return own
     if own is not None and local_date(own) == day:
@@ -210,7 +216,7 @@ async def send_due_reminders(
 
 
 async def reschedule_for_notice(session: AsyncSession, notice_id: uuid.UUID, now: datetime) -> int:
-    """Move unsent frågestopp and sista anbudsdag reminders to follow the current deadlines.
+    """Move unsent frågestopp, sista anbudsdag and anbudsansökan reminders to follow the current deadlines.
 
     Called when a checklist is published or withdrawn. A reminder whose deadline is no
     longer known keeps its time; the mail then names no date.
@@ -250,9 +256,8 @@ def _due_at(request: ReminderRequest, deadline_at: datetime | None, now: datetim
 
     label = REMINDER_LABELS[request.kind]
     if deadline_at is None:
-        raise InvalidInputError(
-            f"{label} finns inte i den publicerade checklistan. Skapa en egen påminnelse i stället."
-        )
+        where = "annonsen" if request.kind == "anbudsansokan" else "den publicerade checklistan"
+        raise InvalidInputError(f"{label} finns inte i {where}. Skapa en egen påminnelse i stället.")
     if deadline_at <= now:
         raise InvalidInputError(f"{label} har redan passerat.")
     return derived_due_at(local_date(deadline_at), now)

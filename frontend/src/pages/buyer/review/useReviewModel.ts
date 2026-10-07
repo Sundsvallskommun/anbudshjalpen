@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Checklist } from "../../../api/types";
+import type { Checklist, NoticeDeadlineKind } from "../../../api/types";
 import { autoChecks, kindMismatches, needsCheck, rowHints, type AutoCheck } from "./checks";
 import type { RowState } from "./ReviewList";
 import { checklistRows, type ReviewRow } from "./rows";
@@ -20,6 +20,7 @@ export interface ReviewModel {
 export function useReviewModel({
   checklist,
   noticeDeadline,
+  noticeDeadlineKind,
   headings,
   evaluationSection,
   changed,
@@ -27,6 +28,7 @@ export function useReviewModel({
 }: {
   checklist: Checklist;
   noticeDeadline: string | null;
+  noticeDeadlineKind: NoticeDeadlineKind;
   headings: ReadonlyMap<string, string>;
   evaluationSection: DocumentHeading | null;
   changed: ReadonlySet<string>;
@@ -34,8 +36,8 @@ export function useReviewModel({
 }): ReviewModel {
   const rows = useMemo(() => checklistRows(checklist), [checklist]);
   const context = useMemo(
-    () => ({ checklist, rows, noticeDeadline, headings, evaluationSection }),
-    [checklist, rows, noticeDeadline, headings, evaluationSection],
+    () => ({ checklist, rows, noticeDeadline, noticeDeadlineKind, headings, evaluationSection }),
+    [checklist, rows, noticeDeadline, noticeDeadlineKind, headings, evaluationSection],
   );
   const checks = useMemo(() => autoChecks(context), [context]);
   const states = useMemo(() => {

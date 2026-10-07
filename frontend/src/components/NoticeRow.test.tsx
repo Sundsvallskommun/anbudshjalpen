@@ -98,6 +98,13 @@ describe("NoticeRow", () => {
     expect(within(row).queryByText("Passar delvis")).not.toBeInTheDocument();
   });
 
+  it("says above the date when it is the last day for anbudsansökan", () => {
+    const row = renderRow({ ...noticeSummary, deadline_kind: "request" });
+    expect(within(row).getByText("Anbudsansökan")).toBeInTheDocument();
+    expect(within(row).getByText("Sista dag för anbudsansökan")).toBeInTheDocument();
+    expect(within(row).queryByText("Sista anbudsdag")).not.toBeInTheDocument();
+  });
+
   it("leaves the status out when asked to", () => {
     const row = renderRow({ ...noticeSummary, status: "planned" }, false);
     expect(within(row).queryByText("Planerad")).not.toBeInTheDocument();

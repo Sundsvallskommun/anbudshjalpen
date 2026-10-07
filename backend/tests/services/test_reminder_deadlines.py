@@ -18,10 +18,17 @@ from api.factories import demo_checklist, seed_demo
 QUESTIONS = date(2026, 10, 30)
 TENDERS = date(2026, 11, 9)
 NOTICE_DEADLINE = datetime(2026, 11, 9, 12, 0, tzinfo=STOCKHOLM)
+REQUESTS = datetime(2026, 10, 20, 23, 59, 59, tzinfo=STOCKHOLM)
 
 
-def _notice(deadline_at: datetime | None = NOTICE_DEADLINE) -> Notice:
-    return Notice(title="Ommålning (fiktiv)", deadline_at=deadline_at)
+def _notice(deadline_at: datetime | None = NOTICE_DEADLINE, deadline_kind: str = "tender") -> Notice:
+    return Notice(title="Ommålning (fiktiv)", deadline_at=deadline_at, deadline_kind=deadline_kind)
+
+
+def _restricted() -> Notice:
+    """A restricted procedure: the notice's deadline is the last day for anbudsansökan."""
+
+    return _notice(REQUESTS, "request")
 
 
 def _checklist(tenders: date = TENDERS) -> Checklist:
@@ -44,6 +51,12 @@ def _checklist(tenders: date = TENDERS) -> Checklist:
         ("sista_anbudsdag", _notice(None), _checklist(), end_of_local_day(TENDERS)),
         ("sista_anbudsdag", _notice(None), None, None),
         ("egen", _notice(), _checklist(), None),
+        ("anbudsansokan", _notice(), _checklist(), None),  # the notice's deadline is for tenders
+        # A restricted procedure: anbudsansökan follows the notice, sista anbudsdag the checklist alone.
+        ("anbudsansokan", _restricted(), None, REQUESTS),
+        ("anbudsansokan", _restricted(), _checklist(), REQUESTS),
+        ("sista_anbudsdag", _restricted(), None, None),
+        ("sista_anbudsdag", _restricted(), _checklist(), end_of_local_day(TENDERS)),
     ],
 )
 def test_reminder_deadline(
@@ -66,3 +79,30 @@ async def test_no_reminder_for_a_deadline_that_passed_earlier_today(db_session: 
     reminder = await create_reminder(db_session, demo.company_user.id, demo.notice.id, request, eleven)
     assert reminder.due_at == eleven  # too late for two days ahead: it goes now
     assert reminder.deadline_at == demo.notice.deadline_at
+
+
+async def test_a_restricted_procedure_reminds_about_anbudsansokan(db_session: AsyncSession) -> None:
+    demo = await seed_demo(db_session)
+    demo.notice.deadline_kind = "request"
+    await db_session.flush()
+    now = demo.notice.deadline_at - timedelta(days=10) if demo.notice.deadline_at else None
+    assert now is not None
+
+    reminder = await create_reminder(
+        db_session, demo.company_user.id, demo.notice.id, ReminderRequest(kind="anbudsansokan"), now
+    )
+
+    assert reminder.kind == "anbudsansokan"
+    assert reminder.deadline_at == demo.notice.deadline_at
+
+
+async def test_no_anbudsansokan_reminder_for_a_tender_deadline(db_session: AsyncSession) -> None:
+    demo = await seed_demo(db_session)
+    with pytest.raises(InvalidInputError, match="Sista dag för anbudsansökan finns inte i annonsen"):
+        await create_reminder(
+            db_session,
+            demo.company_user.id,
+            demo.notice.id,
+            ReminderRequest(kind="anbudsansokan"),
+            datetime.now(STOCKHOLM),
+        )

@@ -26,6 +26,11 @@ export interface DeadlineBlockProps {
   label?: string;
   isLabelHidden?: boolean;
   /**
+   * A word shown above the date where the label is not, e.g. "Anbudsansökan" on a list row whose date is not sista
+   * anbudsdag. Screen readers hear the label instead, so the note is hidden from them.
+   */
+  note?: string | null;
+  /**
    * inline: "9 nov kl. 23:59 · om 35 dagar" on one line, for sentences and the sticky step bar.
    * stack: the date large (23 px) with "kl. 23:59 · om 35 dagar" below, for key figures and cards.
    * compact: the date (19 px) with the relative time below, for list rows and rails.
@@ -89,6 +94,7 @@ export function DeadlineBlock({
   deadline,
   label,
   isLabelHidden = false,
+  note = null,
   variant = "stack",
   year = "auto",
   align = "start",
@@ -99,11 +105,17 @@ export function DeadlineBlock({
   const date = formatShortDate(deadline, year, now);
   const spoken = `${formatLongDate(deadline, year === "never" ? "never" : "always", now)}${clock ? ` ${clock}` : ""}`;
   const isLabelVisible = Boolean(label) && !isLabelHidden && variant !== "compact";
+  const shownNote = note && !isLabelVisible ? note : null;
 
   if (variant === "inline") {
     return (
       <HStack gap={1} vAlign="center" wrap="wrap">
         {label && (isLabelVisible ? <Text>{label}</Text> : <VisuallyHidden>{label}</VisuallyHidden>)}
+        {shownNote && (
+          <Text type="supporting" aria-hidden="true">
+            {shownNote}
+          </Text>
+        )}
         <DateText shown={clock ? `${date} ${clock}` : date} spoken={spoken} isPassedDate={passed} />
         <Text type="supporting" aria-hidden="true">
           ·
@@ -117,6 +129,11 @@ export function DeadlineBlock({
   return (
     <VStack gap={0.5} hAlign={hAlign}>
       {label && (isLabelVisible ? <Text type="supporting">{label}</Text> : <VisuallyHidden>{label}</VisuallyHidden>)}
+      {shownNote && (
+        <Text type="supporting" aria-hidden="true">
+          {shownNote}
+        </Text>
+      )}
       <DateText shown={date} spoken={spoken} size={variant === "stack" ? "xl" : "lg"} isPassedDate={passed} />
       <HStack gap={1} vAlign="center" wrap="wrap" hAlign={hAlign}>
         {variant === "stack" && clock && (

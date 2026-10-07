@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from anbudsklar.contracts import DeadlineKind
 from anbudsklar.ingest.common import Outcome, assign_changed
 from anbudsklar.models import Notice
 
@@ -37,6 +38,7 @@ class NoticeValues:
     procedure: str | None = None
     published_at: datetime | None = None
     deadline_at: datetime | None = None
+    deadline_kind: DeadlineKind = "tender"
     estimated_value_sek: int | None = None
     place: str | None = None
     url: str | None = None

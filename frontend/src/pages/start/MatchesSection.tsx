@@ -14,6 +14,7 @@ import { NoticeRow } from "../../components/NoticeRow";
 import { RowList } from "../../components/RowList";
 import { ErrorNotice, Loading } from "../../components/states";
 import { relativeDays } from "../../lib/format";
+import { noticeDeadlineReminder, REMINDER_SUBJECT } from "../../lib/labels";
 import { useIsPhone } from "../../lib/usePhone";
 import { HeadingCount } from "./CardHeading";
 import { ForwardLink } from "./ForwardLink";
@@ -22,14 +23,13 @@ import type { MatchDismissal } from "./useMatchDismissal";
 
 const HEADING_ID = "nya-traffar";
 
-/** "Bedömda mot er profil. Närmaste sista anbudsdag är om 25 dagar." */
+/** "Bedömda mot er profil. Närmaste sista anbudsdag är om 25 dagar." (or sista dag för anbudsansökan, if that is nearer) */
 function lead(fitting: readonly MatchView[]): string {
   const nearest = fitting
-    .map((match) => match.notice.deadline_at)
-    .filter((deadline): deadline is string => deadline !== null)
-    .sort()[0];
+    .flatMap(({ notice }) => (notice.deadline_at ? [{ notice, at: notice.deadline_at }] : []))
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))[0];
   return nearest
-    ? `Bedömda mot er profil. Närmaste sista anbudsdag är ${relativeDays(nearest)}.`
+    ? `Bedömda mot er profil. Närmaste ${REMINDER_SUBJECT[noticeDeadlineReminder(nearest.notice)]} är ${relativeDays(nearest.at)}.`
     : "Bedömda mot er profil.";
 }
 

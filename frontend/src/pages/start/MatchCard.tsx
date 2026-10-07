@@ -17,7 +17,7 @@ import { AiProvenance } from "../../components/ui/AiProvenance";
 import { DeadlineBlock } from "../../components/ui/DeadlineBlock";
 import { ArrowRightIcon } from "../../components/ui/icons";
 import { SourceLink } from "../../components/ui/source/SourceLink";
-import { REASON_KIND } from "../../lib/labels";
+import { noticeDeadlineLabel, REASON_KIND } from "../../lib/labels";
 import { useIsPhone } from "../../lib/usePhone";
 import { withoutEngineLead } from "./start";
 
@@ -153,13 +153,13 @@ function Title({ match, id, titleRef }: { match: MatchView; id: string; titleRef
  * "Sista anbudsdag 9 nov kl. 23:59 · om 35 dagar" on one line of a phone's card: the words are supporting text, so the
  * date stays the line's weight and the line fits 390 px. Screen readers hear the block's own label once.
  */
-function PhoneDeadline({ deadline }: { deadline: string }) {
+function PhoneDeadline({ deadline, label }: { deadline: string; label: string }) {
   return (
     <HStack gap={2} vAlign="center" wrap="wrap">
       <Text type="supporting" aria-hidden="true">
-        Sista anbudsdag
+        {label}
       </Text>
-      <DeadlineBlock deadline={deadline} label="Sista anbudsdag" isLabelHidden variant="inline" />
+      <DeadlineBlock deadline={deadline} label={label} isLabelHidden variant="inline" />
     </HStack>
   );
 }
@@ -194,7 +194,7 @@ function Header({
           {tokens}
           {about}
         </VStack>
-        {notice.deadline_at && <PhoneDeadline deadline={notice.deadline_at} />}
+        {notice.deadline_at && <PhoneDeadline deadline={notice.deadline_at} label={noticeDeadlineLabel(notice)} />}
       </VStack>
     );
   }
@@ -208,7 +208,7 @@ function Header({
       </StackItem>
       {notice.deadline_at && (
         <RowEnd>
-          <DeadlineBlock deadline={notice.deadline_at} label="Sista anbudsdag" align="end" />
+          <DeadlineBlock deadline={notice.deadline_at} label={noticeDeadlineLabel(notice)} align="end" />
         </RowEnd>
       )}
     </HStack>

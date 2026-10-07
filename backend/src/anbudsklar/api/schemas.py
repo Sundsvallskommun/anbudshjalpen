@@ -18,6 +18,7 @@ from anbudsklar.contracts import (
     Answer,
     Checklist,
     CpvSuggestions,
+    DeadlineKind,
     MatchAssessment,
     ReviewResult,
     RulesAnswer,
@@ -97,6 +98,9 @@ class NoticeSummary(ApiModel):
     status: NoticeStatus
     published_at: datetime | None
     deadline_at: datetime | None
+    # What `deadline_at` is the last day for: "tender" (sista anbudsdag) or "request" (sista
+    # dag för anbudsansökan, all a restricted procedure's notice in TED gives).
+    deadline_kind: DeadlineKind = "tender"
     # Frågestopp from the published checklist, as the end of that day in Stockholm (like
     # AnswerView.question_deadline): the last day for questions, so show it as a date.
     question_deadline: datetime | None = None
@@ -227,7 +231,9 @@ class ReviewView(ApiModel):
     stored: Literal[False] = False  # the draft is never stored
 
 
-ReminderKind = Literal["fragestopp", "sista_anbudsdag", "egen"]
+# "anbudsansokan" follows the notice's deadline when it is one for requests to participate
+# (`NoticeSummary.deadline_kind` "request"); "sista_anbudsdag" then follows the checklist only.
+ReminderKind = Literal["fragestopp", "sista_anbudsdag", "anbudsansokan", "egen"]
 
 
 class ReminderRequest(ApiModel):
@@ -245,7 +251,8 @@ class ReminderView(ApiModel):
     due_at: datetime  # when the e-mail is sent, which is not the deadline
     # The deadline the reminder is about, so the UI never works it out: for sista anbudsdag
     # the notice's own deadline (with its time) when it falls on the day the reminder follows,
-    # otherwise the end of that day in Stockholm (frågestopp is a date: show it as one).
+    # for anbudsansökan the notice's own deadline, otherwise the end of that day in Stockholm
+    # (frågestopp is a date: show it as one).
     # None for "egen" reminders and when the deadline is no longer known.
     deadline_at: datetime | None = None
     sent_at: datetime | None
@@ -343,7 +350,8 @@ class ChecklistAdminItem(ApiModel):
     id: uuid.UUID
     notice_id: uuid.UUID
     notice_title: str
-    deadline_at: datetime | None  # the notice's sista anbudsdag; the queue is sorted on it
+    deadline_at: datetime | None  # the notice's deadline; the queue is sorted on it
+    deadline_kind: DeadlineKind = "tender"  # as NoticeSummary.deadline_kind
     status: ChecklistStatus
     engine: str
     created_at: datetime
@@ -400,6 +408,8 @@ class InterpretationView(ApiModel):
 class InsightItem(ApiModel):
     notice_id: uuid.UUID
     notice_title: str
+    # Sista anbudsdag, when the tender period ends: the notice's own deadline, or for a notice
+    # that only gives the last day for anbudsansökan the published checklist's; else None.
     deadline_at: datetime | None
     question_count: int
     not_in_document_count: int

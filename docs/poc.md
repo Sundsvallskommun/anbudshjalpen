@@ -30,7 +30,8 @@ loggar man in som Anna Berg på firman ([beslut 0007](decisions/0007-poc-login-p
    kvalificeringskrav, bilagor, utvärdering och datum, där varje punkt länkar till sidan i underlaget ("s. 5") och
    termerna förklaras vid klick. "Påminn mig" finns vid sista anbudsdag och sista dag för frågor i sidhuvudet, och på
    checklistans första daterade rad för frågestopp och för sista anbudsdag, alltså de datum som påminnelsen gäller.
-   Sidhuvudets knapp för sista anbudsdag använder datumet ur den publicerade checklistan, eller annars annonsens.
+   Sidhuvudets knapp för sista anbudsdag använder datumet ur den publicerade checklistan, eller annars annonsens. I ett
+   selektivt förfarande anger annonsen bara sista dag för anbudsansökan, och sidhuvudet påminner om den i stället.
    Knappen visas bara för en öppen upphandling och aldrig för ett datum som har passerat, och för frågestoppet bara när
    checklistan är publicerad.
 5. **Fråga:** svar med citat, med slutsatsen först. Om underlaget inte ger svar föreslår Anbudsklar att firman ställer

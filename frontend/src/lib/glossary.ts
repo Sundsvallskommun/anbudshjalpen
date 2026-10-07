@@ -63,6 +63,12 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     forms: ["sista anbudsdag", "sista anbudsdagen"],
   },
   {
+    term: "Anbudsansökan",
+    explanation:
+      "En ansökan om att få lämna anbud, i ett selektivt förfarande. Köparen väljer ut leverantörer bland dem som har ansökt och bjuder in dem att lämna anbud. Därför kommer sista dag för anbudsansökan före sista anbudsdag, som står i inbjudan.",
+    forms: ["anbudsansökan", "anbudsansökningar", "anbudsansökningen"],
+  },
+  {
     term: "Förfarande",
     explanation:
       "Hur upphandlingen genomförs enligt lagen, till exempel öppet förfarande, där alla får lämna anbud. Under EU:s beloppsgränser gäller 19 kapitlet i LOU, och underlaget beskriver hur upphandlingen går till. Namnen förenklat förfarande och urvalsförfarande togs bort ur lagen den 1 februari 2022, men äldre underlag använder dem.",

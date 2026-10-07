@@ -6,6 +6,7 @@
 import type { MatchView, ReminderView } from "../../api/types";
 import type { DeadlineReminderKind } from "../../components/ui/ReminderState";
 import { calendarDateOf, formatClock, formatLongDate, formatShortDate, isPassed, relativeDays } from "../../lib/format";
+import { noticeDeadlineReminder, REMINDER_SUBJECT } from "../../lib/labels";
 
 const weekdayFormat = new Intl.DateTimeFormat("sv-SE", { weekday: "long", timeZone: "Europe/Stockholm" });
 
@@ -62,7 +63,7 @@ export function deadlineSuggestions(matches: readonly MatchView[], now: Date = n
     if (fit === "passar_inte") continue;
     const candidates: [DeadlineReminderKind, string | null][] = [
       ["fragestopp", notice.question_deadline],
-      ["sista_anbudsdag", notice.deadline_at],
+      [noticeDeadlineReminder(notice), notice.deadline_at],
     ];
     for (const [kind, deadline] of candidates) {
       if (!deadline || isPassed(deadline, now)) continue;
@@ -73,7 +74,4 @@ export function deadlineSuggestions(matches: readonly MatchView[], now: Date = n
 }
 
 /** What a deadline is called in running text, for the reminder button's name ("Påminn mig före sista anbudsdag …"). */
-export const DEADLINE_SUBJECT: Record<DeadlineReminderKind, string> = {
-  fragestopp: "sista dag för frågor",
-  sista_anbudsdag: "sista anbudsdag",
-};
+export const DEADLINE_SUBJECT: Record<DeadlineReminderKind, string> = REMINDER_SUBJECT;

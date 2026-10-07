@@ -149,6 +149,7 @@ Avstånden följer temats skala: i regel 16 px mellan rader, 24 px mellan gruppe
 - Raden "12 öppna upphandlingar · närmast sista anbudsdag först", som också nämner en vald köpare ("3 öppna
   upphandlingar från Timrå kommun") och på bredare skärmar har "Sortera" bredvid sig. Sedan raderna i ett kort. En rad
   har titeln (högst två rader), "köpare · kategori · källa", bara de tokens som säger något och fristblocket till höger.
+  Är datumet sista dag för anbudsansökan (ett selektivt förfarande) står "Anbudsansökan" ovanför det.
   På telefon står tokens på en egen rad under. Hela raden är en länk. "Öppen för anbud" visas inte, eftersom det är det
   vanliga läget. Sidorna bläddras med Astryx `Pagination`.
 - Högerspalten har "Passar er" för en företagare eller en uppmaning att logga in för en besökare, och "Kommande enligt
@@ -160,7 +161,8 @@ Avstånden följer temats skala: i regel 16 px mellan rader, 24 px mellan gruppe
 exempel "Sundsvalls kommun · DEMO-2026-0147". En påhittad upphandling visar ingen källa i raden, eftersom token Fiktiv
 redan säger det. Efter raden kommer tokens i ordningen status (utom öppen), Fiktiv, passform och Granskad checklista.
 Referensnumret står bara här, inte i listans rader. Sedan nyckeltalen i fyra kolumner, två gånger två på telefon: sista
-anbudsdag och sista dag för frågor med "Påminn mig", uppskattat värde och förfarandet i klarspråk ("Under EU:s
+anbudsdag och sista dag för frågor med "Påminn mig" (i ett selektivt förfarande "Sista dag för anbudsansökan" i
+stället för sista anbudsdag, med en påminnelse om den), uppskattat värde och förfarandet i klarspråk ("Under EU:s
 beloppsgränser"). Därefter de stängda knapparna "Därför verkar den passa (n skäl)" och "Om upphandlingen", och
 "Underlaget · 17 sidor", som öppnar källdialogen på sida 1, med "Ladda ned". Ett skäl som gäller ett krav har länken
 "Visa kravet", som öppnar steg 1 vid kravet. På telefon är knapparna rader i ett kort, och underlaget ligger under "Om
@@ -176,7 +178,7 @@ när allt ser bra ut.
 | 1 Krav | Ursprungsraden, till exempel "Granskad och publicerad av inköp, Sundsvalls kommun, 5 okt 2026 · Alla 86 källhänvisningar hittades i underlaget" (på telefon "Granskad av inköp 5 okt"). "Det här behöver du göra" med fyra statistikrutor som leder till sina avsnitt och på telefon bara visar siffra och ord, sedan sammanfattningen och grupperna med antal. Skallkrav, Kvalificeringskrav och Viktiga datum (med "Före anbudet") är öppna. Bilagor att lämna in, Så utvärderas anbuden, Krav på uppdraget, Avtalsvillkor, Ord och begrepp, Oklart i underlaget och "Efter anbudet och under uppdraget" är stängda. Slutar med "Ställ en fråga" | "På den här sidan", en innehållsförteckning som följer med och öppnar en stängd grupp, och "Något som inte stämmer?". Under 1 024 px har steget ingen högerspalt |
 | 2 Fråga | Frågorna som en tråd: frågan i en bubbla ("Du") och svaret som ett kort med ursprungsrad, "Står i underlaget", en fet slutsats och citaten med sida. När underlaget inte svarar har svaret en tonad ruta, "Ger underlaget inget entydigt svar?", med "Påminn mig" och länken dit frågan ställs formellt ([AI-uppgifterna](ai-tasks.md#besvara-fråga-besvara_fraga)), och annars raden "Oklart? Ställ frågan i e-Avrop senast 30 okt.". Exempelfrågor och skrivfältet, som är sticky på telefon | "Bra att veta" om frågor i e-Avrop, med sista dag för frågor och "Påminn mig" och, när checklistan anger det, när kommunen svarar senast. Sedan underlaget |
 | 3 Granska | Ytan för utkastet, med "Utkastet sparas inte" och "Ladda inte upp riktiga anbud eller personuppgifter i demon" vid ytan. Efter granskningen en rad med filnamnet och "Granska en ny version", utlåtandet med framstegsstapel och filter, och grupperna Måste åtgärdas (öppen), Kontrollera själv, Ser bra ut, Krav på uppdraget och Avtalsvillkor. Rader att åtgärda eller kontrollera säger hur kravet visas ("Så visar du det") och har "Fråga om kravet", som öppnar steg 2 med frågan ifylld | "Så läser du resultatet", och efter granskningen även "Utkastet sparas inte", som ytan säger innan dess |
-| 4 Lämna in | Skall- och kvalificeringskrav och bilagor att bocka av. Det som granskningen bedömde som "Ser bra ut" är förbockat och märkt "Granskat". Kortet "Lämna anbudet" med länken till e-Avrop, eller för en påhittad upphandling att den inte finns där. Bockarna sparas bara i webbläsaren | "Ditt framsteg", till exempel "12 av 21 klara", som står före listan på smala skärmar |
+| 4 Lämna in | Skall- och kvalificeringskrav och bilagor att bocka av. Det som granskningen bedömde som "Ser bra ut" är förbockat och märkt "Granskat". Kortet "Lämna anbudet" med länken till e-Avrop, eller för en påhittad upphandling att den inte finns där. I ett selektivt förfarande säger kortet först att man lämnar en anbudsansökan senast annonsens datum, och sista anbudsdag tas från checklistan. Bockarna sparas bara i webbläsaren | "Ditt framsteg", till exempel "12 av 21 klara", som står före listan på smala skärmar |
 
 **Utan checklista**, som de flesta annonserna från TED, har sidan inga steg. Under sidhuvudet står kortet "Ingen
 granskad checklista ännu" med skälet, knappen till annonsen, knappen till underlaget där det finns när det inte är
@@ -213,7 +215,8 @@ tillbaka till länken när dialogen stängs.
   fristen och utskicket står som två fakta bredvid varandra, även på telefon: fristblocket, till exempel "Sista
   anbudsdag 9 nov kl. 23:59", och "Mejlas fredag 7 november kl. 08:00 · om 33 dagar", eller "Skickad 7 nov" när mejlet
   har gått. Utan påminnelser står "Inga påminnelser ännu" med de närmaste fristerna i träffar som verkar passa, var och
-  en med "Påminn mig". Finns ingen frist att föreslå visar sidan i stället "Se upphandlingar".
+  en med "Påminn mig". Finns ingen frist att föreslå visar sidan i stället "Se upphandlingar". En påminnelse om sista
+  dag för anbudsansökan följer annonsens datum; en om sista anbudsdag följer då bara checklistans.
 - **Logga in** heter "Välj vem du är i demon", med raden "Ingen riktig inloggning. I tjänsten loggar företag in med
   e-legitimation." Två rollkort, staplade på telefon, har avatar, namn, roll, tre saker man kan göra, vart man kommer
   och "Fortsätt som Anna" eller "Fortsätt som Lars". Hela demotexten står under korten.
@@ -223,7 +226,9 @@ tillbaka till länken när dialogen stängs.
 - **Att granska** visar först en ruta om underlag som inte har tolkats än ("2 underlag kunde inte tolkas" eller "1
   underlag tolkas just nu"). Sedan "Att hantera (n) · Publicerade · Avvisade · Alla", där Att hantera omfattar utkast
   och godkända checklistor, och en tabell sorterad på sista anbudsdag: Upphandling, Sista anbudsdag, Status, Källor
-  ("41/41" med bock eller "3 att kontrollera"), Krav, Tolkad och knappen "Granska". Ett äldre utkast märks "Ersatt av
+  ("41/41" med bock eller "3 att kontrollera"), Krav, Tolkad och knappen "Granska". Är annonsens datum sista dag för
+  anbudsansökan står "Anbudsansökan" ovanför det, och den automatiska kontrollen jämför då inte checklistans sista
+  anbudsdag med annonsen utan varnar om de är samma dag. Ett äldre utkast märks "Ersatt av
   nyare tolkning". Där tabellen inte får plats, under 1 100 px, står uppgifterna under rubriken, med "Granska" bredvid.
   "Ny upphandling" står i sidhuvudet och har ett fält för referensnummer (diarienummer), som visas under upphandlingens
   rubrik.
@@ -253,7 +258,7 @@ Byggstenarna som omgörningen lade till ligger i `frontend/src/components/ui/`. 
 | `AccentCard` | Ett kort med en accentkant på 4 px i startkanten, för det enda kortet i en vy som leder vidare: "Nästa steg" och Starts "Nästa frist". Tar samma props som Astryx `Card` |
 | `AiProvenance` | Ursprungsraden överst i varje automatiskt block, en gång. Granskat innehåll: "Granskad av inköp 5 okt 2026 · Alla 86 källhänvisningar hittades i underlaget". Annars "Automatiskt framtaget · inte granskat av inköp". Popovern "Hur togs det här fram?" namnger motorn: regelbaserat, AI via Eneo eller en AI-modell. `basis` säger vad innehållet bygger på: underlaget (standard), där popovern slutar med "Det är alltid förfrågningsunderlaget som gäller", eller lagen (`basis="law"`, Regelhjälpen), där den säger "Läs alltid hela paragrafen" och "Det är alltid lagtexten som gäller". På telefon heter länken "Mer" |
 | `CollapsibleSection` | En grupp som kort, där rubriken är knappen. Antalet står i en Badge och ingår i knappens namn ("Skallkrav, 11 krav"), med en hjälprad och ett startläge. En länk till gruppen ("#skallkrav") eller till en rad i den öppnar gruppen och rullar sedan fram till målet och ger det fokus, även när man kommer från en annan sida. Innehållet ligger kvar när gruppen är stängd, så att ankarna fungerar |
-| `DeadlineBlock` | Fristblocket: "9 nov" stort i tabellsiffror, "kl. 23:59" och "om 35 dagar". Vid 7 dagar eller färre blir den relativa tiden en gul token med klocka, och ett passerat datum blir grått med "passerat". Varianterna `inline`, `stack` och `compact` |
+| `DeadlineBlock` | Fristblocket: "9 nov" stort i tabellsiffror, "kl. 23:59" och "om 35 dagar". Vid 7 dagar eller färre blir den relativa tiden en gul token med klocka, och ett passerat datum blir grått med "passerat". Varianterna `inline`, `stack` och `compact`. `note` sätter ett ord ovanför datumet där etiketten inte syns, till exempel "Anbudsansökan" |
 | `NextStepCard` | "Nästa steg" sist i varje steg: en mening och en eller två knappar, på ett `AccentCard` |
 | `ReminderState` | "Påminn mig" vid en frist, och efteråt på samma plats "Påminnelse mejlas 7 nov · Ändra". På telefon står "Påminnelse 7 nov", och skärmläsare hör ändå "mejlas". En besökare skickas till inloggningen. Inköpare och passerade datum får ingen knapp |
 | `RequirementRow` | Ett krav som en kompakt rad på minst 48 px: titeln, vid behov "Bevis: …" och "s. 5". Brödtexten visas bara när den säger mer än titeln, och raden har ankaret `#krav-K12`, som granskningens "Visa kravet" länkar till |

@@ -5,7 +5,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
 import { VStack } from "@astryxdesign/core/VStack";
 import type { NoticeSummary } from "../api/types";
-import { sourceLabel } from "../lib/labels";
+import { noticeDeadlineLabel, noticeDeadlineNote, sourceLabel } from "../lib/labels";
 import { useIsPhone } from "../lib/usePhone";
 import { Row, RowEnd, RowLink } from "./RowList";
 import { FictitiousToken, FitToken, NoticeStatusToken, PublishedChecklistToken } from "./tokens";
@@ -72,15 +72,25 @@ function NoticeTokens({ notice, isStatusShown }: { notice: NoticeSummary; isStat
  */
 const DEADLINE_WIDTH = 112;
 
-/** Sista anbudsdag at the row's end edge, or what to expect when the notice has none. */
+/**
+ * Sista anbudsdag at the row's end edge, or what to expect when the notice has none. A restricted procedure's date is
+ * the last day for anbudsansökan, and the row says so above it.
+ */
 function RowDeadline({ notice, width }: { notice: NoticeSummary; width?: number }) {
+  const label = noticeDeadlineLabel(notice);
   return (
     <RowEnd width={width}>
       {notice.deadline_at ? (
-        <DeadlineBlock deadline={notice.deadline_at} label="Sista anbudsdag" variant="compact" align="end" />
+        <DeadlineBlock
+          deadline={notice.deadline_at}
+          label={label}
+          note={noticeDeadlineNote(notice.deadline_kind)}
+          variant="compact"
+          align="end"
+        />
       ) : (
         <>
-          <VisuallyHidden>Sista anbudsdag:</VisuallyHidden>
+          <VisuallyHidden>{`${label}:`}</VisuallyHidden>
           <Text type="supporting">{notice.status === "planned" ? "Datum kommer" : "Inget datum"}</Text>
         </>
       )}

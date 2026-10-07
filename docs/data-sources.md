@@ -29,10 +29,18 @@ Kontaktpersoners namn, e-post och telefonnummer i annonser sparas inte.
 - **Köpare:** Sundsvalls kommun och de kommunala bolagen, sökta på organisationsnummer med och utan bindestreck, och på
   namn som reserv (`TED_BUYER_NAMES`). Sök inte på ort: då kommer statliga myndigheter i Sundsvall med.
 - **Annonstyper:** upphandlingar, tilldelningar och förhandsannonser från de senaste 18 månaderna.
-- **Status:** sista anbudsdag i framtiden ger `open`, tilldelning ger `awarded`, förhandsannons ger `planned` och
-  resten blir `closed`. Hela svaret från TED sparas i `raw`. När sista anbudsdag passerar sparar jobbet
-  `close_expired` `closed` på annonsen inom en kvart, för annonser från alla källor, och API:t visar den som stängd
-  redan från sista anbudsdagen.
+- **Sista dag:** annonsens tidigaste sista anbudsdag (eForms BT-131, fälten `deadline-receipt-tender-*-lot`) sparas
+  som `deadline_at` med `deadline_kind` `tender`. Ett selektivt förfarande har ingen sista anbudsdag i annonsen, bara
+  sista dag för anbudsansökan (BT-1311, `cac:ParticipationRequestReceptionPeriod`, fälten
+  `deadline-receipt-request-*-lot`): då sparas den dagen med `deadline_kind` `request`, och appen, mejlen, MCP-verktygen
+  och motorernas annonsblock kallar den "Sista dag för anbudsansökan". Sista anbudsdag kommer först i inbjudan till de
+  utvalda och finns bara om en publicerad checklista anger den. Kontrollerat 2026-10-07 på annonsen 680702-2026
+  (Hedbergska skolan, Sundsvalls kommun).
+- **Status:** en sista dag i framtiden ger `open`, tilldelning ger `awarded`, förhandsannons ger `planned` och resten
+  blir `closed`. Hela svaret från TED sparas i `raw`. När sista dagen passerar sparar jobbet `close_expired` `closed`
+  på annonsen inom en kvart, för annonser från alla källor, och API:t visar den som stängd redan från den dagen. Det
+  gäller också sista dag för anbudsansökan: efter den kan inget nytt företag komma med, så annonsen räknas inte längre
+  som öppen och matchas inte.
 - **Referensnummer:** köparens eget nummer för upphandlingen (eForms BT-22, fältet `internal-identifier-proc`) sparas
   som `reference_number`. Det visas efter köparen på upphandlingens sida och i MCP-verktyget
   `hamta_upphandling`. Annonser som e-Avrop har skickat till TED saknar det: den 2026-10-05 gällde det alla 165

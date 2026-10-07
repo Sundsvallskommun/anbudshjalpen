@@ -12,7 +12,9 @@ import type {
   Fit,
   JobName,
   MatchReason,
+  NoticeDeadlineKind,
   NoticeStatus,
+  NoticeSummary,
   ReminderKind,
   RequirementKind,
   VerificationSummary,
@@ -118,8 +120,34 @@ export const REASON_HEADING: Record<MatchReason["kind"], string> = {
 export const REMINDER_KIND: Record<ReminderKind, string> = {
   fragestopp: "Sista dag för frågor",
   sista_anbudsdag: "Sista anbudsdag",
+  anbudsansokan: "Sista dag för anbudsansökan",
   egen: "Egen påminnelse",
 };
+
+/** A deadline a reminder follows, as running text names it ("Påminn mig före sista anbudsdag …"). */
+export const REMINDER_SUBJECT: Record<Exclude<ReminderKind, "egen">, string> = {
+  fragestopp: "sista dag för frågor",
+  sista_anbudsdag: "sista anbudsdag",
+  anbudsansokan: "sista dag för anbudsansökan",
+};
+
+/** The reminder that follows a notice's own deadline: sista anbudsdag, or anbudsansökan in a restricted procedure. */
+export function noticeDeadlineReminder(notice: Pick<NoticeSummary, "deadline_kind">): "sista_anbudsdag" | "anbudsansokan" {
+  return notice.deadline_kind === "request" ? "anbudsansokan" : "sista_anbudsdag";
+}
+
+/** What a notice's own deadline is called: "Sista anbudsdag", or "Sista dag för anbudsansökan" (`deadline_kind`). */
+export function noticeDeadlineLabel(notice: Pick<NoticeSummary, "deadline_kind">): string {
+  return REMINDER_KIND[noticeDeadlineReminder(notice)];
+}
+
+/**
+ * The word a list row shows above a deadline that is not sista anbudsdag, where the row has no room for the label.
+ * Null for sista anbudsdag, which every list row is read as.
+ */
+export function noticeDeadlineNote(kind: NoticeDeadlineKind): string | null {
+  return kind === "request" ? "Anbudsansökan" : null;
+}
 
 export const JOBS: { job: JobName; label: string; description: string }[] = [
   { job: "ingest_ted", label: "Hämta annonser från TED", description: "Annonser från EU:s annonsdatabas." },
@@ -128,7 +156,7 @@ export const JOBS: { job: JobName; label: string; description: string }[] = [
   {
     job: "close_expired",
     label: "Stäng passerade annonser",
-    description: "Stänger öppna annonser vars sista anbudsdag har passerat.",
+    description: "Stänger öppna annonser vars sista anbudsdag, eller sista dag för anbudsansökan, har passerat.",
   },
   { job: "interpret_pending", label: "Tolka nya underlag", description: "Gör checklistor av uppladdade underlag." },
   { job: "match_all", label: "Bedöm matchningar", description: "Jämför företagens profiler med upphandlingarna." },
