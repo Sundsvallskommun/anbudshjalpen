@@ -19,6 +19,7 @@ Hör ihop med: [Dokumentationsindex](../README.md), [Arkitektur](../architecture
 | [0005](0005-domain-search-in-postgres.md) | Sökning i upphandlingsdatan görs i Postgres | Accepterat | 2026-10-05 |
 | [0006](0006-vite-spa-served-by-fastapi.md) | Webbappen byggs med Vite och serveras av FastAPI | Accepterat | 2026-10-05 |
 | [0007](0007-poc-login-persona-picker.md) | Inloggningen i PoC:n är ett val av demoperson | Accepterat | 2026-10-05 |
+| [0008](0008-license-agpl-3.md) | Repot licensieras under AGPL-3.0, som Eneo | Accepterat | 2026-10-07 |
 
 ## Så skriver du ett beslut
 

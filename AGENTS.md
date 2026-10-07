@@ -52,6 +52,9 @@ code comments are English. User-facing text is Swedish.
 | `data/` | CPV list and fictitious fixtures |
 | `deploy/dokploy/` | Compose files and env templates for Dokploy |
 | `.github/workflows/ci.yml` | CI |
+| `.github/ISSUE_TEMPLATE/`, `.github/pull_request_template.md` | Issue forms and the pull request template (Swedish) |
+| `docs/CONTRIBUTING.md`, `docs/SECURITY.md` | How to contribute, and how to report a vulnerability (security@sundsvall.se) |
+| `LICENSE` | GNU AGPL v3, as Eneo (decision 0008) |
 
 ## Checks
 

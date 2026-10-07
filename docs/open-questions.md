@@ -14,7 +14,6 @@ När en fråga är avgjord flyttas svaret till ett beslut i [decisions/](decisio
 |---|---|
 | Vilken modell ska Eneo-testinstansen använda? | Den behöver klara svenska, långa dokument, JSON-svar och verktygsanrop. Samma leverantör som kommunens Eneo är mest likt produktion. Kvalitetstestet jämför kandidaterna |
 | Vilken server och vilka domäner får testmiljön i Dokploy? | Anbudsklar och Eneo-testinstansen behöver var sin domän med https. Se [deploy/dokploy](../deploy/dokploy/README.md) |
-| Vilken licens ska repot ha? | Inget är valt än. Eneo och Tal till text använder AGPL-3.0-only |
 | Ska inköparens vy bli en Eneo-modul i produktion? | I PoC:n ligger den i appen. En modul fungerar för medarbetare, men mycket kan också visas direkt i Eneo |
 | Hur loggar företagare in i produktion, och hur kontrolleras behörigheten? | PoC:n använder demopersoner ([beslut 0007](decisions/0007-poc-login-persona-picker.md)). Produktion behöver kommunens lösning för e-legitimation och en kontroll av att personen får företräda företaget |
 | När är Eneo Flows klart att bygga på? | Avgör när de styrda uppgifterna flyttar från assistenter till flöden ([beslut 0004](decisions/0004-eneo-api-and-own-mcp-server.md)) |

@@ -1,0 +1,99 @@
+name: "Felrapport"
+description: "Rapportera ett fel eller något som inte fungerar som det ska"
+title: "[Fel]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tack för att du rapporterar ett fel. Fyll i avsnitten nedan, så att vi kan återskapa och rätta det.
+
+        Rapportera inte en säkerhetsbrist här. Följ [säkerhetspolicyn](https://github.com/Sundsvallskommun/anbudsklar/blob/main/docs/SECURITY.md) i stället.
+        Skriv inga personuppgifter, inga riktiga anbud och inga nycklar i ärendet.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Beskrivning"
+      description: "Vad hände?"
+      placeholder: "Granskningen i steg 3 visar ett fel när jag laddar upp en Word-fil."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Så återskapar du felet"
+      description: "Vilka steg leder till felet?"
+      placeholder: |
+        1. Logga in som Anna
+        2. Öppna en upphandling och välj steg 3 Granska
+        3. Ladda upp ett utkast
+        4. Se felet
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Förväntat resultat"
+      description: "Vad borde ha hänt i stället?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: "Skärmbilder och loggar"
+      description: "Lägg till skärmbilder eller felutskrifter om du har. Ta bort personuppgifter och nycklar först."
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: "Allvarlighet"
+      options:
+        - "Kritisk (appen går inte att använda, eller data går förlorad)"
+        - "Hög (en funktion fungerar inte, och det finns ingen väg runt)"
+        - "Medel (en funktion fungerar inte, men det finns en väg runt)"
+        - "Låg (utseende eller en mindre olägenhet)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: "Del"
+      description: "Vilken del gäller felet? Välj Annat om du är osäker."
+      options:
+        - "Webbappen"
+        - "API och backend"
+        - "AI-motorn eller kopplingen till Eneo"
+        - "MCP-servern"
+        - "Schemalagda jobb och mejl"
+        - "Insamling av annonser och lagtext"
+        - "Drift, Compose eller Dokploy"
+        - "Dokumentation"
+        - "Annat"
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: "Miljö"
+      description: "Hur körde du appen, och med vilken motor och webbläsare?"
+      placeholder: |
+        Körning: make up (eller make dev-api och make dev-web, eller testmiljön i Dokploy)
+        AI_ENGINE: heuristic
+        Commit: utskriften från git rev-parse --short HEAD
+        Webbläsare: Firefox på Windows 11
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: "Innan du skickar"
+      options:
+        - label: "Jag har sökt bland befintliga ärenden och hittade inget om samma fel."
+          required: true
+        - label: "Ärendet innehåller inga personuppgifter, inga riktiga anbud och inga nycklar."
+          required: true

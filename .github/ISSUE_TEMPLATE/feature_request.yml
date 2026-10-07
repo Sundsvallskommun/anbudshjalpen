@@ -1,0 +1,69 @@
+name: "Önskemål"
+description: "Föreslå en ny funktion eller en förbättring"
+title: "[Önskemål]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tack för ditt förslag. Beskriv vad du vill kunna göra och varför det skulle hjälpa.
+
+        Anbudsklar bygger bara på offentliga källor och företagets egna data, sparar aldrig anbudsutkast och ger aldrig en leverantör råd som går utöver underlaget.
+        Reglerna står i [Bidra](https://github.com/Sundsvallskommun/anbudsklar/blob/main/docs/CONTRIBUTING.md).
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Problem"
+      description: "Vilket problem löser förslaget, och för vem: en företagare, en inköpare eller den som driftar?"
+      placeholder: "Som företagare vill jag ... eftersom ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: "Förslag"
+      description: "Hur skulle du vilja att det fungerade?"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: "Del"
+      description: "Vilken del gäller förslaget? Välj Annat om du är osäker."
+      options:
+        - "Webbappen"
+        - "API och backend"
+        - "AI-motorn eller kopplingen till Eneo"
+        - "MCP-servern"
+        - "Schemalagda jobb och mejl"
+        - "Insamling av annonser och lagtext"
+        - "Drift, Compose eller Dokploy"
+        - "Dokumentation"
+        - "Annat"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternativ"
+      description: "Har du funderat på andra lösningar eller sätt att komma runt problemet?"
+
+  - type: textarea
+    id: context
+    attributes:
+      label: "Mer information"
+      description: "Annat som hjälper, till exempel skisser, skärmbilder eller länkar. Bara påhittade data."
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: "Innan du skickar"
+      options:
+        - label: "Jag har sökt bland befintliga ärenden och hittade inget om samma sak."
+          required: true
+        - label: "Ärendet innehåller inga personuppgifter, inga riktiga anbud och inga nycklar."
+          required: true

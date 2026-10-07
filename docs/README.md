@@ -33,6 +33,8 @@ Status: **Aktuell** stämmer med det vi vet nu. **Under arbete** beskriver någo
 | [Kvalitetstest](quality-test.md) | Hur tolkningen mäts mot facit, och facitformatet | Under arbete |
 | [Utveckling](development.md) | Köra lokalt, kommandon, portar och tester | Under arbete |
 | [Drift](operations.md) | Imagen, miljövariabler, gränser, jobb, säkerhetskopiering, uppdatering och felsökning | Under arbete |
+| [Bidra](CONTRIBUTING.md) | Från ärende till pull request: regler för kod, data och dokumentation, kontrollerna och commit-meddelanden | Aktuell |
+| [Säkerhet](SECURITY.md) | Hur du rapporterar en säkerhetsbrist, vad som omfattas, svarstiderna och vad du gör om en nyckel har läckt | Aktuell |
 | [Eneos byggstenar](eneo-building-blocks.md) | Moduler, widgets, Flows med mera: vad de gör, status och vad de passar till | Daterad 2026-10-05 |
 | [Öppna frågor](open-questions.md) | Det som återstår att avgöra inom teknik, verksamhet och juridik, och fel vi hittat i Eneo | Aktuell |
 | [Ordlista](glossary.md) | Upphandlings- och tekniktermer på vanlig svenska | Aktuell |
