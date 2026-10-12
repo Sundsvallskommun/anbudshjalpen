@@ -197,7 +197,7 @@ function Writing({ ai }: { ai: AskAiApi }) {
           if (problem) setProblem(null);
         }}
         onSubmit={submit}
-        placeholder={ai.scope.kind === "notice" ? "Till exempel: Hur många referensuppdrag behövs?" : "Till exempel: Vad är ett tilldelningsbeslut?"}
+        placeholder="Skriv din fråga här"
         density="compact"
         elevation="none"
         status={problem ? { type: "error", message: problem } : undefined}
