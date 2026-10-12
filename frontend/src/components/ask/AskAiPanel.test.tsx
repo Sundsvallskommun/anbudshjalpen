@@ -183,4 +183,20 @@ describe("Fråga AI (decision 0014)", () => {
     expect(within(panel).queryByRole("article")).not.toBeInTheDocument();
     expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull();
   });
+
+  it("opens compact with a small title, can be made larger, and keeps its size until the next time", async () => {
+    mockApi([...baseRoutes(companyUser), noticeRoute]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    const panel = await openPanel();
+    // An h2 in the outline, set at a panel's size.
+    expect(within(panel).getByRole("heading", { level: 2, name: "Fråga AI" }).tagName).toBe("H5");
+    await userEvent.click(within(panel).getByRole("button", { name: "Förstora panelen" }));
+    expect(within(panel).getByRole("button", { name: "Förminska panelen" })).toBeInTheDocument();
+
+    await userEvent.click(within(panel).getByRole("button", { name: "Stäng" }));
+    await userEvent.click(screen.getByRole("button", { name: "Fråga AI" }));
+    const again = await screen.findByRole("dialog", { name: "Fråga AI" });
+    expect(within(again).getByRole("button", { name: "Förminska panelen" })).toBeInTheDocument();
+  });
 });
