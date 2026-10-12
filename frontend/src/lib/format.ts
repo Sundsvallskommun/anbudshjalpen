@@ -10,6 +10,7 @@ const dateFormat = new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "lon
 const monthFormat = new Intl.DateTimeFormat(LOCALE, { month: "long", year: "numeric", timeZone: "UTC" });
 const calendarDayFormat = new Intl.DateTimeFormat(LOCALE, { timeZone: ZONE });
 const timeFormat = new Intl.DateTimeFormat(LOCALE, { hour: "2-digit", minute: "2-digit", timeZone: ZONE });
+const clockWithSecondsFormat = new Intl.DateTimeFormat(LOCALE, { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: ZONE });
 const calendarDateFormat = new Intl.DateTimeFormat(LOCALE, {
   day: "numeric",
   month: "long",
@@ -210,6 +211,11 @@ export function timeOfDay(value: string): string | null {
 export function formatClock(value: string): string | null {
   const time = timeOfDay(value);
   return time ? `kl. ${time}` : null;
+}
+
+/** "kl. 15:37:12" for a moment the reader watches move, such as when a page last asked the server. */
+export function formatClockWithSeconds(value: string | number | Date): string {
+  return `kl. ${clockWithSecondsFormat.format(new Date(value))}`;
 }
 
 /**

@@ -24,6 +24,7 @@ from anbudsklar.config import Settings
 from anbudsklar.db import get_engine, session_scope
 from anbudsklar.models import CpvCode, LouSection
 from anbudsklar.services.background import SessionFactory
+from anbudsklar.services.checklists import INTERPRET_INTERVAL, INTERPRET_JOB
 from anbudsklar.services.dates import STOCKHOLM
 from anbudsklar.services.errors import ConflictError
 from anbudsklar.services.jobs import JobContext, open_job_context, run_job
@@ -41,7 +42,7 @@ def schedule() -> list[tuple[str, BaseTrigger]]:
         ("ingest_eavrop", CronTrigger(hour=6, minute=30, timezone=STOCKHOLM)),
         ("ingest_lou", CronTrigger(day_of_week="mon", hour=5, minute=0, timezone=STOCKHOLM)),
         ("close_expired", IntervalTrigger(minutes=15, timezone=STOCKHOLM)),
-        ("interpret_pending", IntervalTrigger(minutes=5, timezone=STOCKHOLM)),
+        (INTERPRET_JOB, IntervalTrigger(seconds=int(INTERPRET_INTERVAL.total_seconds()), timezone=STOCKHOLM)),
         ("match_all", IntervalTrigger(minutes=30, timezone=STOCKHOLM)),
         ("send_reminders", IntervalTrigger(minutes=1, timezone=STOCKHOLM)),
         ("notify_matches", IntervalTrigger(minutes=10, timezone=STOCKHOLM)),

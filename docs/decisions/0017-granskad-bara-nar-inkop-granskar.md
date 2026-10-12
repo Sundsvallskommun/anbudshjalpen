@@ -1,6 +1,7 @@
 # 0017: Ordet "granskad" i annonslistorna visas bara när inköp granskar checklistor
 
-- **Status:** Accepterat
+- **Status:** Accepterat, för checklistans ursprungsrad när granskningen är av ersatt av
+  [0019](0019-utan-granskning-ingen-ogranskad-och-checklista-pa-vag.md)
 - **Datum:** 2026-10-12
 - **Gäller:** hur annonser, passformen och kortet utan checklista talar om checklistan när granskningen är av
 - **Ersätter:** att annonserna märks "Checklista, inte granskad" när granskningen är av, i

@@ -27,6 +27,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from anbudsklar.ai.engine import AiEngine, EngineError, EngineOutputError
 from anbudsklar.api.schemas import (
     ChecklistAdminItem,
+    ChecklistProgress,
+    ChecklistProgressState,
     ChecklistStatus,
     ChecklistUpdate,
     ChecklistView,
@@ -37,7 +39,7 @@ from anbudsklar.api.schemas import (
 from anbudsklar.contracts import CONTRACT_VERSION, Checklist, deadline_kind
 from anbudsklar.documents.citations import verify_checklist
 from anbudsklar.documents.store import load_paged_document
-from anbudsklar.models import ChecklistRecord, Document, Notice, PublishedAnswer
+from anbudsklar.models import ChecklistRecord, Document, JobRun, Notice, PublishedAnswer
 from anbudsklar.services.access import Viewer
 from anbudsklar.services.answers import answer_inputs, answers_digest
 from anbudsklar.services.app_settings import review_required
@@ -58,6 +60,13 @@ PENDING_BATCH_SIZE = 5
 MAX_INTERPRET_ATTEMPTS = 5
 RETRY_BASE_DELAY = timedelta(minutes=15)
 RETRY_MAX_DELAY = timedelta(hours=6)
+# The worker's job that interprets waiting documents, and how often it runs (the worker's
+# schedule reads the interval from here, so the notice page can say when the next run is due).
+INTERPRET_JOB = "interpret_pending"
+INTERPRET_INTERVAL = timedelta(minutes=5)
+# `services.jobs` imports this module, so its RUNNING and STALE_AFTER are repeated here.
+_JOB_RUNNING = "running"
+_JOB_STALE_AFTER = timedelta(hours=2)
 MAX_ERROR_CHARS = 1000
 
 
@@ -148,6 +157,57 @@ async def visible_checklist(
     if viewer.is_buyer:
         return await latest_checklist(session, notice_id)
     return await published_checklist(session, notice_id)
+
+
+async def checklist_progress(session: AsyncSession, notice_id: uuid.UUID) -> ChecklistProgress | None:
+    """Where the notice's first checklist is on its way, or None when none is coming (decision 0019).
+
+    Follows the document `interpret_pending` would pick up first: before the worker has got
+    to it, while the job runs, or while it will try again after a failure. None once the
+    worker gave up, and for attachments, so that the notice page never promises a checklist
+    that is not on its way. The next run is estimated from the job's last start and its
+    interval, and unknown when the worker has not run for two intervals.
+    """
+
+    has_checklist = exists().where(ChecklistRecord.document_id == Document.id)
+    waiting = or_(Document.interpret_attempts == 0, Document.interpret_retry_at.is_not(None))
+    document = await session.scalar(
+        select(Document)
+        .where(
+            Document.notice_id == notice_id,
+            ~has_checklist,
+            Document.page_count > 0,
+            Document.auto_interpret,
+            waiting,
+        )
+        .order_by(Document.interpret_attempts, Document.created_at, Document.id)
+        .limit(1)
+    )
+    if document is None:
+        return None
+    now = utcnow()
+    last = (
+        await session.execute(
+            select(JobRun.started_at, JobRun.status)
+            .where(JobRun.job == INTERPRET_JOB)
+            .order_by(JobRun.started_at.desc())
+            .limit(1)
+        )
+    ).first()
+    last_run_at = last.started_at if last else None
+    running = last is not None and last.status == _JOB_RUNNING and last.started_at > now - _JOB_STALE_AFTER
+    recent = last_run_at is not None and last_run_at > now - 2 * INTERPRET_INTERVAL
+    state: ChecklistProgressState = (
+        "running" if running else "retrying" if document.interpret_attempts > 0 else "queued"
+    )
+    return ChecklistProgress(
+        state=state,
+        attempts=document.interpret_attempts,
+        max_attempts=MAX_INTERPRET_ATTEMPTS,
+        retry_at=document.interpret_retry_at,
+        next_run_at=last_run_at + INTERPRET_INTERVAL if last_run_at and recent else None,
+        last_run_at=last_run_at,
+    )
 
 
 class ChecklistState(NamedTuple):

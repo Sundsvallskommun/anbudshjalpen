@@ -218,6 +218,20 @@ describe("Fråga AI (decision 0014)", () => {
     expect(within(answer).getByRole("button", { name: "Försök igen" })).toBeInTheDocument();
   });
 
+  it("offers the example questions only until the first one is asked, and shows the question without a name over it", async () => {
+    mockApi([...baseRoutes(companyUser), noticeRoute, { method: "POST", path: QUESTIONS, body: answerInDocument }]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    const panel = await openPanel();
+    const examples = await within(panel).findByRole("list", { name: "Exempel på frågor" });
+    await userEvent.click(within(examples).getByRole("button", { name: "Vilka försäkringar måste vi ha?" }));
+    await answerTo(panel, "Vilka försäkringar måste vi ha?", LEAD);
+
+    expect(within(panel).queryByRole("list", { name: /frågor/u })).not.toBeInTheDocument();
+    expect(within(panel).queryByText("Du")).not.toBeInTheDocument();
+    expect(within(panel).getByText("Vilka försäkringar måste vi ha?")).toBeInTheDocument();
+  });
+
   it("offers the print view and clearing once there is a conversation", async () => {
     mockApi([...baseRoutes(companyUser), noticeRoute, { method: "POST", path: QUESTIONS, body: answerInDocument }]);
     renderApp(`/upphandlingar/${NOTICE_ID}`);

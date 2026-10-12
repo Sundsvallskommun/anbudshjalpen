@@ -30,6 +30,7 @@ ChecklistStatus = Literal["none", "draft", "approved", "published", "rejected"]
 NoticeStatus = Literal["open", "closed", "awarded", "planned"]
 Fit = Literal["passar", "passar_delvis", "passar_inte"]
 InterpretationState = Literal["pending", "retrying", "failed"]
+ChecklistProgressState = Literal["queued", "running", "retrying"]
 # "deadline": soonest sista anbudsdag first, notices without one last; "published": newest
 # first; "relevance": best text match first (newest first when there is no text).
 NoticeSort = NoticeOrder
@@ -231,6 +232,21 @@ class PublishedAnswerView(ApiModel):
     answered_at: datetime
 
 
+class ChecklistProgress(ApiModel):
+    """Where a checklist on its way is (decision 0019), so the notice page says more than "soon".
+
+    `queued`: the worker has not got to the document yet; `running`: the interpretation job
+    runs right now; `retrying`: an attempt failed and the worker tries again from `retry_at`.
+    """
+
+    state: ChecklistProgressState
+    attempts: int  # failed attempts so far
+    max_attempts: int  # after which the worker gives up
+    retry_at: datetime | None  # the earliest next attempt after a failure
+    next_run_at: datetime | None  # when the worker's next run is due; None when it has not run lately
+    last_run_at: datetime | None  # when the interpretation job last started
+
+
 class NoticeDetail(NoticeSummary):
     description: str | None
     procedure: str | None
@@ -241,6 +257,9 @@ class NoticeDetail(NoticeSummary):
     cpv_labels: dict[str, str] = Field(default_factory=dict)  # code -> Swedish label, for known codes
     documents: list[DocumentInfo]
     checklist: ChecklistView | None  # companies only see published checklists
+    # Where a checklist on its way is; None when none is coming, so a page never promises a
+    # checklist that the worker will not make (decision 0019).
+    checklist_progress: ChecklistProgress | None = None
     match: MatchView | None = None
     # The buyer's published answers to suppliers' questions, oldest answer first, as e-Avrop numbers them.
     published_answers: list[PublishedAnswerView] = Field(default_factory=list)

@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.documents.store import store_document
-from anbudsklar.models import MatchRecord, PublishedAnswer, QuestionLog
+from anbudsklar.models import JobRun, MatchRecord, PublishedAnswer, QuestionLog
 from anbudsklar.services.dates import end_of_local_day
 
 from .factories import (
@@ -102,7 +102,72 @@ async def test_detail_without_published_checklist(
     body = (await client.get(f"/api/notices/{notice.id}")).json()
     assert body["checklist"] is None
     assert body["checklist_status"] == "none"
+    # The document has its checklist, a draft: nothing more is on its way for companies.
+    assert body["checklist_progress"] is None
     assert (await client.get(f"/api/notices/{uuid.uuid4()}")).status_code == 404
+
+
+async def test_detail_says_while_a_checklist_is_on_its_way(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    """The page shows a checklist as coming only while the worker will interpret (decision 0019)."""
+
+    notice = await add_notice(db_session, title="Snöröjning (fiktiv)", external_id="TEST-3")
+    document = await add_document(db_session, notice, document_pages(demo.fragestopp, demo.deadline))
+    url = f"/api/notices/{notice.id}"
+
+    async def progress() -> dict[str, object] | None:
+        return (await client.get(url)).json()["checklist_progress"]
+
+    # Nothing has run yet: in the queue, with no run to count from.
+    assert await progress() == {
+        "state": "queued",
+        "attempts": 0,
+        "max_attempts": 5,
+        "retry_at": None,
+        "next_run_at": None,
+        "last_run_at": None,
+    }
+
+    # The worker's last run says when the next one is due.
+    started = datetime.now(UTC) - timedelta(minutes=2)
+    db_session.add(
+        JobRun(job="interpret_pending", status="ok", started_at=started, finished_at=started, stats={})
+    )
+    await db_session.flush()
+    queued = await progress()
+    assert queued is not None and queued["state"] == "queued"
+    assert datetime.fromisoformat(str(queued["next_run_at"])) == started + timedelta(minutes=5)
+
+    # While the job runs, the page says so.
+    running = JobRun(job="interpret_pending", status="running", started_at=datetime.now(UTC), stats={})
+    db_session.add(running)
+    await db_session.flush()
+    assert (await progress() or {})["state"] == "running"
+    running.status = "ok"
+    running.finished_at = datetime.now(UTC)
+
+    # A failure the worker will try again after still counts as on its way.
+    document.interpret_attempts = 1
+    document.interpret_retry_at = datetime.now(UTC) + timedelta(minutes=15)
+    await db_session.flush()
+    retrying = await progress()
+    assert retrying is not None and retrying["state"] == "retrying" and retrying["attempts"] == 1
+    assert retrying["retry_at"] is not None
+
+    # Once it gave up, nothing is on its way until a buyer asks for a new interpretation.
+    document.interpret_retry_at = None
+    await db_session.flush()
+    assert await progress() is None
+
+    # An attachment is never interpreted on its own.
+    document.interpret_attempts = 0
+    document.auto_interpret = False
+    await db_session.flush()
+    assert await progress() is None
+
+    # The demo notice has its published checklist: nothing is on its way there either.
+    assert (await client.get(f"/api/notices/{demo.notice.id}")).json()["checklist_progress"] is None
 
 
 async def test_match_is_shown_on_the_detail_for_the_company(
