@@ -6,9 +6,10 @@ import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import type { ReactNode } from "react";
 import { useReviewRequired } from "../../api/queries";
-import type { VerificationSummary } from "../../api/types";
+import type { TokenUsageView, VerificationSummary } from "../../api/types";
 import { formatShortDate } from "../../lib/format";
 import { engineDescription, verificationText, type ProvenanceBasis } from "../../lib/labels";
+import { usageLine } from "../../lib/usage";
 import { useIsPhone } from "../../lib/usePhone";
 
 export type { ProvenanceBasis } from "../../lib/labels";
@@ -36,6 +37,8 @@ export interface AiProvenanceProps {
   howLabel?: string;
   /** More to say in the popover, such as what a fit assessment compares. */
   details?: ReactNode;
+  /** What the answer cost the language model, when the engine counted it: one line in the popover. */
+  usage?: TokenUsageView | null;
 }
 
 /** A middle dot that keeps to the word before it (a no-break space), so a wrapped line never starts with "·". */
@@ -71,7 +74,8 @@ function HowItWasMade({
   reviewedAt,
   verification,
   details,
-}: Pick<AiProvenanceProps, "engine" | "reviewedAt" | "verification" | "details"> & { basis: ProvenanceBasis }) {
+  usage,
+}: Pick<AiProvenanceProps, "engine" | "reviewedAt" | "verification" | "details" | "usage"> & { basis: ProvenanceBasis }) {
   const copy = BASIS_COPY[basis];
   const checked = verification ? verificationText(verification) : null;
   return (
@@ -83,6 +87,11 @@ function HowItWasMade({
         {checked ? ` ${checked}.` : ""}
       </Text>
       {details}
+      {usage && (
+        <Text as="p" type="supporting">
+          {usageLine(usage)}
+        </Text>
+      )}
       <Text as="p">
         {reviewedAt
           ? `Inköp granskade innehållet ${formatShortDate(reviewedAt, "always")} innan det visades för företag.`
@@ -110,6 +119,7 @@ export function AiProvenance({
   verification,
   howLabel = "Hur togs det här fram?",
   details,
+  usage,
 }: AiProvenanceProps) {
   const isPhone = useIsPhone();
   const reviewRequired = useReviewRequired();
@@ -134,7 +144,14 @@ export function AiProvenance({
           label={howLabel}
           width={360}
           content={
-            <HowItWasMade engine={engine} basis={basis} reviewedAt={reviewedAt} verification={verification} details={details} />
+            <HowItWasMade
+              engine={engine}
+              basis={basis}
+              reviewedAt={reviewedAt}
+              verification={verification}
+              details={details}
+              usage={usage}
+            />
           }
         >
           <Link size="sm" hasUnderline label={isPhone ? `Mer: ${howLabel}` : undefined}>

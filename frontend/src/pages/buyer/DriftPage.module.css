@@ -11,6 +11,12 @@
   padding-inline: var(--spacing-5);
 }
 
+/* The AI usage section's content in the card's inset, below its head. */
+.body {
+  padding-block: var(--spacing-4) var(--spacing-5);
+  padding-inline: var(--spacing-5);
+}
+
 .main {
   flex: 1 1 auto;
   min-inline-size: 0;
@@ -27,7 +33,8 @@
 
 @media (max-width: 639px) {
   .head,
-  .row {
+  .row,
+  .body {
     padding-inline: var(--spacing-4);
   }
 }

@@ -76,6 +76,26 @@ class QuestionTurn:
 
 
 @dataclass(frozen=True)
+class TokenUsage:
+    """Tokens one task run consumed, as the model provider counted them, summed over its attempts.
+
+    The counts feed the usage and cost statistics on Drift (`services.ai_usage`), never a
+    decision in the app, so an engine that cannot count leaves `EngineRun.usage` as None
+    rather than guessing.
+    """
+
+    input_tokens: int
+    output_tokens: int
+
+    @property
+    def total_tokens(self) -> int:
+        return self.input_tokens + self.output_tokens
+
+    def __add__(self, other: TokenUsage) -> TokenUsage:
+        return TokenUsage(self.input_tokens + other.input_tokens, self.output_tokens + other.output_tokens)
+
+
+@dataclass(frozen=True)
 class EngineRun:
     """Metadata about how a result was produced, stored next to the result."""
 
@@ -83,6 +103,9 @@ class EngineRun:
     model: str | None = None
     attempts: int = 1
     notes: list[str] = field(default_factory=list)
+    # None when the engine reported no counts: the heuristic engine has no model, and the
+    # Eneo adapter does not read Eneo's counts yet (see `anbudsklar.ai.eneo`).
+    usage: TokenUsage | None = None
 
 
 @dataclass(frozen=True)

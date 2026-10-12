@@ -33,13 +33,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from anbudsklar.ai.engine import AiEngine, EngineError
 from anbudsklar.api.schemas import MatchView
 from anbudsklar.config import Settings
-from anbudsklar.contracts import deadline_kind
+from anbudsklar.contracts import Task, deadline_kind
 from anbudsklar.cpv import CPV_DIGITS, MIN_GROUP_DIGITS, best_cpv_overlap
 from anbudsklar.documents.citations import verify_match
 from anbudsklar.documents.store import load_paged_document
 from anbudsklar.models import ChecklistRecord, Company, MatchNotification, MatchRecord, Notice, User
 from anbudsklar.search.queries import cpv_labels
 from anbudsklar.services.access import ROLE_COMPANY, Viewer
+from anbudsklar.services.ai_usage import record_call
 from anbudsklar.services.checklists import PUBLISHED, checklist_payload, published_checklists
 from anbudsklar.services.contexts import company_profile, notice_context
 from anbudsklar.services.dates import utcnow
@@ -467,6 +468,7 @@ async def _assess(
     assessment, run = await engine.assess_match(
         company_profile(company, labels), notice_context(notice, labels), contract
     )
+    await record_call(session, Task.ASSESS_MATCH, run, notice_id=notice.id)
     pages = await cache.get(session, checklist.document_id) if checklist else []
     verified = verify_match(assessment, pages)
     if record is None:

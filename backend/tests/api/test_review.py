@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.documents.extract import MAX_PAGES
-from anbudsklar.models import Document, QuestionLog
+from anbudsklar.models import AiCall, Document, QuestionLog
 from anbudsklar.services import review
 
 from .factories import (
@@ -58,6 +58,9 @@ async def test_company_gets_a_review_and_nothing_is_stored(
     assert {check["requirement_id"] for check in body["result"]["checks"]} <= {"K1", "K2"}
     assert await db_session.scalar(select(func.count()).select_from(Document)) == documents_before
     assert await db_session.scalar(select(func.count()).select_from(QuestionLog)) == 0
+    # Only that the engine was called is kept, for the statistics on Drift: nothing from the draft.
+    [call] = (await db_session.scalars(select(AiCall))).all()
+    assert (call.task, call.notice_id, call.input_tokens) == ("granska_utkast", demo.notice.id, None)
 
 
 async def test_draft_never_spools_to_disk(

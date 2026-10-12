@@ -2,9 +2,10 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { hasActiveRun, JOB_POLL_MS } from "../../api/queries";
-import type { JobRunView } from "../../api/types";
+import type { AiUsageView, JobRunView } from "../../api/types";
+import { formatNumber, formatSekCost } from "../../lib/format";
 import { buyerUser } from "../../test/fixtures";
-import { baseRoutes, mockApi, renderApp } from "../../test/render";
+import { baseRoutes, mockApi, renderApp, type MockRoute } from "../../test/render";
 
 function run(job: string, startedAt: string, status = "ok", stats: Record<string, unknown> = {}): JobRunView {
   return {
@@ -27,6 +28,43 @@ const recent = [
   run("ingest_lou", "2026-09-28T03:00:00Z", "failed"),
 ];
 
+const noUsage: AiUsageView = {
+  since: "2026-09-05T12:00:00Z",
+  until: "2026-10-05T12:00:00Z",
+  days: 30,
+  calls: 0,
+  calls_with_usage: 0,
+  input_tokens: 0,
+  output_tokens: 0,
+  cost_sek: null,
+  price_input_sek_per_million: null,
+  price_output_sek_per_million: null,
+  by_task: [],
+  by_model: [],
+};
+
+const usage: AiUsageView = {
+  ...noUsage,
+  calls: 5,
+  calls_with_usage: 4,
+  input_tokens: 130_000,
+  output_tokens: 5_000,
+  cost_sek: 4.5,
+  price_input_sek_per_million: 30,
+  price_output_sek_per_million: 120,
+  by_task: [
+    { task: "tolka_underlag", calls: 1, calls_with_usage: 1, input_tokens: 100_000, output_tokens: 4_000, cost_sek: 3.48 },
+    { task: "besvara_fraga", calls: 3, calls_with_usage: 3, input_tokens: 30_000, output_tokens: 1_000, cost_sek: 1.02 },
+    { task: "regelhjalpen", calls: 1, calls_with_usage: 0, input_tokens: 0, output_tokens: 0, cost_sek: null },
+  ],
+  by_model: [{ engine: "openai", model: "gpt-x", calls: 4, calls_with_usage: 4, input_tokens: 130_000, output_tokens: 5_000, cost_sek: 4.5 }],
+};
+
+const usageRoute: MockRoute = { method: "GET", path: "/api/admin/ai-usage", body: noUsage };
+
+/** Testing Library normalizes the DOM's no-break spaces (in "130 000" and "4,50 kr") to plain spaces, so the expectation must too. */
+const plain = (text: string) => text.replace(/\s/gu, " ");
+
 afterEach(() => {
   vi.useRealTimers();
 });
@@ -39,11 +77,12 @@ describe("DriftPage", () => {
   it("groups the jobs, puts failed ones first and says how each latest run went", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-10-05T12:00:00Z"));
-    mockApi([...baseRoutes(buyerUser), { method: "GET", path: "/api/admin/jobs", body: recent }]);
+    mockApi([...baseRoutes(buyerUser), usageRoute, { method: "GET", path: "/api/admin/jobs", body: recent }]);
     renderApp("/inkop/drift");
 
     expect(await screen.findByRole("heading", { level: 1, name: "Drift" })).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent)).toEqual([
+      "AI-användning",
       "Hämta",
       "Bearbeta",
       "Skicka",
@@ -73,6 +112,7 @@ describe("DriftPage", () => {
     let runs = recent;
     const calls = mockApi([
       ...baseRoutes(buyerUser),
+      usageRoute,
       { method: "GET", path: "/api/admin/jobs", body: () => runs },
       {
         method: "POST",
@@ -93,6 +133,49 @@ describe("DriftPage", () => {
     await vi.advanceTimersByTimeAsync(JOB_POLL_MS);
     expect(await screen.findByText("· Senast nyss · 422 hämtade · 422 oförändrade")).toBeInTheDocument();
     expect(calls.filter((call) => call.path === "/api/admin/jobs").length).toBeGreaterThan(fetches);
+  });
+});
+
+describe("AI-användning", () => {
+  it("sums the period, lists the tasks and says what the estimate rests on", async () => {
+    mockApi([...baseRoutes(buyerUser), { ...usageRoute, body: usage }, { method: "GET", path: "/api/admin/jobs", body: recent }]);
+    renderApp("/inkop/drift");
+
+    const section = await screen.findByRole("region", { name: "AI-användning" });
+    expect(
+      await within(section).findByText(
+        plain(
+          `5 anrop · ${formatNumber(130_000)} tokens in · ${formatNumber(5_000)} tokens ut · uppskattningsvis ${formatSekCost(4.5)} · 1 anrop utan tokenräkning`,
+        ),
+      ),
+    ).toBeInTheDocument();
+    expect(within(section).getByText("Modell: gpt-x · 4 anrop")).toBeInTheDocument();
+    const rows = within(section).getAllByRole("row").slice(1); // after the header row
+    expect(rows.map((row) => within(row).getAllByRole("cell")[0]!.textContent)).toEqual([
+      "Tolka underlag",
+      "Besvara fråga",
+      "Regelhjälpen",
+    ]);
+    expect(within(rows[1]!).getByText(plain(formatSekCost(1.02)))).toBeInTheDocument();
+    // A call the engine did not count shows no tokens, with the reason for screen readers.
+    expect(within(rows[2]!).getAllByText("inga tokens räknade")).toHaveLength(2);
+    expect(within(section).getByText(/Uppskattningen utgår från 30\skr per miljon tokens in/u)).toBeInTheDocument();
+    // The demo's engine is rule-based, so the section says why its calls carry no tokens.
+    expect(within(section).getByText(/Den regelbaserade motorn använder ingen språkmodell/u)).toBeInTheDocument();
+  });
+
+  it("asks for another period when the reader picks one, and says when nothing was called", async () => {
+    const user = userEvent.setup();
+    const calls = mockApi([...baseRoutes(buyerUser), usageRoute, { method: "GET", path: "/api/admin/jobs", body: recent }]);
+    renderApp("/inkop/drift");
+    const section = await screen.findByRole("region", { name: "AI-användning" });
+    expect(await within(section).findByText("Inga AI-anrop de senaste 30 dagarna.")).toBeInTheDocument();
+    expect(within(section).getByText(/Ingen kostnad kan uppskattas förrän priset är satt/u)).toBeInTheDocument();
+
+    await user.click(within(section).getByRole("radio", { name: "7 dagar" }));
+    await vi.waitFor(() => {
+      expect(calls.some((call) => call.path === "/api/admin/ai-usage" && call.search === "?days=7")).toBe(true);
+    });
   });
 });
 

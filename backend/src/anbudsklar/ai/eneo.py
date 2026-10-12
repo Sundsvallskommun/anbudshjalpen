@@ -92,6 +92,20 @@ def _assistant_segment(assistant_id: str) -> str:
     return assistant_id
 
 
+# Token usage is not read from Eneo yet, so every EngineRun from this engine has `usage=None`
+# and the statistics on Drift count its calls without tokens or cost. Eneo has the numbers,
+# three ways (eneo-ai/eneo at 2026-10-09; re-verify before relying on them):
+#   1. `GET /api/v1/assistants/{id}/sessions/{session_id}/` returns the session's messages,
+#      and each `Message` carries `num_tokens_question` and `num_tokens_answer`, the provider's
+#      cumulative prompt and completion counts for that turn. One extra call per task, read
+#      in `_run_task` before `_delete_session`, and for Regelhjälpen the last message of the
+#      kept session. The endpoint requires `Authentication.USER`; check that the service key
+#      is accepted before building on it.
+#   2. The non-streamed AskResponse has no counts, but a streamed ask (`"stream": true`)
+#      ends with a `token_usage` SSE event (`SSETokenUsage`).
+#   3. `AskResponse.model` may carry `input_cost_per_token` and `output_cost_per_token`,
+#      Eneo's own price per model, when the principal may view pricing.
+# When one of them is used, put the counts in `AskResult` and `TokenUsage` in the EngineRun.
 @dataclass(frozen=True)
 class AskResult:
     """The parts of Eneo's AskResponse that the engine uses."""
@@ -373,6 +387,7 @@ class EneoEngine:
         finally:
             if session_id:
                 await self._delete_session(assistant_id, session_id)
+        # usage stays None: see the note above AskResult on how to read Eneo's token counts.
         return value, EngineRun(engine=self.name, model=model_name, attempts=attempts)
 
     async def interpret_document(

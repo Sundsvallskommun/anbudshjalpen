@@ -7,9 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from anbudsklar import lou_refs
 from anbudsklar.ai.engine import AiEngine, RuleContext
 from anbudsklar.api.schemas import RulesView
-from anbudsklar.contracts import RuleSource
+from anbudsklar.contracts import RuleSource, Task
 from anbudsklar.models import LouSection
 from anbudsklar.search.queries import get_lou_section, parse_lou_reference, search_lou
+from anbudsklar.services.ai_usage import TokenPrices, record_call, usage_view
 
 CONTEXT_SECTIONS = 5
 # Engines with their own knowledge and our MCP tools do not need our search results.
@@ -34,17 +35,30 @@ def rule_context(section: LouSection) -> RuleContext:
 
 
 async def ask_rules(
-    session: AsyncSession, engine: AiEngine, question: str, session_id: str | None
+    session: AsyncSession,
+    engine: AiEngine,
+    question: str,
+    session_id: str | None,
+    *,
+    prices: TokenPrices | None = None,
 ) -> RulesView:
-    """Answer a rules question. `session_id` continues a conversation the caller may continue."""
+    """Answer a rules question. `session_id` continues a conversation the caller may continue.
+
+    The question is never stored; the call is recorded for the statistics on Drift.
+    """
 
     context: list[RuleContext] = []
     if engine.name not in ENGINES_WITH_OWN_KNOWLEDGE:
         sections = await search_lou(session, question, limit=CONTEXT_SECTIONS)
         context = [rule_context(section) for section in sections]
     answer, run = await engine.answer_rules(question, session_id, context)
+    await record_call(session, Task.ANSWER_RULES, run)
     sources = [await with_excerpt(session, source) for source in answer.sources]
-    return RulesView(answer=answer.model_copy(update={"sources": sources}), engine=run.engine)
+    return RulesView(
+        answer=answer.model_copy(update={"sources": sources}),
+        engine=run.engine,
+        usage=usage_view(run, prices),
+    )
 
 
 async def with_excerpt(session: AsyncSession, source: RuleSource) -> RuleSource:

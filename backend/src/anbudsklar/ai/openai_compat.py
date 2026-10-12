@@ -16,10 +16,17 @@ from typing import Any, Literal
 
 import openai
 from openai import AsyncOpenAI
-from openai.types.chat import ChatCompletionMessageParam
+from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 from openai.types.chat.completion_create_params import ResponseFormat
 
-from anbudsklar.ai.engine import EngineConfigError, EngineError, EngineRun, QuestionTurn, RuleContext
+from anbudsklar.ai.engine import (
+    EngineConfigError,
+    EngineError,
+    EngineRun,
+    QuestionTurn,
+    RuleContext,
+    TokenUsage,
+)
 from anbudsklar.ai.jsonio import request_validated
 from anbudsklar.ai.prompts import TEXT_TASKS, load_prompt, render_task_message
 from anbudsklar.config import Settings
@@ -64,6 +71,19 @@ def cited_sources(answer: str, context: list[RuleContext]) -> list[RuleSource]:
         if (keys and keys <= cited_keys) or item.reference in answer:
             sources.append(RuleSource(title=item.title, reference=item.reference, url=item.url))
     return sources
+
+
+def _usage(completion: ChatCompletion) -> TokenUsage | None:
+    """The provider's own count for one completion; None when the endpoint sends none.
+
+    OpenAI, Azure and vLLM fill `usage` on every completion, but a proxy or a small
+    local server may leave it out, and the statistics then say so instead of guessing.
+    """
+
+    usage = completion.usage
+    if usage is None:
+        return None
+    return TokenUsage(input_tokens=usage.prompt_tokens, output_tokens=usage.completion_tokens)
 
 
 def _engine_error(error: openai.OpenAIError) -> EngineError:
@@ -123,19 +143,17 @@ class OpenAICompatEngine:
 
     async def _create(
         self, messages: list[ChatCompletionMessageParam], response_format: ResponseFormat | None
-    ) -> str:
+    ) -> ChatCompletion:
         if response_format is None:
-            completion = await self._client.chat.completions.create(model=self._model, messages=messages)
-        else:
-            completion = await self._client.chat.completions.create(
-                model=self._model, messages=messages, response_format=response_format
-            )
-        if not completion.choices:
-            return ""
-        return completion.choices[0].message.content or ""
+            return await self._client.chat.completions.create(model=self._model, messages=messages)
+        return await self._client.chat.completions.create(
+            model=self._model, messages=messages, response_format=response_format
+        )
 
-    async def _complete(self, task: Task, messages: list[ChatCompletionMessageParam]) -> str:
-        """One completion, stepping down the structured-output modes on 400 responses.
+    async def _complete(
+        self, task: Task, messages: list[ChatCompletionMessageParam]
+    ) -> tuple[str, TokenUsage | None]:
+        """One completion and its token count, stepping down the structured-output modes on 400 responses.
 
         A mode is remembered only after it worked, so one oversized request does not
         permanently turn off structured output.
@@ -146,7 +164,7 @@ class OpenAICompatEngine:
         )
         for mode in modes:
             try:
-                text = await self._create(messages, self._response_format(mode, task))
+                completion = await self._create(messages, self._response_format(mode, task))
             except openai.BadRequestError as error:
                 if mode == modes[-1]:
                     raise _engine_error(error) from error
@@ -155,25 +173,39 @@ class OpenAICompatEngine:
                 raise _engine_error(error) from error
             if task not in TEXT_TASKS:
                 self._mode = mode
-            return text
+            text = completion.choices[0].message.content or "" if completion.choices else ""
+            return text, _usage(completion)
         raise EngineError("Anropet till språkmodellen misslyckades.")
 
     async def _run_task[M: ContractModel](
         self, task: Task, model: type[M], **inputs: Any
     ) -> tuple[M, EngineRun]:
         messages: list[ChatCompletionMessageParam] = [{"role": "system", "content": load_prompt(task)}]
+        # Every attempt resends the conversation, so a retry costs the whole document again:
+        # the run's usage is the sum, which is what the provider bills.
+        used = TokenUsage(0, 0)
+        counted = True
 
         async def send(message: str) -> str:
+            nonlocal used, counted
             messages.append({"role": "user", "content": message})
-            text = await self._complete(task, messages)
+            text, usage = await self._complete(task, messages)
             messages.append({"role": "assistant", "content": text})
+            if usage is None:
+                counted = False
+            else:
+                used = used + usage
             return text
 
         result, attempts = await request_validated(
             model, render_task_message(task, **inputs), send, self._max_retries
         )
         run = EngineRun(
-            engine=self.name, model=self._model, attempts=attempts, notes=[f"svarsformat: {self._mode}"]
+            engine=self.name,
+            model=self._model,
+            attempts=attempts,
+            notes=[f"svarsformat: {self._mode}"],
+            usage=used if counted else None,
         )
         return result, run
 
@@ -236,11 +268,12 @@ class OpenAICompatEngine:
                 "content": render_task_message(Task.ANSWER_RULES, context=context, question=question),
             },
         ]
-        text = (await self._complete(Task.ANSWER_RULES, messages)).strip()
+        text, usage = await self._complete(Task.ANSWER_RULES, messages)
+        text = text.strip()
         if not text:
             raise EngineError("Språkmodellen gav ett tomt svar.")
         answer = RulesAnswer(answer=text, sources=cited_sources(text, context))
-        return answer, EngineRun(engine=self.name, model=self._model)
+        return answer, EngineRun(engine=self.name, model=self._model, usage=usage)
 
     async def aclose(self) -> None:
         await self._client.close()

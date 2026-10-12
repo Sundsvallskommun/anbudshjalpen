@@ -16,10 +16,12 @@ from anbudsklar.api.deps import (
     JobContextDep,
     SessionDep,
     SessionFactoryDep,
+    SettingsDep,
     require_buyer,
 )
 from anbudsklar.api.limits import rate_limited
 from anbudsklar.api.schemas import (
+    AiUsageView,
     AppSettingsSaved,
     AppSettingsUpdate,
     AppSettingsView,
@@ -39,6 +41,7 @@ from anbudsklar.api.schemas import (
 from anbudsklar.api.uploads import UPLOAD_OPENAPI, read_upload
 from anbudsklar.services import checklists, insights, jobs, notices, reminders
 from anbudsklar.services.access import Viewer
+from anbudsklar.services.ai_usage import DEFAULT_DAYS, MAX_DAYS, token_prices, usage_summary
 from anbudsklar.services.app_settings import get_app_settings, save_app_settings
 from anbudsklar.services.background import interpret_in_background
 from anbudsklar.services.dates import utcnow
@@ -215,6 +218,17 @@ async def update_app_settings(
         published = await checklists.publish_pending(session)
     await session.commit()
     return AppSettingsSaved(**saved.model_dump(), published_now=published)
+
+
+@router.get("/ai-usage")
+async def ai_usage(
+    session: SessionDep,
+    settings: SettingsDep,
+    days: Annotated[int, Query(ge=1, le=MAX_DAYS, description="Hur många dagar bakåt")] = DEFAULT_DAYS,
+) -> AiUsageView:
+    """The AI engine's calls, tokens and estimated cost over the last `days` days, for Drift."""
+
+    return await usage_summary(session, days=days, now=utcnow(), prices=token_prices(settings))
 
 
 @router.get("/jobs")

@@ -11,6 +11,7 @@ import { ErrorNotice } from "../../components/states";
 import { JOB_LABEL, JOBS } from "../../lib/labels";
 import { Page } from "../../shell/Page";
 import { RequireRole } from "../../shell/RequireRole";
+import { AiUsageSection } from "./AiUsageSection";
 import { failedFirst, JOB_GROUPS, RUN_STATE, runState, sinceText, statsLine, type JobGroup, type RunState } from "./jobs";
 import styles from "./DriftPage.module.css";
 
@@ -129,8 +130,9 @@ function Drift() {
       title="Drift"
       breadcrumbs={[{ label: "Inköp", href: "/inkop" }]}
       width={960}
-      intro="Jobben körs automatiskt enligt schema. Här ser du hur det gick senast och kan starta ett jobb direkt, till exempel i en demo."
+      intro="Här ser du vad AI-motorn har använts till och vad det uppskattningsvis kostar. Jobben körs automatiskt enligt schema: här ser du hur det gick senast och kan starta ett jobb direkt, till exempel i en demo."
     >
+      <AiUsageSection />
       {jobs.isError && <ErrorNotice title="Jobben kunde inte hämtas" error={jobs.error} onRetry={() => jobs.refetch()} />}
       {run.isError && (
         <ErrorNotice title={`${(run.variables && JOB_LABEL[run.variables]) ?? "Jobbet"} kunde inte startas`} error={run.error} />
@@ -143,9 +145,9 @@ function Drift() {
 }
 
 /**
- * Drift (direction.md, section 4): the scheduled jobs grouped as Hämta, Bearbeta and Skicka, each with how its latest
- * run went, when, one line of its statistics, and "Kör nu". Failed jobs come first in their group. Reached from the
- * account menu.
+ * Drift (direction.md, section 4): first the AI engine's usage and estimated cost (`AiUsageSection`), then the
+ * scheduled jobs grouped as Hämta, Bearbeta and Skicka, each with how its latest run went, when, one line of its
+ * statistics, and "Kör nu". Failed jobs come first in their group. Reached from the account menu.
  */
 export default function DriftPage() {
   return <RequireRole role="inkopare" title="Drift">{() => <Drift />}</RequireRole>;

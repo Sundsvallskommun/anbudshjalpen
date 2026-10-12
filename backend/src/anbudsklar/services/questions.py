@@ -11,13 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.ai.engine import AiEngine, QuestionTurn
 from anbudsklar.api.schemas import AnswerView, QuestionRequest, QuestionTurnIn, ReadSummary
-from anbudsklar.contracts import Checklist, DocumentSet, PagedDocument
+from anbudsklar.contracts import Checklist, DocumentSet, PagedDocument, Task
 from anbudsklar.documents.bundle import PageRef, build_document_set
 from anbudsklar.documents.citations import verify_answer
 from anbudsklar.documents.store import load_paged_document
 from anbudsklar.models import Document, Notice, QuestionLog
 from anbudsklar.search.queries import search_document
 from anbudsklar.services.access import Viewer
+from anbudsklar.services.ai_usage import TokenPrices, record_call, usage_view
 from anbudsklar.services.answers import answer_inputs
 from anbudsklar.services.checklists import checklist_payload, key_date, tender_deadline, visible_checklist
 from anbudsklar.services.contexts import notice_context
@@ -41,6 +42,7 @@ async def ask_question(
     viewer: Viewer,
     *,
     eavrop_url: str,
+    prices: TokenPrices | None = None,
 ) -> AnswerView:
     """Answer from the procurement's documents and the buyer's published answers, and log the question.
 
@@ -69,6 +71,7 @@ async def ask_question(
     answer, run = await engine.answer_question(
         notice_context(notice), document_set, request.question, bounded_history(request.history), answers
     )
+    await record_call(session, Task.ANSWER_QUESTION, run, notice_id=notice.id)
     verified = verify_answer(answer, documents, answers)
 
     payload = checklist_payload(checklist) if checklist else None
@@ -88,6 +91,7 @@ async def ask_question(
     return AnswerView(
         answer=verified,
         engine=run.engine,
+        usage=usage_view(run, prices),
         document_id=main.id,
         read=read_summary(document_set),
         question_deadline=end_of_local_day(deadline) if deadline else None,

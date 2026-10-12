@@ -441,6 +441,34 @@ class AppSetting(Base):
     updated_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
 
 
+class AiCall(Base):
+    """One completed call to the AI engine, for the usage and cost statistics on Drift.
+
+    Only calls that returned a result are recorded, in the caller's transaction, so a
+    result that is then thrown away is not counted. The token counts are the provider's
+    own where the engine passes them on (`openai`), and None where it does not: the
+    heuristic engine has no model, and the Eneo adapter does not read Eneo's counts yet
+    (`anbudsklar.ai.eneo`). Nothing about the content is kept: not the question, the
+    document, the draft or the answer. `notice_id` says which procurement the call
+    served, when one did.
+    """
+
+    __tablename__ = "ai_calls"
+    __table_args__ = (Index("ix_ai_calls_created_at", "created_at"),)
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    task: Mapped[str] = mapped_column(String(32))  # contracts.Task
+    engine: Mapped[str] = mapped_column(String(32))
+    model: Mapped[str | None] = mapped_column(Text)
+    input_tokens: Mapped[int | None] = mapped_column(Integer)
+    output_tokens: Mapped[int | None] = mapped_column(Integer)
+    attempts: Mapped[int] = mapped_column(Integer, default=1)
+    notice_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("notices.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(  # application clock, as the statistics window is
+        DateTime(timezone=True), default=_utcnow, server_default=func.now(), nullable=False
+    )
+
+
 class JobRun(Base):
     """Bookkeeping for scheduled and manual jobs (ingestion, extraction, matching)."""
 

@@ -2,7 +2,8 @@
 
 The draft never touches the database or the disk: the API reads the upload into
 memory, the text is extracted here, sent to the engine and dropped when the request
-ends. Nothing about the draft is logged.
+ends. Nothing about the draft is logged; only that the engine was called, and what the
+call cost in tokens, is recorded for the statistics on Drift (`services.ai_usage`).
 """
 
 from __future__ import annotations
@@ -14,9 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.ai.engine import AiEngine
 from anbudsklar.api.schemas import ReviewView
-from anbudsklar.contracts import PagedDocument
+from anbudsklar.contracts import PagedDocument, Task
 from anbudsklar.documents.citations import verify_review
 from anbudsklar.documents.extract import DocumentError, extract_pages
+from anbudsklar.services.ai_usage import TokenPrices, record_call, usage_view
 from anbudsklar.services.checklists import checklist_payload, published_checklist
 from anbudsklar.services.errors import ConflictError, FileTooLargeError
 from anbudsklar.services.files import as_service_error, mimetype_for
@@ -32,6 +34,7 @@ async def review_draft(
     *,
     filename: str,
     data: bytes,
+    prices: TokenPrices | None = None,
 ) -> ReviewView:
     if len(data) > MAX_DRAFT_BYTES:
         raise FileTooLargeError("Utkastet är för stort. Den största tillåtna storleken är 20 MB.")
@@ -46,10 +49,12 @@ async def review_draft(
     pages = await _extract(data, mimetype, filename)
     checklist = checklist_payload(record)
     result, run = await engine.review_draft(checklist, PagedDocument(filename=filename, pages=pages))
+    await record_call(session, Task.REVIEW_DRAFT, run, notice_id=notice.id)
     return ReviewView(
         result=verify_review(result, pages),
         requirement_titles={requirement.id: requirement.title for requirement in checklist.requirements},
         engine=run.engine,
+        usage=usage_view(run, prices),
     )
 
 

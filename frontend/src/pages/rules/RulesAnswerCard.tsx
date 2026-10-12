@@ -6,7 +6,7 @@ import { Spinner } from "@astryxdesign/core/Spinner";
 import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import { lazy, Suspense, useId } from "react";
-import type { RulesView } from "../../api/types";
+import type { RulesView, TokenUsageView } from "../../api/types";
 import { AiProvenance } from "../../components/ui/AiProvenance";
 import { RuleSourceCard } from "./RuleSourceCard";
 import { needsSourceWarning, parseRulesAnswer, sourcesHeading, type RulesAnswerParts } from "./rulesAnswer";
@@ -32,13 +32,13 @@ function PlainText({ text }: { text: string }) {
  * "Svar" and the provenance line, read before the answer (direction.md, section 2). The answer rests on the law, so
  * the popover says how the paragraphs are shown and that the law text is what applies.
  */
-function AnswerHeader({ engine }: { engine?: string }) {
+function AnswerHeader({ engine, usage }: { engine?: string; usage?: TokenUsageView | null }) {
   return (
     <HStack gap={2} vAlign="center" wrap="wrap">
       <Text type="supporting" color="primary" weight="semibold">
         Svar
       </Text>
-      {engine && <AiProvenance engine={engine} basis="law" howLabel="Hur togs svaret fram?" />}
+      {engine && <AiProvenance engine={engine} basis="law" howLabel="Hur togs svaret fram?" usage={usage} />}
     </HStack>
   );
 }
@@ -85,7 +85,7 @@ function AnswerContent({ view }: { view: RulesView }) {
   const parts = parseRulesAnswer(view.answer);
   return (
     <>
-      <AnswerHeader engine={view.engine} />
+      <AnswerHeader engine={view.engine} usage={view.usage} />
       {(parts.lead || parts.body) && (
         <VStack gap={2}>
           {parts.lead && (

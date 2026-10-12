@@ -36,11 +36,12 @@ from anbudsklar.api.schemas import (
     InterpretationView,
     VerificationSummary,
 )
-from anbudsklar.contracts import CONTRACT_VERSION, Checklist, deadline_kind
+from anbudsklar.contracts import CONTRACT_VERSION, Checklist, Task, deadline_kind
 from anbudsklar.documents.citations import verify_checklist
 from anbudsklar.documents.store import load_paged_document
 from anbudsklar.models import ChecklistRecord, Document, JobRun, Notice, PublishedAnswer
 from anbudsklar.services.access import Viewer
+from anbudsklar.services.ai_usage import record_call
 from anbudsklar.services.answers import answer_inputs, answers_digest
 from anbudsklar.services.app_settings import review_required
 from anbudsklar.services.contexts import notice_context
@@ -260,6 +261,7 @@ async def interpret_document(
 
     answers = await answer_inputs(session, notice.id)
     checklist, run = await engine.interpret_document(notice_context(notice), paged, answers)
+    await record_call(session, Task.INTERPRET_DOCUMENT, run, notice_id=notice.id)
     verified, summary = verify_checklist(checklist, paged.pages, answers)
     document.interpret_attempts = 0
     document.interpret_error = None

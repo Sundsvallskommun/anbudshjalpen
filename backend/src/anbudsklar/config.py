@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     ai_engine: EngineName = "heuristic"
     ai_max_retries: int = Field(default=2, ge=0, le=5)
     ai_timeout_seconds: float = 180.0
+    # What the model costs, for the estimate on Drift: SEK per million tokens in and out. Both
+    # must be set for a cost to be shown; the statistics count tokens either way.
+    ai_price_input_sek_per_million: float | None = Field(default=None, ge=0)
+    ai_price_output_sek_per_million: float | None = Field(default=None, ge=0)
 
     # Eneo (AI engine via Eneo's API; see docs/eneo-integration.md)
     eneo_backend_url: str | None = None  # e.g. https://eneo-test.example.se (same name as Eneo modules)

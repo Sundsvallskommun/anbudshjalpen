@@ -13,6 +13,7 @@ from anbudsklar.api.deps import (
     MatchRefresherDep,
     SessionDep,
     SessionFactoryDep,
+    SettingsDep,
     require_company_user,
 )
 from anbudsklar.api.limits import rate_limited
@@ -26,6 +27,7 @@ from anbudsklar.api.schemas import (
 )
 from anbudsklar.services import matching, profiles
 from anbudsklar.services.access import Viewer
+from anbudsklar.services.ai_usage import token_prices
 
 router = APIRouter(tags=["profile"])
 
@@ -66,10 +68,18 @@ async def update_profile(
     dependencies=[Depends(rate_limited("cpv_suggestions")), Depends(require_company_user)],
 )
 async def suggest_cpv(
-    body: CpvSuggestionRequest, session: SessionDep, engine: EngineDep, slots: AiSlotsDep
+    body: CpvSuggestionRequest,
+    session: SessionDep,
+    engine: EngineDep,
+    slots: AiSlotsDep,
+    settings: SettingsDep,
 ) -> CpvSuggestionView:
+    """The commit keeps the record of the two calls for the statistics on Drift; the profile is untouched."""
+
     async with slots.hold():
-        return await profiles.suggest_cpv(session, engine, body.description)
+        view = await profiles.suggest_cpv(session, engine, body.description, prices=token_prices(settings))
+    await session.commit()
+    return view
 
 
 @router.get("/cpv")
