@@ -35,6 +35,7 @@ När en fråga är avgjord flyttas svaret till ett beslut i [decisions/](decisio
 | Vilken träffsäkerhet krävs för att en checklista ska få publiceras? | Inköp |
 | Ligger avtalskatalogen i e-Avrops avtalsdatabas? e-Avrop har ett Avtals-API som kan läsas med samma nyckel | Inköp |
 | Får underlagen från e-Avrops API visas och citeras publikt i Anbudsklar och via MCP till Eneo? Kan vi få en nyckel som bara läser publicerade uppgifter? Se [e-Avrops API](eavrop.md#det-som-saknas) | Inköp och Antirio |
+| Frågor och svar läses ur loggfilen `LoggfilOrginalFragor.txt`, som inte är dokumenterad ([beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md)). Får den användas så, håller formatet, och kan svar som inköp bara skickar till frågeställaren hamna där? Bäst vore ett fält i API:t. Se [e-Avrops API](eavrop.md#frågor-och-svar) | Antirio och inköp |
 | Ska inköparen godkänna checklistorna innan de publiceras? Det kostar tid per upphandling och gör checklistan till kommunens sammanfattning. Båda sätten går att pröva: inställningen finns under Inköp › Inställningar ([beslut 0011](decisions/0011-installningar-granskning-valfri.md)) | Inköp |
 | Vilken verksamhet ska piloten gälla? | Näringslivsenheten och inköp |
 

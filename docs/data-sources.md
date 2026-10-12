@@ -72,6 +72,9 @@ Anbudsklar läser kommunens upphandlingar via e-Avrops Projekt-API med kommunens
 
 - Nyckeln läser allt i kommunens projekt. Insamlaren sparar bara publicerade upphandlingar och fälten i en vitlista
   ([beslut 0009](decisions/0009-eavrop-projekt-api.md)).
+- Inköps publicerade svar på leverantörernas frågor läses ur annonsens frågelogg, bara besvarade frågor och aldrig
+  vem som frågade ([beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md)). De visas i steg 2 Fråga och via
+  MCP-verktyget `hamta_fragor_svar`.
 - e-Avrops webbplats hämtas inte automatiskt. Dess `robots.txt` förbjuder det, och API:t gör det onödigt.
 - Samma upphandling i TED och e-Avrop känns igen på länken: TED:s länk till underlaget är e-Avrops annonslänk med
   upphandlingens id. Den blir en annons, och underlaget från e-Avrop läggs på den.

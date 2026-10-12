@@ -184,6 +184,31 @@ class DocumentPage(Base):
     document: Mapped[Document] = relationship(back_populates="pages")
 
 
+class PublishedAnswer(Base):
+    """A question a supplier asked the buyer about a notice, with the answer the buyer published.
+
+    These are the questions and answers e-Avrop shows on the notice's public page, read from
+    the announcement's question log (decision 0013). Only answered questions are stored, and
+    never who asked: the log we read carries no names, and the buyer's answer reaches every
+    supplier anyway. `external_key` identifies the question in its source, so that a re-read
+    updates an edited answer and removes a withdrawn one instead of storing it twice.
+    """
+
+    __tablename__ = "published_answers"
+    __table_args__ = (UniqueConstraint("notice_id", "external_key", name="uq_published_answers_notice_key"),)
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    notice_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("notices.id", ondelete="CASCADE"))
+    source: Mapped[str] = mapped_column(String(32))  # eavrop
+    external_key: Mapped[str] = mapped_column(String(64))
+    question: Mapped[str] = mapped_column(Text)
+    answer: Mapped[str] = mapped_column(Text)
+    asked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    answered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = _created_at()
+    updated_at: Mapped[datetime] = _changed_at()
+
+
 class ChecklistRecord(Base):
     """An AI-produced checklist for a notice and its approval state.
 

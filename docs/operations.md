@@ -131,7 +131,7 @@ Worker kör jobben med APScheduler, i svensk tid. Varje körning sparas i tabell
 | Jobb | När | Gör |
 |---|---|---|
 | `ingest_ted` | Varje dag 06:15 | Hämtar annonser från TED |
-| `ingest_eavrop` | Varje dag 06:30 | Hämtar kommunens publicerade upphandlingar från e-Avrops API och underlaget till de öppna. Bara projekt som ändrats sedan förra lyckade körningen hämtas. Utan `EAVROP_API_TOKEN` gör jobbet ingenting. Se [e-Avrops API](eavrop.md) |
+| `ingest_eavrop` | Varje dag 06:30 | Hämtar kommunens publicerade upphandlingar från e-Avrops API, underlaget till de öppna och inköps publicerade svar på leverantörernas frågor ([beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md)). Bara projekt som ändrats sedan förra lyckade körningen hämtas, utom de öppna, vars frågelogg läses varje gång eftersom ett svar inte räknas som en ändring i e-Avrop. Statistiken räknar `answers_inserted`, `answers_updated`, `answers_deleted` och `answers_failed`. Utan `EAVROP_API_TOKEN` gör jobbet ingenting. Se [e-Avrops API](eavrop.md) |
 | `ingest_lou` | Måndagar 05:00 | Hämtar LOU från Riksdagen |
 | `close_expired` | Var 15:e minut | Sparar `closed` på öppna annonser vars sista dag har passerat (sista anbudsdag, eller sista dag för anbudsansökan i ett selektivt förfarande), oavsett källa |
 | `interpret_pending` | Var femte minut | Tolkar nya underlag till checklistor, högst fem per körning. Ett misslyckat försök görs om efter 15 minuter, 30 minuter, 1 timme och 2 timmar, och efter fem försök ger jobbet upp. Det ger upp direkt när samma underlag inte kan lyckas: ett underlag utan läsbar text, en modell som fortsätter att bryta mot kontraktet, ett underlag som är för stort för modellen och en förfrågan som modelleverantören eller Eneo avvisar eller inte kan läsa |
@@ -234,8 +234,10 @@ skäl.
 
 ## Kända luckor
 
-- e-Avrop hämtas bara med kommunens nyckel. Utan den saknas annonser under tröskelvärdena och riktiga underlag. Det
-  e-Avrops API inte ger, till exempel frågor och svar, står i [e-Avrops API](eavrop.md#det-som-saknas).
+- e-Avrop hämtas bara med kommunens nyckel. Utan den saknas annonser under tröskelvärdena, riktiga underlag och
+  inköps publicerade svar på frågor. Det e-Avrops API inte ger står i [e-Avrops API](eavrop.md#det-som-saknas).
+  Svaren läses ur en loggfil som inte är dokumenterad; ändrar e-Avrop den slutar nya svar komma in, och jobbet
+  räknar `answers_failed`.
 - Inloggningen är ett val av demoperson ([beslut 0007](decisions/0007-poc-login-persona-picker.md)). Sessionerna
   ligger i processens minne, gäller i åtta timmar och är högst 10 000; därutöver loggas den äldsta ut först. En
   omstart loggar ut alla, och appen måste köras som en enda process. Gränserna för antal anrop och vilken webbläsare

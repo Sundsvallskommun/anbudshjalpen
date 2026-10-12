@@ -215,6 +215,20 @@ class MatchView(ApiModel):
     created_at: datetime  # when the assessment was made
 
 
+class PublishedAnswerView(ApiModel):
+    """A question a supplier asked in e-Avrop and the answer the buyer published there (decision 0013).
+
+    Public for every supplier, and never says who asked. `asked_at` is missing when the
+    source's log gave no time for the question.
+    """
+
+    source: str  # eavrop
+    question: str
+    answer: str
+    asked_at: datetime | None
+    answered_at: datetime
+
+
 class NoticeDetail(NoticeSummary):
     description: str | None
     procedure: str | None
@@ -226,6 +240,8 @@ class NoticeDetail(NoticeSummary):
     documents: list[DocumentInfo]
     checklist: ChecklistView | None  # companies only see published checklists
     match: MatchView | None = None
+    # The buyer's published answers to suppliers' questions, oldest answer first, as e-Avrop numbers them.
+    published_answers: list[PublishedAnswerView] = Field(default_factory=list)
 
 
 class PageView(ApiModel):

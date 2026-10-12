@@ -9,6 +9,7 @@ the response.
 from __future__ import annotations
 
 import json
+import re
 from copy import deepcopy
 from datetime import UTC, datetime
 from typing import Any
@@ -32,12 +33,14 @@ from anbudsklar.ingest.eavrop import (
 )
 from anbudsklar.ingest.notices import STOCKHOLM, NoticeValues, eavrop_procurement_id
 from anbudsklar.ingest.ted import TedRecord, upsert_ted_notices
-from anbudsklar.models import Document, Notice
+from anbudsklar.models import Document, Notice, PublishedAnswer
 
 API = "https://www.e-avrop.com/api"
 CLIENT_ID = 4242
 LIST_URL = f"{API}/v1.1/clients/{CLIENT_ID}/procurements"
 NOW = datetime(2026, 10, 8, 12, 0, tzinfo=UTC)
+ANNOUNCEMENT_ID = 74000
+LOG_DOCUMENTS_URL = f"{API}/v1/announcements/{ANNOUNCEMENT_ID}/log-documents"
 
 # Words from the secret parts of the synthetic project. None of them may be stored.
 SECRET_WORDS = (
@@ -48,6 +51,33 @@ SECRET_WORDS = (
     "Utvärderingsprotokoll",
     "kreditupplysning",
     "project-documents",
+    "Frågeställare Fiktivsson",
+    "fragor@fiktiv.example",
+    "intressent@fiktiv.example",
+)
+
+# The question log e-Avrop writes next to the announcement (decision 0013): one answered question,
+# one not answered yet. Fictitious, in the file's own shape.
+QUESTION_LOG = (
+    "Orginal Fraga 2026-10-05 16:42:46:\n"
+    "Ska ställning ingå i priset?\n"
+    "Besvarad Fraga 2026-10-06 10:38:45:\n"
+    "Ska ställning ingå i priset?\n"
+    "Svar :\n"
+    "Ja, ställning ingår i anbudspriset.\n"
+    "\n\n"
+    "Orginal Fraga 2026-10-07 09:48:37:\n"
+    "Får vi lämna anbud tillsammans?\n"
+    "Besvarad Fraga :\n"
+    "Får vi lämna anbud tillsammans?\n"
+    "Svar :\n"
+    "\n"
+)
+# The e-mail logs next to it: who asked and who got the answer. They must never be fetched.
+EMAIL_LOG = (
+    "**** E-POSTMEDDELANDE SKICKAT 2026-10-05 16:42 ****\n"
+    "Frågeställare\nFrågeställare Fiktivsson\nFiktiv Anbudsgivare AB\nfragor@fiktiv.example\n"
+    "intressent@fiktiv.example\n"
 )
 
 
@@ -60,6 +90,10 @@ def _document(doc_id: int, filename: str, updated: str | None = None) -> dict[st
     if updated:
         document["UpdatedDate"] = updated
     return document
+
+
+def _log_file(filename: str, encoded: str, folder: str) -> dict[str, str]:
+    return {"Url": f"{LOG_DOCUMENTS_URL}?filename={encoded}&foldername={folder}", "Filename": filename}
 
 
 def _project(**changes: Any) -> dict[str, Any]:
@@ -118,6 +152,13 @@ def _project(**changes: Any) -> dict[str, Any]:
             ],
         },
         "RequestForApplications": {},
+        "AnnouncementLogFiles": [
+            _log_file("Loggfil2026-10-01 10.00.00.txt", "Loggfil2026-10-01+10.00.00.txt", ""),
+            _log_file("LoggfilOrginalFragor.txt", "LoggfilOrginalFragor.txt", ""),
+            _log_file("frågor.txt", "fr%C3%A5gor.txt", "QA"),
+            _log_file("svar.txt", "svar.txt", "QA"),
+            _log_file("meddelanden.txt", "meddelanden.txt", "QA"),
+        ],
     }
     project.update(changes)
     return project
@@ -143,7 +184,7 @@ def api_settings(settings: Settings) -> Settings:
     )
 
 
-def _mock_documents(respx_mock: respx.MockRouter) -> dict[int, respx.Route]:
+def _mock_documents(respx_mock: respx.MockRouter, *, question_log: bool = True) -> dict[int, respx.Route]:
     routes = {}
     for doc_id, text in (
         (12, "Kravspecifikation. Leverantören ska måla fasaden."),
@@ -154,7 +195,25 @@ def _mock_documents(respx_mock: respx.MockRouter) -> dict[int, respx.Route]:
                 200, content=text.encode(), headers={"Content-Type": "application/octet-stream"}
             )
         )
+    if question_log:
+        _mock_question_log(respx_mock)
     return routes
+
+
+def _mock_question_log(
+    respx_mock: respx.MockRouter, text: str = QUESTION_LOG
+) -> tuple[respx.Route, respx.Route]:
+    """The question log, as e-Avrop serves it (Windows-1252), and the e-mail logs beside it."""
+
+    log = respx_mock.get(LOG_DOCUMENTS_URL, params__contains={"filename": "LoggfilOrginalFragor.txt"}).mock(
+        return_value=httpx.Response(
+            200, content=text.encode("cp1252"), headers={"Content-Type": "application/octet-stream"}
+        )
+    )
+    secret_logs = respx_mock.get(url__regex=rf"{re.escape(LOG_DOCUMENTS_URL)}.*").mock(
+        return_value=httpx.Response(200, content=EMAIL_LOG.encode())
+    )
+    return log, secret_logs
 
 
 # --- Reading a project ---------------------------------------------------------------
@@ -280,7 +339,8 @@ async def test_ingest_stores_the_notice_and_only_the_public_documents(
     )
     respx_mock.get(f"{API}/v1/procurements/900100").mock(return_value=httpx.Response(200, json=_project()))
     respx_mock.get(f"{API}/v1/procurements/900200").mock(return_value=httpx.Response(200, json=unannounced))
-    documents = _mock_documents(respx_mock)
+    documents = _mock_documents(respx_mock, question_log=False)
+    question_log, secret_logs = _mock_question_log(respx_mock)
     secret = respx_mock.get(url__regex=rf"{API}/v1/project-documents/.*").mock(
         return_value=httpx.Response(200)
     )
@@ -294,11 +354,13 @@ async def test_ingest_stores_the_notice_and_only_the_public_documents(
         "not_public": 1,
         "documents_stored": 2,
         "documents_skipped": 1,
+        "answers_inserted": 1,
     }
     assert listing.calls.last.request.headers["Authorization"] == "Bearer test-token"
     assert listing.calls.last.request.url.params["from"].startswith("2025-04-")
     assert all(route.called for route in documents.values())
     assert not secret.called
+    assert question_log.called and not secret_logs.called  # the e-mail logs name who asked
     notice = await db_session.scalar(select(Notice).where(Notice.source == "eavrop"))
     assert notice is not None
     assert (notice.external_id, notice.status, notice.reference_number) == ("900001", "open", "UH-2026-9999")
@@ -317,6 +379,14 @@ async def test_ingest_stores_the_notice_and_only_the_public_documents(
         ("Administrativa föreskrifter fiktiv.txt", True),
         ("Kravspecifikation fiktiv.txt", False),
     ]
+    # Only the answered question is public; the unanswered one is not stored.
+    [answer] = (await db_session.scalars(select(PublishedAnswer))).all()
+    assert (answer.notice_id, answer.question, answer.answer) == (
+        notice.id,
+        "Ska ställning ingå i priset?",
+        "Ja, ställning ingår i anbudspriset.",
+    )
+    assert answer.answered_at == datetime(2026, 10, 6, 10, 38, 45, tzinfo=STOCKHOLM)
 
 
 async def test_a_rerun_skips_unchanged_projects_and_documents(
@@ -332,7 +402,8 @@ async def test_a_rerun_skips_unchanged_projects_and_documents(
     second = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
 
     assert second == {"fetched": 1, "inserted": 0, "updated": 0, "unchanged": 1}
-    assert detail.call_count == 1
+    # The open project is read once more for its question log (decision 0013); its documents are not.
+    assert detail.call_count == 2
     assert all(route.call_count == 1 for route in documents.values())
 
 
@@ -371,7 +442,7 @@ async def test_documents_go_to_the_ted_notice_of_the_same_procurement(
 
     stats = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
 
-    assert stats["linked"] == 1
+    assert stats["linked"] == 1 and stats["answers_inserted"] == 1
     assert (
         await db_session.scalar(select(func.count()).select_from(Notice).where(Notice.source == "eavrop"))
         == 0
@@ -382,6 +453,7 @@ async def test_documents_go_to_the_ted_notice_of_the_same_procurement(
         )
         == 2
     )
+    assert (await db_session.scalar(select(PublishedAnswer.notice_id))) == twin.id
 
 
 async def test_ted_does_not_add_a_procurement_already_stored_from_eavrop(db_session: AsyncSession) -> None:
@@ -446,3 +518,168 @@ async def test_a_list_item_outside_the_api_is_not_fetched(
     stats = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
 
     assert stats["skipped"] == 1
+
+
+# --- Questions and answers (decision 0013) ------------------------------------------
+
+
+async def test_answers_are_read_for_open_procurements_the_list_calls_unchanged(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    """A new answer does not change the project's UpdatedDate, so open projects are read anyway."""
+
+    db_session.add(
+        Notice(
+            source="eavrop",
+            external_id="900001",
+            title="Fiktiv ommålning",
+            status="open",
+            raw={"list_url": f"{API}/v1/procurements/900100", "list_updated": "2026-10-01T10:00:00+02:00"},
+        )
+    )
+    await db_session.flush()
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[_list_item(900100)]))
+    detail = respx_mock.get(f"{API}/v1/procurements/900100").mock(
+        return_value=httpx.Response(200, json=_project())
+    )
+    documents = _mock_documents(respx_mock, question_log=False)
+    question_log, secret_logs = _mock_question_log(respx_mock)
+
+    stats = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+    assert stats["unchanged"] == 1 and stats["answers_inserted"] == 1
+    assert detail.call_count == 1 and question_log.called and not secret_logs.called
+    assert not any(route.called for route in documents.values())  # the answers only, not the documents
+
+
+async def test_a_ted_twin_gets_its_answers_by_procurement_id(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    twin = Notice(
+        source="ted",
+        external_id="900001-2026",
+        title="Fiktiv ommålning (TED)",
+        status="open",
+        documents_url="https://www.e-avrop.com/sundsvall/e-Upphandling/NoticeLink.aspx?id=900001",
+        raw={},
+    )
+    db_session.add(twin)
+    await db_session.flush()
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[]))
+    by_id = respx_mock.get(f"{API}/v1/procurements/by-procurement-id/900001").mock(
+        return_value=httpx.Response(200, json=_project())
+    )
+    question_log, secret_logs = _mock_question_log(respx_mock)
+
+    stats = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+    assert stats["answers_inserted"] == 1 and by_id.called and question_log.called
+    assert not secret_logs.called
+    assert (await db_session.scalar(select(PublishedAnswer.notice_id))) == twin.id
+
+
+async def test_an_open_notice_without_a_project_is_skipped_quietly(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    db_session.add(
+        Notice(
+            source="ted",
+            external_id="900002-2026",
+            title="Fiktiv städning (TED)",
+            status="open",
+            documents_url="https://www.e-avrop.com/sundsvall/e-Upphandling/NoticeLink.aspx?id=900002",
+            raw={},
+        )
+    )
+    await db_session.flush()
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[]))
+    respx_mock.get(f"{API}/v1/procurements/by-procurement-id/900002").mock(return_value=httpx.Response(404))
+
+    stats = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+    assert "answers_inserted" not in stats and "answers_failed" not in stats
+
+
+async def test_an_edited_or_withdrawn_answer_is_mirrored(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[_list_item(900100)]))
+    respx_mock.get(f"{API}/v1/procurements/900100").mock(return_value=httpx.Response(200, json=_project()))
+    _mock_documents(respx_mock, question_log=False)
+    question_log, _ = _mock_question_log(respx_mock)
+
+    first = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+    edited = QUESTION_LOG.replace("Ja, ställning ingår i anbudspriset.", "Ja, ställning och lift ingår.")
+    question_log.mock(return_value=httpx.Response(200, content=edited.encode("cp1252")))
+    second = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+    question_log.mock(return_value=httpx.Response(200, content=b""))
+    third = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+    assert first["answers_inserted"] == 1
+    assert second["answers_updated"] == 1 and "answers_inserted" not in second
+    assert third["answers_deleted"] == 1
+    assert (await db_session.scalars(select(PublishedAnswer))).all() == []
+
+
+async def test_a_question_log_that_cannot_be_read_changes_nothing(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[_list_item(900100)]))
+    respx_mock.get(f"{API}/v1/procurements/900100").mock(return_value=httpx.Response(200, json=_project()))
+    _mock_documents(respx_mock, question_log=False)
+    question_log, _ = _mock_question_log(respx_mock)
+
+    await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+    question_log.mock(return_value=httpx.Response(500))
+    stats = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+    assert stats["answers_failed"] == 1 and "answers_deleted" not in stats
+    assert len((await db_session.scalars(select(PublishedAnswer))).all()) == 1
+
+
+async def test_a_ted_notice_of_another_buyer_in_eavrop_is_not_asked_for(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    """The key reads the municipality's projects only; other buyers' pages in e-Avrop are left alone."""
+
+    db_session.add(
+        Notice(
+            source="ted",
+            external_id="900003-2026",
+            title="Fiktiv upphandling hos en annan köpare (TED)",
+            status="open",
+            documents_url="https://www.e-avrop.com/annankommun/e-Upphandling/NoticeLink.aspx?id=900003",
+            raw={},
+        )
+    )
+    await db_session.flush()
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[]))
+    other = respx_mock.get(url__regex=rf"{API}/v1/procurements/by-procurement-id/.*").mock(
+        return_value=httpx.Response(403)
+    )
+
+    stats = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+    assert not other.called and "answers_failed" not in stats
+
+
+async def test_a_refused_project_in_the_answers_pass_does_not_fail_the_run(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    db_session.add(
+        Notice(
+            source="ted",
+            external_id="900004-2026",
+            title="Fiktiv upphandling (TED)",
+            status="open",
+            documents_url="https://www.e-avrop.com/sundsvall/e-Upphandling/NoticeLink.aspx?id=900004",
+            raw={},
+        )
+    )
+    await db_session.flush()
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[]))
+    respx_mock.get(f"{API}/v1/procurements/by-procurement-id/900004").mock(return_value=httpx.Response(403))
+
+    stats = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+    assert stats["answers_failed"] == 1

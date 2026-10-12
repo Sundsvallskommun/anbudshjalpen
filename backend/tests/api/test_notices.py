@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.documents.store import store_document
-from anbudsklar.models import MatchRecord, QuestionLog
+from anbudsklar.models import MatchRecord, PublishedAnswer, QuestionLog
 from anbudsklar.services.dates import end_of_local_day
 
 from .factories import (
@@ -550,3 +550,45 @@ async def test_answers_read_every_document_and_cite_the_one_they_come_from(
     assert citation["document"] == "6.6 Krav på Entreprenör.pdf"
     assert citation["document_id"] == str(attachment.id)
     assert citation["check"] == "verified"
+
+
+async def test_the_detail_lists_the_published_answers_oldest_first(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    """The buyer's published answers (decision 0013) are public: no sign-in, and never who asked."""
+
+    now = datetime.now(UTC)
+    db_session.add_all(
+        [
+            PublishedAnswer(
+                notice_id=demo.notice.id,
+                source="eavrop",
+                external_key="b" * 64,
+                question="Gäller kravet på F-skatt även underleverantörer?",
+                answer="Ja.",
+                asked_at=now - timedelta(days=2),
+                answered_at=now - timedelta(days=1),
+            ),
+            PublishedAnswer(
+                notice_id=demo.notice.id,
+                source="eavrop",
+                external_key="a" * 64,
+                question="Ska ställning ingå i priset?",
+                answer="Ja, ställning ingår i anbudspriset.",
+                asked_at=None,
+                answered_at=now - timedelta(days=3),
+            ),
+        ]
+    )
+    await db_session.flush()
+
+    body = (await client.get(f"/api/notices/{demo.notice.id}")).json()
+
+    assert [item["question"] for item in body["published_answers"]] == [
+        "Ska ställning ingå i priset?",
+        "Gäller kravet på F-skatt även underleverantörer?",
+    ]
+    first = body["published_answers"][0]
+    assert first["answer"] == "Ja, ställning ingår i anbudspriset."
+    assert first["source"] == "eavrop" and first["asked_at"] is None
+    assert set(first) == {"source", "question", "answer", "asked_at", "answered_at"}

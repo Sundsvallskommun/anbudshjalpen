@@ -38,7 +38,7 @@ from anbudsklar.mcp.tools.common import (
     trimmed,
 )
 from anbudsklar.models import Document, Notice
-from anbudsklar.search.queries import search_notices
+from anbudsklar.search.queries import count_published_answers, search_notices
 from anbudsklar.services.upcoming import ANNOUNCE_MONTHS_BEFORE_END, list_upcoming
 
 StatusFilter = Literal["oppen", "planerad", "avslutad", "tilldelad", "alla"]
@@ -126,10 +126,11 @@ def register(server: FastMCP, ctx: ToolContext) -> None:
         structured_output=False,
         description=(
             "Hämta en upphandling: köpare, status, datum, förfarande, CPV-koder, beskrivning, länk till "
-            "annonsen, inlästa dokument (dokument_id, filnamn, antal sidor) och om inköp har publicerat en "
-            "checklista. Använd efter sok_upphandlingar och innan du läser i underlaget. Läs dokument med "
-            "lasa_sidor, sök i dem med sok_i_underlag och hämta checklistan med hamta_checklista. Ange "
-            "annonslänken som källa för datum och beskrivning."
+            "annonsen, inlästa dokument (dokument_id, filnamn, antal sidor), om inköp har publicerat en "
+            "checklista och hur många svar på leverantörers frågor inköp har publicerat i e-Avrop. Använd "
+            "efter sok_upphandlingar och innan du läser i underlaget. Läs dokument med lasa_sidor, sök i dem "
+            "med sok_i_underlag, hämta checklistan med hamta_checklista och de publicerade svaren med "
+            "hamta_fragor_svar. Ange annonslänken som källa för datum och beskrivning."
         ),
     )
     async def hamta_upphandling(upphandling_id: UpphandlingId) -> str:
@@ -138,7 +139,8 @@ def register(server: FastMCP, ctx: ToolContext) -> None:
             documents = await list_documents(session, notice.id)
             labels = await cpv_labels(session, notice.cpv_codes)
             published = await has_published_checklist(session, notice.id)
-            return _render_notice(notice, documents, labels, published, ctx.budget)
+            answers = await count_published_answers(session, notice.id)
+            return _render_notice(notice, documents, labels, published, answers, ctx.budget)
 
     @server.tool(
         name="kommande_upphandlingar",
@@ -217,7 +219,12 @@ def _notice_line(notice: Notice) -> str:
 
 
 def _render_notice(
-    notice: Notice, documents: list[Document], labels: dict[str, str], published: bool, budget: int
+    notice: Notice,
+    documents: list[Document],
+    labels: dict[str, str],
+    published: bool,
+    answer_count: int,
+    budget: int,
 ) -> str:
     cpv = "; ".join(f"{code} {labels.get(code, '')}".strip() for code in notice.cpv_codes) or MISSING
     lines = [f"# {notice.title}", f"upphandling_id: {notice.id}"]
@@ -251,6 +258,13 @@ def _render_notice(
         "Inköp har publicerat en checklista: hämta den med hamta_checklista."
         if published
         else "Ingen publicerad checklista ännu. Svara utifrån dokumenten med lasa_sidor och sok_i_underlag."
+    )
+    lines += ["", "## Frågor och svar i e-Avrop"]
+    lines.append(
+        f"Inköp har publicerat {count(answer_count, 'svar', 'svar')} på leverantörers frågor: hämta dem med "
+        "hamta_fragor_svar innan du bedömer om något är otydligt."
+        if answer_count
+        else "Inga publicerade frågor och svar ännu."
     )
     return "\n".join(lines) + "\n"
 

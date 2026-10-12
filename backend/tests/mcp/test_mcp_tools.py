@@ -31,6 +31,7 @@ EXPECTED_TOOLS = {
     "lasa_sidor",
     "kontrollera_citat",
     "hamta_checklista",
+    "hamta_fragor_svar",
     "hamta_paragraf",
     "sok_lou",
     "sla_upp_cpv",
@@ -283,6 +284,7 @@ async def test_no_tool_shows_company_data_or_unpublished_drafts(
         ("lasa_sidor", {"upphandling_id": notice_id, "fran_sida": 1, "till_sida": 5}),
         ("hamta_checklista", {"upphandling_id": notice_id}),
         ("hamta_checklista", {"upphandling_id": str(seeded.draft_only.id)}),
+        ("hamta_fragor_svar", {"upphandling_id": notice_id}),
         ("kommande_upphandlingar", {"manader": 36}),
     ]
     async with mcp_client(db_session) as client:
@@ -290,3 +292,23 @@ async def test_no_tool_shows_company_data_or_unpublished_drafts(
 
     for output in outputs:
         assert COMPANY_SECRET not in output and DRAFT_SECRET not in output
+
+
+async def test_published_answers_are_listed_oldest_first_and_the_notice_counts_them(
+    db_session: AsyncSession, seeded: Seeded
+) -> None:
+    notice_id = str(seeded.notice.id)
+    async with mcp_client(db_session) as client:
+        answers = await client.call_tool("hamta_fragor_svar", {"upphandling_id": notice_id})
+        later = await client.call_tool("hamta_fragor_svar", {"upphandling_id": notice_id, "offset": 1})
+        none = await client.call_tool("hamta_fragor_svar", {"upphandling_id": str(seeded.draft_only.id)})
+        notice = await client.call_tool("hamta_upphandling", {"upphandling_id": notice_id})
+
+    text = texts(answers)
+    assert "Svar 1–2 av 2" in text and "vem som frågade visas inte" in text
+    assert text.index("Ska ställning ingå i priset?") < text.index("F-skatt")
+    assert "## Fråga 1 (besvarad" in text and "Svar: Ja, ställning ingår i anbudspriset." in text
+    assert "Svar 2–2 av 2" in texts(later) and "Ska ställning" not in texts(later)
+    assert "Inga publicerade frågor och svar" in texts(none)
+    assert "Inköp har publicerat 2 svar" in texts(notice)
+    assert "hamta_fragor_svar" in texts(notice)

@@ -24,6 +24,7 @@ Hör ihop med: [Dokumentationsindex](../README.md), [Arkitektur](../architecture
 | [0010](0010-labblage-egna-foretag.md) | En accesskod skyddar testmiljön, och labbläget låter deltagare prova med sitt eget företag | Accepterat | 2026-10-12 |
 | [0011](0011-installningar-granskning-valfri.md) | Inköp styr inställningar i tjänsten, och granskningen före publicering går att slå av | Accepterat | 2026-10-12 |
 | [0012](0012-fragor-mot-alla-dokument.md) | Frågor besvaras mot alla dokument i upphandlingen, med ett urval över en budget | Accepterat | 2026-10-12 |
+| [0013](0013-fragor-och-svar-fran-eavrop.md) | Inköps publicerade svar på leverantörernas frågor hämtas från e-Avrops frågelogg | Accepterat | 2026-10-12 |
 
 ## Så skriver du ett beslut
 

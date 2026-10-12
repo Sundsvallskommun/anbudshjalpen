@@ -153,6 +153,10 @@ publicerade.
   frågor visas först efter sista anbudsdag. Frågor som ställs efter sista anbudsdag sparas inte, och inte heller
   inköparens egna provfrågor. I ett selektivt förfarande pågår anbudstiden efter sista dag för anbudsansökan, så där
   gäller den publicerade checklistans sista anbudsdag, och utan den visas inga frågor.
+- Inköps publicerade svar på leverantörernas frågor i e-Avrop sparas utan vem som frågade: insamlaren läser bara
+  frågeloggen, som saknar namn, aldrig e-postloggarna bredvid den, och sparar bara besvarade frågor
+  ([beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md)). Svaren är samma offentliga uppgifter som
+  annonssidan i e-Avrop visar.
 - Anbudsklars assistenter ligger i ett eget space i Eneo, med Insights avstängt och lagringstiden en dag. Appen
   använder en `sk_`-nyckel som ägs av ett servicekonto och bara gäller det spacet, och raderar varje session efter
   anropet.

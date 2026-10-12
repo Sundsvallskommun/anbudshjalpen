@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.cpv import CPV_CODE, cpv_digits, cpv_prefix
 from anbudsklar.documents.citations import HIGHLIGHT, PageIndex, QuoteMatch, excerpt, match_quote
-from anbudsklar.models import CpvCode, Document, DocumentPage, LouSection, Notice
+from anbudsklar.models import CpvCode, Document, DocumentPage, LouSection, Notice, PublishedAnswer
 from anbudsklar.search.types import BuyerCount, NoticeOrder, PageHit, PageText, QuoteCheck
 from anbudsklar.visibility import shown_notices
 
@@ -773,3 +773,25 @@ async def search_lou(session: AsyncSession, query: str, limit: int = 5) -> list[
         .limit(_clamp(limit))
     )
     return list(await session.scalars(stmt))
+
+
+# --- Published questions and answers ----------------------------------------------
+
+
+async def list_published_answers(session: AsyncSession, notice_id: uuid.UUID) -> list[PublishedAnswer]:
+    """The buyer's published answers for a notice, oldest answer first, as e-Avrop numbers them.
+
+    Public data (decision 0013): the API and the MCP tools show the same rows.
+    """
+
+    rows = await session.scalars(
+        select(PublishedAnswer)
+        .where(PublishedAnswer.notice_id == notice_id)
+        .order_by(PublishedAnswer.answered_at, PublishedAnswer.asked_at, PublishedAnswer.id)
+    )
+    return list(rows)
+
+
+async def count_published_answers(session: AsyncSession, notice_id: uuid.UUID) -> int:
+    query = select(func.count()).select_from(PublishedAnswer).where(PublishedAnswer.notice_id == notice_id)
+    return int(await session.scalar(query) or 0)
