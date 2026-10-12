@@ -6,6 +6,7 @@ import {
   buyerUser,
   checklistView,
   companyUser,
+  config,
   DOCUMENT_ID,
   draftChecklistView,
   matchView,
@@ -498,6 +499,18 @@ describe("NoticePage without a checklist", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Därför passar den delvis (3 skäl)" }));
     expect(screen.getByText(/Bedömt bara på CPV-kod och ord i annonsen/u)).toBeInTheDocument();
+  });
+
+  it("leaves out \"granskad\" while inköp does not review checklists (decision 0017)", async () => {
+    const withoutReview: MockRoute = { method: "GET", path: "/api/config", body: { ...config, review_required: false } };
+    mockApi([withoutReview, ...baseRoutes(companyUser), withoutChecklist]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    expect(await screen.findByRole("heading", { level: 2, name: "Ingen checklista ännu" })).toBeInTheDocument();
+    expect(screen.getByText(/^Underlaget finns, men det finns ingen checklista/u)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Därför passar den delvis (3 skäl)" }));
+    expect(screen.getByText(/Det finns ingen checklista att jämföra med\.$/u)).toBeInTheDocument();
+    expect(screen.queryByText(/granskad/u)).not.toBeInTheDocument();
   });
 
   it("promises no checklist for an awarded notice", async () => {

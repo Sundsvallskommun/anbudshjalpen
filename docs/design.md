@@ -188,7 +188,9 @@ granskad checklista ännu" med skälet, knappen till annonsen, knappen till unde
 inläst här (till exempel "Underlaget i e-Avrop") och, när det finns ett underlag, "Fråga underlaget", som öppnar Fråga
 AI. Under kortet står inköps publicerade svar, när det finns några. "Påminn mig"
 står vid sista anbudsdag bland nyckeltalen, så kortet upprepar den inte. En stängd eller tilldelad upphandling lovas
-ingen checklista: kortet heter då "Ingen granskad checklista". Saknas underlaget kan inköparen ladda upp det där.
+ingen checklista: kortet heter då "Ingen granskad checklista". Saknas underlaget kan inköparen ladda upp det där. När
+inköp inte granskar checklistor står det "Ingen checklista ännu" och "Ingen checklista" ([beslut
+0017](decisions/0017-granskad-bara-nar-inkop-granskar.md)).
 
 ### Fråga AI
 
@@ -288,8 +290,10 @@ tillbaka till länken när dialogen stängs.
 - **Inställningar** (`/inkop/installningar`) har en strömbrytare per inställning med en förklaring under, och sparar
   direkt med en toast som säger vad som hände ("Inställningen är sparad. 12 checklistor som väntade på granskning
   publicerades."). Se [beslut 0011](decisions/0011-installningar-granskning-valfri.md). När granskningen är av märks
-  annonser "Checklista, inte granskad" i stället för "Granskad checklista", och ursprungsraden säger "Automatiskt
-  framtagen · inte granskad av inköp".
+  annonser med checklista bara "Checklista" (grå), eftersom "granskad" då inte skiljer ut någon annons ([beslut
+  0017](decisions/0017-granskad-bara-nar-inkop-granskar.md)), och checklistans ursprungsrad säger "Automatiskt
+  framtagen · inte granskad av inköp". Slås granskningen på igen märks en checklista som publicerades utan granskning
+  "Checklista, inte granskad".
 
 ## Delade komponenter
 

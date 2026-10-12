@@ -18,6 +18,7 @@ from anbudsklar.api.limits import rate_limited
 from anbudsklar.api.schemas import AppConfig, GateRequest, LoginRequest, SessionView
 from anbudsklar.api.security import SESSION_COOKIE, clear_session_cookie, set_session_cookie
 from anbudsklar.services.access import ROLE_BUYER
+from anbudsklar.services.app_settings import review_required
 from anbudsklar.services.dates import utcnow
 from anbudsklar.services.lab import lab_enabled, list_lab_companies
 from anbudsklar.services.personas import available_roles, list_personas, persona_user, user_view
@@ -42,7 +43,11 @@ DEMO_NOTICE = (
 
 @router.get("/config")
 async def app_config(
-    request: Request, response: Response, settings: SettingsDep, engine: EngineDep
+    request: Request,
+    response: Response,
+    settings: SettingsDep,
+    engine: EngineDep,
+    session: SessionDep,
 ) -> AppConfig:
     disclosure = AI_DISCLOSURE + (HEURISTIC_NOTE if engine.name == "heuristic" else "")
     response.headers["Cache-Control"] = "no-store"  # gate_required is per browser
@@ -54,6 +59,7 @@ async def app_config(
         eavrop_url=settings.eavrop_base_url,
         gate_required=gate_enabled(settings) and not gate_passed(request, settings),
         lab_enabled=lab_enabled(settings),
+        review_required=await review_required(session),
     )
 
 

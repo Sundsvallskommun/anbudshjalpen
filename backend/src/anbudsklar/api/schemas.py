@@ -111,6 +111,7 @@ class AppConfig(ApiModel):
     eavrop_url: str  # the municipality's page in e-Avrop, for notices without a page of their own
     gate_required: bool  # the service wants its access code before anything else (decision 0010)
     lab_enabled: bool  # the login page offers "Prova med ditt eget företag" (decision 0010)
+    review_required: bool  # inköp reviews checklists before companies see them (decisions 0011 and 0017)
 
 
 # --- Notices ------------------------------------------------------------------------

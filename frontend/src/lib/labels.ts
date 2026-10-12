@@ -47,6 +47,17 @@ export const FIT: Record<Fit, string> = {
 export const PUBLISHED_CHECKLIST = "Granskad checklista";
 /** The same token when the checklist was published without inköp's review (decision 0011). */
 export const UNREVIEWED_CHECKLIST = "Checklista, inte granskad";
+/** The token while inköp does not review checklists: "granskad" then tells nobody anything (decision 0017). */
+export const CHECKLIST = "Checklista";
+
+/**
+ * The fit's extra reason when there is no published checklist (direction.md, "Upphandling utan checklista"). It says
+ * "granskad" only while inköp reviews (decision 0017).
+ */
+export function noChecklistReason(reviewRequired: boolean): string {
+  const checklist = reviewRequired ? "granskad checklista" : "checklista";
+  return `Bedömt bara på CPV-kod och ord i annonsen. Det finns ingen ${checklist} att jämföra med.`;
+}
 
 export const REQUIREMENT_KINDS: { kind: RequirementKind; label: string; description: string }[] = [
   {
