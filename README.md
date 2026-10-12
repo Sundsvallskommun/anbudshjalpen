@@ -192,7 +192,7 @@ Hela indexet, med status för varje sida, finns i [docs/README.md](docs/README.m
 
 Bidrag är välkomna från kommuner, organisationer och utvecklare.
 
-1. Börja med ett ärende i [GitHub Issues](https://github.com/Sundsvallskommun/anbudsklar/issues) och beskriv vad du
+1. Börja med ett ärende i [GitHub Issues](https://github.com/Sundsvallskommun/anbudshjalpen/issues) och beskriv vad du
    vill ändra och varför.
 2. Gör ändringen i en egen gren. Ändrar du något som dokumentationen beskriver, ändra sidan i samma commit.
 3. Kör `make check`, och `make gate` om du har ändrat gränssnittet.
@@ -211,7 +211,7 @@ svara, står i [Öppna frågor](docs/open-questions.md).
 
 ### Delta
 
-- **Frågor, idéer och fel:** [GitHub Issues](https://github.com/Sundsvallskommun/anbudsklar/issues)
+- **Frågor, idéer och fel:** [GitHub Issues](https://github.com/Sundsvallskommun/anbudshjalpen/issues)
 - **Kod och dokumentation:** pull requests enligt [Bidra](docs/CONTRIBUTING.md)
 - **Säkerhetsbrister:** mejla `security@sundsvall.se` enligt [Säkerhet](docs/SECURITY.md)
 
@@ -252,6 +252,6 @@ CPV-listan ([data/cpv/README.md](data/cpv/README.md)) och typsnittet i
 
 *Så att fler småföretag kan svara på kommunens upphandlingar*
 
-[GitHub Issues](https://github.com/Sundsvallskommun/anbudsklar/issues) • [Bidra](docs/CONTRIBUTING.md) • [Säkerhet](docs/SECURITY.md) • [Licens](LICENSE)
+[GitHub Issues](https://github.com/Sundsvallskommun/anbudshjalpen/issues) • [Bidra](docs/CONTRIBUTING.md) • [Säkerhet](docs/SECURITY.md) • [Licens](LICENSE)
 
 </div>

@@ -1,6 +1,6 @@
 # 0015: Tjänsten heter Anbudshjälpen och får märket Toppen, och de tekniska namnen behåller anbudsklar
 
-- **Status:** Accepterat
+- **Status:** Accepterat, för repots namn ersatt av [0016](0016-repot-heter-anbudshjalpen.md)
 - **Datum:** 2026-10-12
 - **Gäller:** tjänstens namn och logomärke i webbappen, mejlen, AI-uppgifternas instruktioner och dokumentationen,
   och vilka tekniska namn som inte byts

@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: "Rapportera en säkerhetsbrist"
-    url: "https://github.com/Sundsvallskommun/anbudsklar/blob/main/docs/SECURITY.md"
+    url: "https://github.com/Sundsvallskommun/anbudshjalpen/blob/main/docs/SECURITY.md"
     about: "Rapportera aldrig en säkerhetsbrist i ett öppet ärende. Läs hur du mejlar den till security@sundsvall.se."

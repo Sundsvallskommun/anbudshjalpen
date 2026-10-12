@@ -13,7 +13,7 @@ innehåller en PoC, så mycket kan fortfarande ändras. Börja därför alltid m
 
 ## 1. Börja med ett ärende
 
-Sök först bland [ärendena på GitHub](https://github.com/Sundsvallskommun/anbudsklar/issues). Finns inget om samma
+Sök först bland [ärendena på GitHub](https://github.com/Sundsvallskommun/anbudshjalpen/issues). Finns inget om samma
 sak, skapa ett nytt med mallen **Felrapport** eller **Önskemål**. Beskriv vad du vill ändra, varför och hur du tänker
 göra. Vänta på svar innan du börjar på en större ändring, så att du inte lägger tid på något som inte kan tas emot.
 

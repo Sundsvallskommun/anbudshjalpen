@@ -8,7 +8,7 @@ body:
       value: |
         Tack för att du rapporterar ett fel. Fyll i avsnitten nedan, så att vi kan återskapa och rätta det.
 
-        Rapportera inte en säkerhetsbrist här. Följ [säkerhetspolicyn](https://github.com/Sundsvallskommun/anbudsklar/blob/main/docs/SECURITY.md) i stället.
+        Rapportera inte en säkerhetsbrist här. Följ [säkerhetspolicyn](https://github.com/Sundsvallskommun/anbudshjalpen/blob/main/docs/SECURITY.md) i stället.
         Skriv inga personuppgifter, inga riktiga anbud och inga nycklar i ärendet.
 
   - type: textarea
