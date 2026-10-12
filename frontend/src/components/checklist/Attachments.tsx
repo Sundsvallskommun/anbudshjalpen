@@ -23,7 +23,7 @@ function AttachmentRow({ item, noticeId, documentId }: { item: AttachmentItem; n
         </HStack>
       }
       description={item.description ?? undefined}
-      endContent={
+      source={
         <SourceLink
           noticeId={noticeId}
           citation={item.citation}

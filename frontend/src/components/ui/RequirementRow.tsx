@@ -42,7 +42,8 @@ export interface RequirementRowProps {
 }
 
 /**
- * One requirement as a compact row (at least 48 px): the title, an optional "Bevis: …" chip, and "s. 5" at the end.
+ * One requirement as a compact row (at least 48 px): the title, an optional "Bevis: …" chip, the body and under it
+ * "Källa: 6.1 Upphandlingsföreskrifter.pdf, s. 5".
  * Nothing is said twice (direction.md, section 9.4): a body that repeats the title is left out, one that continues it
  * shows only the continuation, and a title cut off with "…" gives way to the whole sentence. The row carries its
  * anchor (#krav-K12) so other rows can link to it.
@@ -71,24 +72,21 @@ export function RequirementRow({
         </HStack>
       }
       description={
-        shown.body ? (
-          <VStack gap={1}>
-            <TermText text={keepNumbersTogether(shown.body)} terms={terms} />
-          </VStack>
-        ) : undefined
+        <VStack gap={1}>
+          {shown.body && <TermText text={keepNumbersTogether(shown.body)} terms={terms} />}
+          <Text type="supporting">
+            Källa:{" "}
+            <SourceLink
+              noticeId={noticeId}
+              citation={requirement.citation}
+              claim={requirement.title}
+              origin={origin}
+              documentId={documentId}
+            />
+          </Text>
+        </VStack>
       }
-      endContent={
-        <HStack gap={2} vAlign="center">
-          {actions}
-          <SourceLink
-            noticeId={noticeId}
-            citation={requirement.citation}
-            claim={requirement.title}
-            origin={origin}
-            documentId={documentId}
-          />
-        </HStack>
-      }
+      endContent={actions}
     />
   );
 }
