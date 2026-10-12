@@ -1,7 +1,7 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Citation, KeyDate, MatchReason, NoticeDetail } from "../../api/types";
+import type { ChecklistProgress, Citation, KeyDate, MatchReason, NoticeDetail } from "../../api/types";
 import {
   buyerUser,
   checklistView,
@@ -511,6 +511,54 @@ describe("NoticePage without a checklist", () => {
     await userEvent.click(screen.getByRole("button", { name: "Därför passar den delvis (3 skäl)" }));
     expect(screen.getByText(/Det finns ingen checklista att jämföra med\.$/u)).toBeInTheDocument();
     expect(screen.queryByText(/granskad/u)).not.toBeInTheDocument();
+  });
+
+  const queued: ChecklistProgress = { state: "queued", attempts: 0, max_attempts: 5, retry_at: null, next_run_at: "2026-10-05T10:04:00+02:00", last_run_at: "2026-10-05T09:59:00+02:00" };
+
+  it("shows a checklist on its way as coming, not as missing, while inköp does not review (decision 0019)", async () => {
+    const withoutReview: MockRoute = { method: "GET", path: "/api/config", body: { ...config, review_required: false } };
+    mockApi([withoutReview, ...baseRoutes(companyUser), noticeWith({ checklist: null, checklist_status: "none", checklist_progress: queued, question_deadline: null })]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    expect(await screen.findByRole("heading", { level: 2, name: "Checklistan tas fram" })).toBeInTheDocument();
+    expect(screen.getByText(/^Underlaget tolkas automatiskt, och kraven visas här så fort checklistan är klar/u)).toBeInTheDocument();
+    // Where the interpretation is, and that the page keeps asking.
+    expect(screen.getByRole("status")).toHaveTextContent("Står i kö. Nästa tolkning väntas kl. 10:04.");
+    expect(screen.getByText(/^Sidan uppdateras automatiskt\. Senast kontrollerad kl\. 10:00:\d\d\.$/u)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Fråga underlaget" })).toBeInTheDocument();
+    expect(screen.queryByText(/Ingen checklista/u)).not.toBeInTheDocument();
+  });
+
+  it("says when the interpretation runs, and when a failed one is tried again", async () => {
+    const withoutReview: MockRoute = { method: "GET", path: "/api/config", body: { ...config, review_required: false } };
+    mockApi([withoutReview, ...baseRoutes(companyUser), noticeWith({ checklist: null, checklist_status: "none", checklist_progress: { ...queued, state: "running" }, question_deadline: null })]);
+    const view = renderApp(`/upphandlingar/${NOTICE_ID}`);
+    expect(await screen.findByRole("status")).toHaveTextContent("Tolkning pågår. Tar oftast under en minut.");
+    view.unmount();
+
+    const retrying: ChecklistProgress = { ...queued, state: "retrying", attempts: 2, retry_at: "2026-10-05T10:30:00+02:00" };
+    mockApi([withoutReview, ...baseRoutes(companyUser), noticeWith({ checklist: null, checklist_status: "none", checklist_progress: retrying, question_deadline: null })]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+    expect(await screen.findByRole("status")).toHaveTextContent("Försök 2 av 5 misslyckades. Försöker igen tidigast kl. 10:30.");
+  });
+
+  it("tells inköp whether a checklist is on its way while the review is off", async () => {
+    const withoutReview: MockRoute = { method: "GET", path: "/api/config", body: { ...config, review_required: false } };
+    mockApi([withoutReview, ...baseRoutes(buyerUser), noticeWith({ checklist: null, checklist_status: "none", checklist_progress: { ...queued, next_run_at: null }, question_deadline: null })]);
+    const view = renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    expect(await screen.findByRole("heading", { level: 2, name: "Checklistan tas fram" })).toBeInTheDocument();
+    expect(screen.getByText(/^Underlaget tolkas automatiskt till en checklista som publiceras direkt/u)).toBeInTheDocument();
+    // Without a recent run there is no time to promise.
+    expect(screen.getByRole("status")).toHaveTextContent("Står i kö för tolkning.");
+    expect(screen.queryByText(/granskad/u)).not.toBeInTheDocument();
+    view.unmount();
+
+    // Once the worker gave up, nothing is promised: the buyer is told where to ask for a new interpretation.
+    mockApi([withoutReview, ...baseRoutes(buyerUser), noticeWith({ checklist: null, checklist_status: "none", checklist_progress: null, question_deadline: null })]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+    expect(await screen.findByRole("heading", { level: 2, name: "Ingen checklista ännu" })).toBeInTheDocument();
+    expect(screen.getByText(/ingen checklista är på väg: tolkningen misslyckades/u)).toBeInTheDocument();
   });
 
   it("promises no checklist for an awarded notice", async () => {

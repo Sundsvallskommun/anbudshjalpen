@@ -5,6 +5,7 @@ import { Popover } from "@astryxdesign/core/Popover";
 import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import type { ReactNode } from "react";
+import { useReviewRequired } from "../../api/queries";
 import type { VerificationSummary } from "../../api/types";
 import { formatShortDate } from "../../lib/format";
 import { engineDescription, verificationText, type ProvenanceBasis } from "../../lib/labels";
@@ -23,7 +24,8 @@ export interface AiProvenanceProps {
   basis?: ProvenanceBasis;
   /**
    * When inköp reviewed the content (a published checklist's `published_at`); leave out for content nobody
-   * reviewed (answers, fit assessments, draft reviews): "Automatiskt framtaget · inte granskat av inköp".
+   * reviewed (answers, fit assessments, draft reviews): "Automatiskt framtaget · inte granskat av inköp", or just
+   * "Automatiskt framtaget" and the citation check while inköp reviews nothing at all (decision 0019).
    */
   reviewedAt?: string | null;
   /** Who reviewed, as the line says it: "Granskad av inköp" (default) or "Granskad och publicerad av inköp, Sundsvalls kommun". */
@@ -94,9 +96,11 @@ function HowItWasMade({
 /**
  * The provenance line at the top of every automatic block (direction.md, section 2): read before the content, once.
  * Reviewed: "Granskad av inköp 5 okt 2026 · Alla 86 källhänvisningar hittades i underlaget · Hur togs det här fram?".
- * Not reviewed: "Automatiskt framtaget · inte granskat av inköp · Hur togs det här fram?". The popover names the
- * engine (regelbaserat or AI via Eneo) and explains the sources for what the content rests on: the procurement
- * documents, or the law for Regelhjälpen. On a phone the line is shorter and the trigger says "Mer".
+ * Not reviewed: "Automatiskt framtaget · inte granskat av inköp · Hur togs det här fram?". While inköp does not review
+ * checklists at all, "inte granskat av inköp" would only repeat the setting on every line (decision 0019), so the line
+ * gives the citation check instead, as a reviewed line does; the popover still says that nobody reviewed it. The
+ * popover names the engine (regelbaserat or AI via Eneo) and explains the sources for what the content rests on: the
+ * procurement documents, or the law for Regelhjälpen. On a phone the line is shorter and the trigger says "Mer".
  */
 export function AiProvenance({
   engine,
@@ -108,11 +112,12 @@ export function AiProvenance({
   details,
 }: AiProvenanceProps) {
   const isPhone = useIsPhone();
+  const reviewRequired = useReviewRequired();
   const checked = verification ? verificationText(verification) : null;
   const lead = reviewedAt
     ? `${reviewedLabel} ${formatShortDate(reviewedAt, isPhone ? "auto" : "always")}`
     : "Automatiskt framtaget";
-  const rest = reviewedAt ? checked : "inte granskat av inköp";
+  const rest = reviewedAt || !reviewRequired ? checked : "inte granskat av inköp";
 
   return (
     <HStack gap={2} vAlign="start">

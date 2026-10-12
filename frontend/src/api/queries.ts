@@ -185,11 +185,21 @@ export function useNoticeBuyers({ q, status, source, cpv }: BuyerFilters) {
 }
 
 /** One notice; waits while `id` is still unknown (empty). */
+/** How often a notice page asks again while its checklist is on its way: the worker interprets every five minutes. */
+const CHECKLIST_POLL_MS = 15_000;
+
+/** A notice whose first checklist the worker is about to make (decision 0019): the page shows it when it comes. */
+function isChecklistComing(notice: NoticeDetail | undefined): boolean {
+  return notice !== undefined && notice.checklist === null && notice.checklist_progress !== null;
+}
+
 export function useNotice(id: string) {
   return useQuery({
     queryKey: keys.notice(id),
     queryFn: () => api.get<NoticeDetail>(`/api/notices/${id}`),
     enabled: id !== "",
+    // Asked again now and then while a checklist is on its way, so the steps appear without the reader doing anything.
+    refetchInterval: (query) => (isChecklistComing(query.state.data) ? CHECKLIST_POLL_MS : false),
   });
 }
 

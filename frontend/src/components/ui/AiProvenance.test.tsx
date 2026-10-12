@@ -1,6 +1,7 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
+import { config } from "../../test/fixtures";
 import { mockApi } from "../../test/render";
 import { AiProvenance } from "./AiProvenance";
 import { renderWithProviders } from "./testing";
@@ -57,5 +58,18 @@ describe("AiProvenance", () => {
     expect(within(popover).getByText("Inköp har inte granskat det här. Läs alltid hela paragrafen.")).toBeInTheDocument();
     expect(within(popover).getByText("Det är alltid lagtexten som gäller.")).toBeInTheDocument();
     expect(within(popover).queryByText(/underlaget/)).not.toBeInTheDocument();
+  });
+
+  it("leaves out \"inte granskat av inköp\" while inköp reviews nothing, and gives the citation check instead (decision 0019)", async () => {
+    mockApi([{ method: "GET", path: "/api/config", body: { ...config, review_required: false } }]);
+    renderWithProviders(<AiProvenance engine="heuristic" verification={verification} />);
+    expect(await screen.findByText("Alla 86 källhänvisningar hittades i underlaget ·")).toBeInTheDocument();
+    expect(screen.getByText("Automatiskt framtaget")).toBeInTheDocument();
+    expect(screen.queryByText(/inte granskat av inköp/u)).not.toBeInTheDocument();
+
+    // The popover still says so, for the reader who asks.
+    await userEvent.click(screen.getByRole("button", { name: "Hur togs det här fram?" }));
+    const popover = await screen.findByRole("dialog", { name: "Hur togs det här fram?" });
+    expect(within(popover).getByText(/Inköp har inte granskat det här/)).toBeInTheDocument();
   });
 });

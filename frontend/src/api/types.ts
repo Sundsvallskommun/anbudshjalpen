@@ -383,6 +383,23 @@ export interface PublishedAnswerView {
   answered_at: IsoDateTime;
 }
 
+export type ChecklistProgressState = "queued" | "running" | "retrying";
+
+/** Where a checklist on its way is (decision 0019): what the notice page says instead of a bare spinner. */
+export interface ChecklistProgress {
+  /** Waiting for the worker's next run, being interpreted right now, or tried again after a failure. */
+  state: ChecklistProgressState;
+  /** Failed attempts so far, of `max_attempts` before the worker gives up. */
+  attempts: number;
+  max_attempts: number;
+  /** The earliest next attempt after a failure. */
+  retry_at: IsoDateTime | null;
+  /** When the worker's next run is due, from its last start and its interval; null when it has not run lately. */
+  next_run_at: IsoDateTime | null;
+  /** When the interpretation job last started. */
+  last_run_at: IsoDateTime | null;
+}
+
 export interface NoticeDetail extends NoticeSummary {
   description: string | null;
   procedure: string | null;
@@ -394,6 +411,8 @@ export interface NoticeDetail extends NoticeSummary {
   cpv_labels: Record<string, string>;
   documents: DocumentInfo[];
   checklist: ChecklistView | null;
+  /** Where a checklist on its way is; null when none is coming, so the page never promises one (decision 0019). */
+  checklist_progress: ChecklistProgress | null;
   match: MatchView | null;
   /** The buyer's published answers to suppliers' questions, oldest answer first, as e-Avrop numbers them. */
   published_answers: PublishedAnswerView[];

@@ -195,6 +195,7 @@ export const noticeDetail: NoticeDetail = {
   cpv_labels: { "45442100": "Målning" },
   documents: [{ id: DOCUMENT_ID, filename: "Förfrågningsunderlag Solbacken.pdf", page_count: 16, is_fictitious: true }],
   checklist: checklistView,
+  checklist_progress: null,
   match: null,
   published_answers: [],
 };

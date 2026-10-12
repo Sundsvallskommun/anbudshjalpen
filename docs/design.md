@@ -190,7 +190,13 @@ AI. Under kortet står inköps publicerade svar, när det finns några. "Påminn
 står vid sista anbudsdag bland nyckeltalen, så kortet upprepar den inte. En stängd eller tilldelad upphandling lovas
 ingen checklista: kortet heter då "Ingen granskad checklista". Saknas underlaget kan inköparen ladda upp det där. När
 inköp inte granskar checklistor står det "Ingen checklista ännu" och "Ingen checklista" ([beslut
-0017](decisions/0017-granskad-bara-nar-inkop-granskar.md)).
+0017](decisions/0017-granskad-bara-nar-inkop-granskar.md)), och är checklistan på väg, det vill säga underlaget väntar
+på sin tolkning, heter kortet "Checklistan tas fram", säger att kraven visas så fort den är klar, och har en
+statusrad med snurra som säger var tolkningen är: "Står i kö. Nästa tolkning väntas kl. 15:42", "Tolkning pågår. Tar
+oftast under en minut" eller "Försök 1 av 5 misslyckades. Försöker igen tidigast kl. 16:05", med "Sidan uppdateras
+automatiskt. Senast kontrollerad kl. 15:37:12" under. Sidan frågar efter upphandlingen igen var femtonde sekund tills
+stegen kan visas ([beslut 0019](decisions/0019-utan-granskning-ingen-ogranskad-och-checklista-pa-vag.md)). Inköparen får i stället veta att
+en checklista publiceras direkt, eller att ingen är på väg och var en ny tolkning begärs.
 
 ### Fråga AI
 
@@ -202,13 +208,15 @@ syns bredvid, och knappen "Förstora panelen" gör den 720 px bred och högre f�
 sidan laddas om. Huvudet är en rad: en liten rubrik "Fråga AI" (h2 i dokumentets disposition, i en panels storlek)
 med ämnet på en rad under, och tysta ikonknappar med verktygstips: "Spara som PDF" och "Rensa samtalet" när det finns
 ett samtal, förstora eller förminska (inte på telefon) och "Stäng". Under huvudet, på en upphandlings sida, valet
-Underlaget · Reglerna (`SegmentedControl`). Samtalet är en `ChatMessageList`: frågan i en bubbla ("Du") och svaret
+Underlaget · Reglerna (`SegmentedControl`). Samtalet är en `ChatMessageList`: frågan i en bubbla till höger, utan
+namn över sig, och svaret
 som ett kort med ursprungsrad, "Står i underlaget" (eller "Inköp har svarat" när svaret bygger på inköps publicerade
 svar), en fet slutsats, inköps svar med frågan de besvarar och länken till posten, och citaten med sida, eller för reglerna
 paragraferna svaret bygger på, som på Regelhjälpen. När underlaget inte svarar har svaret den tonade rutan "Ger
 underlaget inget entydigt svar?" med "Påminn mig" och länken dit frågan ställs formellt, och annars raden "Oklart?
 Ställ frågan i e-Avrop senast 30 okt.". Tomt säger panelen på en dämpad rad vad svaren bygger på och när sista dag för frågor är.
-Exempelfrågor ovanför skrivfältet, som är Astryx `ChatComposer`, och under det raden att svaren är ett stöd. "Spara
+Exempelfrågor ovanför skrivfältet tills den första frågan är ställd, skrivfältet som är Astryx `ChatComposer`, och
+under det raden att svaren är ett stöd. "Spara
 som PDF" öppnar utskriftsvyn.
 
 Samtalen sparas per ämne i webbläsarens sessionslagring, så de finns kvar mellan sidorna och efter en omladdning i
@@ -300,9 +308,11 @@ tillbaka till länken när dialogen stängs.
   direkt med en toast som säger vad som hände ("Inställningen är sparad. 12 checklistor som väntade på granskning
   publicerades."). Se [beslut 0011](decisions/0011-installningar-granskning-valfri.md). När granskningen är av märks
   annonser med checklista bara "Checklista" (grå), eftersom "granskad" då inte skiljer ut någon annons ([beslut
-  0017](decisions/0017-granskad-bara-nar-inkop-granskar.md)), och checklistans ursprungsrad säger "Automatiskt
-  framtagen · inte granskad av inköp". Slås granskningen på igen märks en checklista som publicerades utan granskning
-  "Checklista, inte granskad".
+  0017](decisions/0017-granskad-bara-nar-inkop-granskar.md)), och ursprungsraderna säger bara "Automatiskt framtaget"
+  med källkontrollen, utan "inte granskat av inköp" ([beslut
+  0019](decisions/0019-utan-granskning-ingen-ogranskad-och-checklista-pa-vag.md)). Slås granskningen på igen märks en
+  checklista som publicerades utan granskning "Checklista, inte granskad" och dess ursprungsrad "Automatiskt framtaget
+  · inte granskat av inköp".
 
 ## Delade komponenter
 
@@ -312,7 +322,7 @@ Byggstenarna som omgörningen lade till ligger i `frontend/src/components/ui/`. 
 | Komponent | Till för |
 |---|---|
 | `AccentCard` | Ett kort med en accentkant på 4 px i startkanten, för det enda kortet i en vy som leder vidare: "Nästa steg" och Starts "Nästa frist". Tar samma props som Astryx `Card` |
-| `AiProvenance` | Ursprungsraden överst i varje automatiskt block, en gång. Granskat innehåll: "Granskad av inköp 5 okt 2026 · Alla 86 källhänvisningar hittades i underlaget". Annars "Automatiskt framtaget · inte granskat av inköp". Popovern "Hur togs det här fram?" namnger motorn: regelbaserat, AI via Eneo eller en AI-modell. `basis` säger vad innehållet bygger på: underlaget (standard), där popovern slutar med "Det är alltid förfrågningsunderlaget som gäller", eller lagen (`basis="law"`, Regelhjälpen), där den säger "Läs alltid hela paragrafen" och "Det är alltid lagtexten som gäller". På telefon heter länken "Mer" |
+| `AiProvenance` | Ursprungsraden överst i varje automatiskt block, en gång. Granskat innehåll: "Granskad av inköp 5 okt 2026 · Alla 86 källhänvisningar hittades i underlaget". Annars "Automatiskt framtaget · inte granskat av inköp", eller bara "Automatiskt framtaget" med källkontrollen medan inköp inte granskar något (beslut 0019). Popovern "Hur togs det här fram?" namnger motorn: regelbaserat, AI via Eneo eller en AI-modell. `basis` säger vad innehållet bygger på: underlaget (standard), där popovern slutar med "Det är alltid förfrågningsunderlaget som gäller", eller lagen (`basis="law"`, Regelhjälpen), där den säger "Läs alltid hela paragrafen" och "Det är alltid lagtexten som gäller". På telefon heter länken "Mer" |
 | `CollapsibleSection` | En grupp som kort, där rubriken är knappen. Antalet står i en Badge och ingår i knappens namn ("Skallkrav, 11 krav"), med en hjälprad och ett startläge. En länk till gruppen ("#skallkrav") eller till en rad i den öppnar gruppen och rullar sedan fram till målet och ger det fokus, även när man kommer från en annan sida. Innehållet ligger kvar när gruppen är stängd, så att ankarna fungerar |
 | `DeadlineBlock` | Fristblocket: "9 nov" stort i tabellsiffror, "kl. 23:59" och "om 35 dagar". Vid 7 dagar eller färre blir den relativa tiden en gul token med klocka, och ett passerat datum blir grått med "passerat". Varianterna `inline`, `stack` och `compact`. `note` sätter ett ord ovanför datumet där etiketten inte syns, till exempel "Anbudsansökan" |
 | `NextStepCard` | "Nästa steg" sist i varje steg: en mening och en eller två knappar, på ett `AccentCard` |

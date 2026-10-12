@@ -41,6 +41,7 @@ from anbudsklar.search.queries import (
 from anbudsklar.services.access import Viewer
 from anbudsklar.services.checklists import (
     checklist_payload,
+    checklist_progress,
     checklist_statuses,
     key_date,
     published_checklists,
@@ -250,6 +251,7 @@ async def notice_detail(session: AsyncSession, notice_id: uuid.UUID, viewer: Vie
         select(Document).where(Document.notice_id == notice.id).order_by(Document.created_at)
     )
     checklist = await visible_checklist(session, notice.id, viewer)
+    progress = await checklist_progress(session, notice.id) if checklist is None else None
     match = await _match_record(session, notice.id, viewer)
     answers = await list_published_answers(session, notice.id)
     return NoticeDetail(
@@ -263,6 +265,7 @@ async def notice_detail(session: AsyncSession, notice_id: uuid.UUID, viewer: Vie
         cpv_labels=await cpv_labels(session, notice.cpv_codes or []),
         documents=[document_info(document) for document in documents],
         checklist=to_checklist_view(checklist) if checklist else None,
+        checklist_progress=progress,
         match=match_view(match, summary) if match else None,
         published_answers=[published_answer_view(answer) for answer in answers],
     )
