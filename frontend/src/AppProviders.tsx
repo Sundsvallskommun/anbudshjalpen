@@ -5,6 +5,7 @@ import sv from "@astryxdesign/core/locales/sv-SE.json";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { Link as RouterLink } from "react-router";
+import { AskAiProvider } from "./components/ask/AskAiProvider";
 import { SourceDialogProvider } from "./components/ui/source/SourceDialogProvider";
 import { AppearanceTheme } from "./shell/appearance";
 
@@ -20,6 +21,8 @@ const MESSAGES = { "sv-SE": sv };
  * setting, which is the default. The theme's tokens are light-dark() values, so the mode only sets the
  * colour scheme. React Router's Link reads `to`, which Astryx passes alongside `href`.
  *
+ * AskAiProvider owns the "Fråga AI" panel's conversations (decision 0014), so they follow the reader between pages.
+ *
  * LayerProvider mounts the viewport that useToast() shows its toasts in ("Dold · Ångra", "Checklistan är
  * publicerad"), here inside the theme, the catalogue and the router: without it each toast falls back to a
  * detached viewport with English words ("Dismiss notification"), no Eneo theme and no router for its links.
@@ -32,7 +35,9 @@ export function AppProviders({ queryClient, children }: { queryClient: QueryClie
         <AppearanceTheme>
           <LinkProvider component={RouterLink}>
             <LayerProvider>
-              <SourceDialogProvider>{children}</SourceDialogProvider>
+              <SourceDialogProvider>
+                <AskAiProvider>{children}</AskAiProvider>
+              </SourceDialogProvider>
             </LayerProvider>
           </LinkProvider>
         </AppearanceTheme>

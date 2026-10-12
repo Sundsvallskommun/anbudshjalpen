@@ -273,13 +273,14 @@ describe("NoticePage step 1 Krav", () => {
     expect(within(explanation).getByText(/Ett intyg från försäkringsbolaget/u)).toBeInTheDocument();
   });
 
-  it("ends with the next step, which opens step 2", async () => {
+  it("ends with the next step, which opens the Fråga AI panel about the notice", async () => {
     mockApi([...baseRoutes(null), noticeRoute]);
     renderApp(`/upphandlingar/${NOTICE_ID}`);
 
     await userEvent.click(await screen.findByRole("button", { name: "Ställ en fråga" }));
-    expect(screen.getByRole("tab", { name: "Fråga" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tabpanel", { name: "Fråga" })).toHaveFocus();
+    const panel = await screen.findByRole("dialog", { name: "Fråga AI" });
+    expect(await within(panel).findByRole("radio", { name: "Underlaget" })).toBeChecked();
+    expect(screen.queryByRole("tab", { name: "Fråga" })).not.toBeInTheDocument();
   });
 
   it("shows inköp an unpublished checklist as not yet what companies see", async () => {
@@ -469,9 +470,11 @@ describe("NoticePage without a checklist", () => {
     expect(reminders).toHaveLength(1);
     expect(within(screen.getByRole("region", { name: "Nyckeltal" })).getByRole("button", { name: /^Påminn mig/u })).toBe(reminders[0]);
 
+    // "Fråga underlaget" opens the "Fråga AI" panel about this notice (decision 0014).
     await userEvent.click(screen.getByRole("button", { name: "Fråga underlaget" }));
-    expect(await screen.findByRole("heading", { level: 2, name: "Fråga underlaget" })).toHaveFocus();
-    expect(screen.getByRole("textbox", { name: /Din fråga/u })).toBeInTheDocument();
+    const panel = await screen.findByRole("dialog", { name: "Fråga AI" });
+    expect(await within(panel).findByRole("radio", { name: "Underlaget" })).toBeChecked();
+    expect(within(panel).getByRole("textbox")).toBeInTheDocument();
   });
 
   it("leads to the notice and to the documents where they are kept when none are read in here", async () => {

@@ -20,6 +20,7 @@ const DriftPage = lazy(() => import("./pages/buyer/DriftPage"));
 const SettingsPage = lazy(() => import("./pages/buyer/SettingsPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 const GatePage = lazy(() => import("./pages/GatePage"));
+const AskAiExportPage = lazy(() => import("./pages/AskAiExportPage"));
 
 function Lazy({ children }: { children: ReactNode }) {
   return <Suspense fallback={<Loading label="Hämtar sidan …" />}>{children}</Suspense>;
@@ -59,6 +60,8 @@ export function App() {
         <Route path="inkop/installningar" element={<Lazy><SettingsPage /></Lazy>} />
         <Route path="*" element={<Lazy><NotFoundPage /></Lazy>} />
       </Route>
+      {/* The conversation as a document to print: no frame, so only the document is printed (decision 0014). */}
+      <Route path="fraga-ai/utskrift" element={<Lazy><AskAiExportPage /></Lazy>} />
     </Routes>
   );
 }

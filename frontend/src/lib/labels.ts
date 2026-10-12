@@ -261,9 +261,8 @@ export function verificationText(summary: VerificationSummary): string | null {
 /** The four steps of a notice page, in order, with the values `?flik=` has always used. */
 export const STEPS = [
   { value: "checklista", label: "Krav", number: 1 },
-  { value: "fraga", label: "Fråga", number: 2 },
-  { value: "granska", label: "Granska", number: 3 },
-  { value: "inlamning", label: "Lämna in", number: 4 },
+  { value: "granska", label: "Granska", number: 2 },
+  { value: "inlamning", label: "Lämna in", number: 3 },
 ] as const;
 
 export type StepValue = (typeof STEPS)[number]["value"];

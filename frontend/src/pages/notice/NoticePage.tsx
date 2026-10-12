@@ -6,6 +6,7 @@ import { useParams } from "react-router";
 import { ApiError } from "../../api/client";
 import { useNotice, useSession } from "../../api/queries";
 import type { NoticeDetail } from "../../api/types";
+import { useAskDeepLink, useRegisterNotice } from "../../components/ask/AskAiProvider";
 import { ErrorNotice, Loading } from "../../components/states";
 import { useSourceDeepLink } from "../../components/ui/source/SourceDialogProvider";
 import { Page } from "../../shell/Page";
@@ -18,6 +19,7 @@ const BREADCRUMBS = [{ label: "Upphandlingar", href: "/upphandlingar" }] as cons
 function NoticeView({ notice }: { notice: NoticeDetail }) {
   const session = useSession();
   const user = session.data?.user ?? null;
+  useRegisterNotice(notice);
   return (
     <Page title={notice.title} breadcrumbs={BREADCRUMBS} intro={<NoticeIntro notice={notice} />}>
       <NoticeHeader notice={notice} user={user} />
@@ -31,14 +33,15 @@ function NoticeView({ notice }: { notice: NoticeDetail }) {
 }
 
 /**
- * A notice (direction.md, section 4 "Upphandlingens sida"): the header every step shares, then the four steps, or,
+ * A notice (direction.md, section 4 "Upphandlingens sida"): the header every step shares, then the three steps, or,
  * without a checklist, why there is none and what can be done anyway. `?citat=` or `?flik=underlag` in the address
- * opens the source dialog once the notice has loaded.
+ * opens the source dialog once the notice has loaded, and `?fraga=` opens the "Fråga AI" panel (decision 0014).
  */
 export default function NoticePage() {
   const { id = "" } = useParams();
   const notice = useNotice(id);
   useSourceDeepLink(notice.data);
+  useAskDeepLink(notice.data);
 
   if (notice.isPending) return <Loading label="Hämtar upphandlingen …" />;
   if (notice.isError) {

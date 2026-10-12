@@ -25,6 +25,7 @@ Hör ihop med: [Dokumentationsindex](../README.md), [Arkitektur](../architecture
 | [0011](0011-installningar-granskning-valfri.md) | Inköp styr inställningar i tjänsten, och granskningen före publicering går att slå av | Accepterat | 2026-10-12 |
 | [0012](0012-fragor-mot-alla-dokument.md) | Frågor besvaras mot alla dokument i upphandlingen, med ett urval över en budget | Accepterat | 2026-10-12 |
 | [0013](0013-fragor-och-svar-fran-eavrop.md) | Inköps publicerade svar på leverantörernas frågor hämtas från e-Avrops frågelogg | Accepterat | 2026-10-12 |
+| [0014](0014-fraga-ai-panel.md) | AI-stödet är en panel som följer läsaren, och samtalet går att spara som PDF | Accepterat | 2026-10-12 |
 
 ## Så skriver du ett beslut
 

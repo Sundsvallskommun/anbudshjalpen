@@ -56,7 +56,7 @@ describe("labels", () => {
   });
 
   it("keeps the step values the address has always used", () => {
-    expect(STEPS.map((step) => `${step.number} ${step.label}`)).toEqual(["1 Krav", "2 Fråga", "3 Granska", "4 Lämna in"]);
-    expect(STEPS.map((step) => step.value)).toEqual(["checklista", "fraga", "granska", "inlamning"]);
+    expect(STEPS.map((step) => `${step.number} ${step.label}`)).toEqual(["1 Krav", "2 Granska", "3 Lämna in"]);
+    expect(STEPS.map((step) => step.value)).toEqual(["checklista", "granska", "inlamning"]);
   });
 });

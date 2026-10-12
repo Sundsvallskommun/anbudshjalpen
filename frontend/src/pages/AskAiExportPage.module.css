@@ -1,0 +1,24 @@
+/* The conversation as a document to print or save as PDF (decision 0014): one reading column on screen, and in print
+   only the document, with page margins and no page break inside a question. Tokens only. */
+.paper {
+  inline-size: 100%;
+  max-inline-size: var(--layout-main);
+}
+
+.turn {
+  break-inside: avoid;
+}
+
+@media print {
+  .toolbar {
+    display: none;
+  }
+
+  .paper {
+    max-inline-size: none;
+  }
+}
+
+@page {
+  margin: 20mm;
+}

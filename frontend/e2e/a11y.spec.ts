@@ -45,8 +45,8 @@ async function openFirstNotice(page: Page, withChecklist: boolean): Promise<stri
   await ready(page);
 }
 
-/** One of the notice page's four steps: Krav, Fråga, Granska or Lämna in (a step's mark adds words to its name). */
-async function openStep(page: Page, step: "Krav" | "Fråga" | "Granska" | "Lämna in") {
+/** One of the notice page's three steps: Krav, Granska or Lämna in (a step's mark adds words to its name). */
+async function openStep(page: Page, step: "Krav" | "Granska" | "Lämna in") {
   await page.getByRole("tablist", { name: "Steg" }).getByRole("tab", { name: step }).click();
   await ready(page);
 }
@@ -83,9 +83,12 @@ const STATES: State[] = [
     name: "upphandling-fraga",
     persona: null,
     go: async (page) => {
+      // The "Fråga AI" panel (decision 0014), which replaced step 2: a dialog, or a bottom sheet on a phone.
       const skip = await openFirstNotice(page, true);
       if (skip) return skip;
-      await openStep(page, "Fråga");
+      await page.getByRole("button", { name: "Fråga AI" }).click();
+      await page.getByRole("dialog", { name: "Fråga AI" }).waitFor();
+      await ready(page);
     },
   },
   { name: "start", persona: "foretagare", go: (page) => open(page, "/start") },

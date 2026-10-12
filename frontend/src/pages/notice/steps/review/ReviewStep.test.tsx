@@ -138,18 +138,19 @@ describe("Step 3 Granska", () => {
     expect(screen.getByRole("button", { name: "Ser bra ut, 1 krav" })).toHaveAttribute("aria-expanded", "true");
   });
 
-  it("asks about a requirement in step 2, with the question ready to send", async () => {
+  it("asks about a requirement in the Fråga AI panel, with the question ready to send", async () => {
     mockApi([...baseRoutes(companyUser), noticeRoute, reviewRoute]);
     renderApp(`/upphandlingar/${NOTICE_ID}?flik=granska`);
 
     await review();
     const ask = screen.getByRole("link", { name: "Fråga om kravet ”Ansvarsförsäkring om minst 5 miljoner kronor”" });
-    // Its address does the same in a new tab.
-    expect(new URLSearchParams(ask.getAttribute("href")!.split("?")[1]).get("flik")).toBe("fraga");
+    // Its address does the same in a new tab: `?fraga=` opens the "Fråga AI" panel with the question (decision 0014).
+    const params = new URLSearchParams(ask.getAttribute("href")!.split("?")[1]);
+    expect(params.get("fraga")).toBe("Hur visar jag att vi uppfyller kravet ”Ansvarsförsäkring om minst 5 miljoner kronor”?");
+    expect(params.get("flik")).toBeNull();
     await userEvent.click(ask);
-    expect(screen.getByRole("tab", { name: "Fråga" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tabpanel", { name: "Fråga" })).toHaveFocus();
-    expect(await screen.findByRole("textbox", { name: /Din fråga/u })).toHaveValue(
+    const panel = await screen.findByRole("dialog", { name: "Fråga AI" });
+    expect(within(panel).getByRole("textbox")).toHaveTextContent(
       "Hur visar jag att vi uppfyller kravet ”Ansvarsförsäkring om minst 5 miljoner kronor”?",
     );
   });

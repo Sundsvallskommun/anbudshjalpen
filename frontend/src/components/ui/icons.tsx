@@ -36,6 +36,16 @@ export function DocumentIcon(props: IconSvgProps) {
   );
 }
 
+/** A conversation with the AI support ("Fråga AI"). */
+export function ChatIcon(props: IconSvgProps) {
+  return (
+    <StrokeIcon {...props}>
+      <path d="M21 11.5a8 8 0 0 1-8.5 8H9l-5 3.5v-6.3A8 8 0 0 1 12.5 3.5h.5a8 8 0 0 1 8 8z" />
+      <path d="M9 11.5h6" />
+    </StrokeIcon>
+  );
+}
+
 /** Remove something the user owns ("Ta bort" a reminder). */
 export function TrashIcon(props: IconSvgProps) {
   return (

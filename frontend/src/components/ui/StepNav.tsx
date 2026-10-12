@@ -75,9 +75,10 @@ export interface StepNavProps {
 }
 
 /**
- * The notice page's four numbered steps (1 Krav · 2 Fråga · 3 Granska · 4 Lämna in) as a sticky tab bar. The step
- * lives in the address (`?flik=checklista|fraga|granska|inlamning`), so it can be linked to and survives a reload. On
- * a phone the labels drop their numbers and fill four equal cells. WAI-ARIA tabs: each tab controls its panel.
+ * The notice page's three numbered steps (1 Krav · 2 Granska · 3 Lämna in) as a sticky tab bar. The step lives in
+ * the address (`?flik=checklista|granska|inlamning`), so it can be linked to and survives a reload; the old step
+ * `fraga` now opens the "Fråga AI" panel (decision 0014). On a phone the labels drop their numbers and fill three
+ * equal cells. WAI-ARIA tabs: each tab controls its panel.
  */
 export function StepNav({ panels, marks = {}, end, idPrefix = "steg" }: StepNavProps) {
   const [params, setParams] = useSearchParams();

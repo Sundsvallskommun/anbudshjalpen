@@ -26,7 +26,7 @@ loggar man in som Anna Berg på firman ([beslut 0007](decisions/0007-poc-login-p
    med Påminn mig, och under träffarna kommande upphandlingar utifrån avtalskatalogen. Gamla adressen /bevakning leder
    hit.
 3. **Träff:** ett mejl som visas i Mailpit, med länk till upphandlingen och till Start.
-4. **Krav:** upphandlingens sida har fyra steg, 1 Krav, 2 Fråga, 3 Granska och 4 Lämna in. Steg 1 visar skallkrav,
+4. **Krav:** upphandlingens sida har tre steg, 1 Krav, 2 Granska och 3 Lämna in. Steg 1 visar skallkrav,
    kvalificeringskrav, bilagor, utvärdering och datum, där varje punkt länkar till sidan i underlaget ("s. 5") och
    termerna förklaras vid klick. "Påminn mig" finns vid sista anbudsdag och sista dag för frågor i sidhuvudet, och på
    checklistans första daterade rad för frågestopp och för sista anbudsdag, alltså de datum som påminnelsen gäller.
@@ -34,10 +34,11 @@ loggar man in som Anna Berg på firman ([beslut 0007](decisions/0007-poc-login-p
    selektivt förfarande anger annonsen bara sista dag för anbudsansökan, och sidhuvudet påminner om den i stället.
    Knappen visas bara för en öppen upphandling och aldrig för ett datum som har passerat, och för frågestoppet bara när
    checklistan är publicerad.
-5. **Fråga:** svar med citat, med slutsatsen först. Om underlaget inte ger svar föreslår Anbudsklar att firman ställer
-   frågan formellt i e-Avrop före frågestoppet och skapar en påminnelse, när den publicerade checklistan anger ett
-   frågestopp som inte har passerat. Före den egna tråden står de svar inköp redan har publicerat i e-Avrop på
-   andra leverantörers frågor, samma för alla ([beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md)).
+5. **Fråga AI:** en panel som öppnas på varje sida ([beslut 0014](decisions/0014-fraga-ai-panel.md)), med svar med
+   citat och slutsatsen först. Om underlaget inte ger svar föreslår Anbudsklar att firman ställer frågan formellt i
+   e-Avrop före frågestoppet och skapar en påminnelse, när den publicerade checklistan anger ett frågestopp som inte
+   har passerat. Samtalet följer med mellan sidorna och går att spara som PDF. I steg 1 står de svar inköp redan har
+   publicerat i e-Avrop på andra leverantörers frågor, samma för alla ([beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md)).
 6. **Granska:** firman laddar upp ett utkast och får först ett besked, till exempel hur många saker som behöver
    åtgärdas, och sedan kraven grupperade som Måste åtgärdas, Kontrollera själv och Ser bra ut. Inget sparas.
 7. **Lämna in:** sker i e-Avrop. Steg 4 är en sista kontroll att bocka av, där det som granskningen bedömde som "Ser

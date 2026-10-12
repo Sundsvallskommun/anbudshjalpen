@@ -14,7 +14,7 @@ function Counter() {
 
 function AskButton() {
   const { goTo } = useStepNav();
-  return <Button label="Ställ en fråga" onClick={() => goTo("fraga", { fraga: "Hur många referenser?" })} />;
+  return <Button label="Granska med en fråga" onClick={() => goTo("granska", { fraga: "Hur många referenser?" })} />;
 }
 
 const panels = {
@@ -24,13 +24,12 @@ const panels = {
       <AskButton />
     </>
   ),
-  fraga: () => <p>Frågorna</p>,
   granska: () => <p>Granskningen</p>,
   inlamning: () => <p>Inlämningen</p>,
 };
 
 describe("StepNav", () => {
-  it("shows the four steps and the one the address asks for", () => {
+  it("shows the three steps and the one the address asks for", () => {
     mockApi([]);
     renderWithProviders(<StepNav panels={panels} />, { path: "/upphandlingar/1?flik=granska" });
     const tabs = screen.getAllByRole("tab");
@@ -47,9 +46,9 @@ describe("StepNav", () => {
     renderWithProviders(<StepNav panels={panels} marks={{ granska: "warning" }} />, { path: "/upphandlingar/1" });
 
     await userEvent.click(screen.getByRole("button", { name: "Räknat 0" }));
-    await userEvent.click(screen.getByRole("tab", { name: "Fråga" }));
-    expect(screen.getByTestId("location")).toHaveTextContent("/upphandlingar/1?flik=fraga");
-    expect(screen.getByText("Frågorna")).toBeVisible();
+    await userEvent.click(screen.getByRole("tab", { name: "Lämna in" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/upphandlingar/1?flik=inlamning");
+    expect(screen.getByText("Inlämningen")).toBeVisible();
 
     await userEvent.click(screen.getByRole("tab", { name: "Krav" }));
     expect(screen.getByRole("button", { name: "Räknat 1" })).toBeInTheDocument();
@@ -60,8 +59,8 @@ describe("StepNav", () => {
   it("moves to a step from its own content, with parameters, and focuses its panel", async () => {
     mockApi([]);
     renderWithProviders(<StepNav panels={panels} />, { path: "/upphandlingar/1" });
-    await userEvent.click(screen.getByRole("button", { name: "Ställ en fråga" }));
-    expect(screen.getByTestId("location")).toHaveTextContent(/flik=fraga&fraga=Hur\+m/u);
-    expect(screen.getByRole("tabpanel", { name: "Fråga" })).toHaveFocus();
+    await userEvent.click(screen.getByRole("button", { name: "Granska med en fråga" }));
+    expect(screen.getByTestId("location")).toHaveTextContent(/flik=granska&fraga=Hur\+m/u);
+    expect(screen.getByRole("tabpanel", { name: "Granska" })).toHaveFocus();
   });
 });

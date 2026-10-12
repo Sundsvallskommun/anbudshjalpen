@@ -4,17 +4,13 @@ import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
 import { VStack } from "@astryxdesign/core/VStack";
-import { useEffect, useRef } from "react";
-import { useSearchParams } from "react-router";
 import type { NoticeDetail, UserView } from "../../api/types";
+import { useAskAi } from "../../components/ask/AskAiProvider";
 import { DocumentUpload } from "../../components/DocumentUpload";
-import { STEP_PARAM } from "../../components/ui/StepNav";
 import { noticeDeadlineLabel } from "../../lib/labels";
 import { externalLink, noticeLinkText, type ExternalLink } from "../../lib/links";
 import { outsideDocumentsText } from "./header/Documents";
-import { QUESTION_HEADING_ID, QuestionStep } from "./steps/question/QuestionStep";
-
-const ASKING = "fraga";
+import { PublishedAnswers } from "./steps/question/PublishedAnswers";
 
 /** A notice past sista anbudsdag, or awarded: no checklist is on its way, so the card does not say "ännu". */
 function isOver(notice: NoticeDetail): boolean {
@@ -58,35 +54,16 @@ function OutsideButton({ href, text }: { href: string; text: string }) {
 
 /**
  * A notice without a checklist (most TED notices; direction.md, section 4): no steps, but why there is no checklist,
- * the notice's own page, the documents where they are kept and, when there is a document here, questions about it.
- * The questions open below (`?flik=fraga`, so the place can be linked to). The reminder before sista anbudsdag is
- * the one beside the date in the key facts: one per deadline. A closed or awarded notice is not promised a checklist.
+ * the notice's own page, the documents where they are kept and, when there is a document here, "Fråga underlaget",
+ * which opens the "Fråga AI" panel (decision 0014). Inköp's published answers follow (decision 0013). The reminder
+ * before sista anbudsdag is the one beside the date in the key facts: one per deadline. A closed or awarded notice
+ * is not promised a checklist.
  */
 export function NoChecklist({ notice, user }: { notice: NoticeDetail; user: UserView | null }) {
-  const [params, setParams] = useSearchParams();
-  const isAsking = notice.has_documents && params.get(STEP_PARAM) === ASKING;
-  const wantsFocus = useRef(false);
+  const askAi = useAskAi();
   const page = externalLink(notice.url);
   const documentsPage = notice.has_documents ? null : externalLink(notice.documents_url);
   const outsideDocuments = documentsPage && documentsPage.href !== page?.href ? documentsPage : null;
-
-  useEffect(() => {
-    if (!isAsking || !wantsFocus.current) return;
-    wantsFocus.current = false;
-    document.getElementById(QUESTION_HEADING_ID)?.focus();
-  }, [isAsking]);
-
-  const ask = () => {
-    wantsFocus.current = true;
-    setParams(
-      (current) => {
-        const next = new URLSearchParams(current);
-        next.set(STEP_PARAM, ASKING);
-        return next;
-      },
-      { replace: true },
-    );
-  };
 
   return (
     <VStack gap={6}>
@@ -99,7 +76,7 @@ export function NoChecklist({ notice, user }: { notice: NoticeDetail; user: User
             <HStack gap={3} vAlign="center" hAlign="center" wrap="wrap">
               {page && <OutsideButton href={page.href} text={noticeLinkText(page.site)} />}
               {outsideDocuments && <OutsideButton href={outsideDocuments.href} text={outsideDocumentsText(outsideDocuments.site)} />}
-              {notice.has_documents && !isAsking && <Button label="Fråga underlaget" variant="primary" onClick={ask} />}
+              {notice.has_documents && <Button label="Fråga underlaget" variant="primary" onClick={() => askAi.open()} />}
             </HStack>
           }
         />
@@ -109,7 +86,7 @@ export function NoChecklist({ notice, user }: { notice: NoticeDetail; user: User
           <DocumentUpload noticeId={notice.id} />
         </Card>
       )}
-      {isAsking && <QuestionStep notice={notice} />}
+      <PublishedAnswers notice={notice} />
     </VStack>
   );
 }

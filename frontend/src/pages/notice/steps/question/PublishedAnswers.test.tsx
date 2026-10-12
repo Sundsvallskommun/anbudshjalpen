@@ -18,7 +18,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("Published answers in step 2 (decision 0013)", () => {
+describe("Published answers in step 1 (decision 0013)", () => {
   it("lists the buyer's answers with their number and date, open from the start", async () => {
     const later = {
       ...publishedAnswer,
@@ -27,7 +27,7 @@ describe("Published answers in step 2 (decision 0013)", () => {
       answered_at: "2026-10-02T09:00:00+02:00",
     };
     mockApi([...baseRoutes(companyUser), noticeWith({ published_answers: [publishedAnswer, later] })]);
-    renderApp(`/upphandlingar/${NOTICE_ID}?flik=fraga`);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
 
     const trigger = await screen.findByRole("button", { name: "Svar inköp har publicerat i e-Avrop, 2 svar" });
     expect(trigger).toHaveAttribute("aria-expanded", "true");
@@ -41,23 +41,23 @@ describe("Published answers in step 2 (decision 0013)", () => {
     expect(second).toHaveTextContent("Fråga 2 · besvarad 2 okt");
     // A single line break in the log is not a paragraph.
     expect(within(second).getByText("Ja. Det gäller alla som utför arbete i uppdraget.")).toBeInTheDocument();
-    // The reader's own thread still follows.
-    expect(screen.getByRole("textbox", { name: /Din fråga/u })).toBeInTheDocument();
+    // The reader's own questions follow, in the "Fråga AI" panel.
+    expect(screen.getByRole("button", { name: "Ställ en fråga" })).toBeInTheDocument();
   });
 
-  it("is shown with the questions of a notice without a checklist, once the reader opens them", async () => {
+  it("is shown under the card of a notice without a checklist", async () => {
     mockApi([...baseRoutes(companyUser), noticeWith({ checklist: null, checklist_status: "none", published_answers: [publishedAnswer] })]);
-    renderApp(`/upphandlingar/${NOTICE_ID}?flik=fraga`);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
 
     expect(await screen.findByRole("list", { name: "Publicerade frågor och svar" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 2, name: "Fråga underlaget" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Fråga underlaget" })).toBeInTheDocument();
   });
 
   it("shows nothing when the buyer has published no answers", async () => {
     mockApi([...baseRoutes(companyUser), noticeWith()]);
-    renderApp(`/upphandlingar/${NOTICE_ID}?flik=fraga`);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
 
-    await screen.findByRole("heading", { level: 2, name: "Fråga underlaget" });
+    await screen.findByRole("button", { name: "Ställ en fråga" });
     expect(screen.queryByRole("list", { name: "Publicerade frågor och svar" })).not.toBeInTheDocument();
   });
 

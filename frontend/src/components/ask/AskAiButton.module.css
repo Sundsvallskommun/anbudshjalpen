@@ -1,0 +1,28 @@
+/* "Fråga AI" follows the reader at the end of the viewport, over the page (decision 0014): the design system has no
+   floating control, so this module places its button. The page keeps a focused control clear of it when it scrolls
+   one into view (WCAG 2.4.11), as app.css does for the step bar. Not printed. Tokens only. */
+.button {
+  position: fixed;
+  inset-block-end: var(--spacing-6);
+  inset-inline-end: var(--spacing-6);
+  z-index: 3;
+  border-radius: var(--radius-container);
+  box-shadow: var(--shadow-high);
+}
+
+@media (max-width: 639px) {
+  .button {
+    inset-block-end: var(--spacing-4);
+    inset-inline-end: var(--spacing-4);
+  }
+}
+
+html:has([data-ask-ai-button]) {
+  scroll-padding-block-end: calc(var(--spacing-10) * 2);
+}
+
+@media print {
+  .button {
+    display: none;
+  }
+}

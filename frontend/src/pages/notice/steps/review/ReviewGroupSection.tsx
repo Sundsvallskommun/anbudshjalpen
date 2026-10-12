@@ -9,7 +9,7 @@ import { StatusToken } from "../../../../components/tokens";
 import { CollapsibleSection } from "../../../../components/ui/CollapsibleSection";
 import { requirementAnchor } from "../../../../components/ui/RequirementRow";
 import { SourceLink } from "../../../../components/ui/source/SourceLink";
-import { useStepNav } from "../../../../components/ui/StepNav";
+import { useAskAi } from "../../../../components/ask/AskAiProvider";
 import { REQUIREMENT_KINDS } from "../../../../lib/labels";
 import { keepNumbersTogether } from "../../../../lib/text";
 import { questionAbout, type ReviewGroup, type ReviewItem } from "./reviewModel";
@@ -33,7 +33,7 @@ function ReviewRow({
   noticeId: string;
   documentId?: string;
 }) {
-  const { goTo } = useStepNav();
+  const askAi = useAskAi();
   const { check, requirement, title } = item;
   const isActionable = group.id === "atgarda" || group.id === "kontrollera";
   const comment = group.helper === check.comment.trim() ? null : check.comment;
@@ -70,16 +70,16 @@ function ReviewRow({
           </>
         )}
         {isActionable && (
-          // A link like its neighbours: its address opens step 2 with the question in the composer, also in a new tab.
+          // A link like its neighbours: its address opens the "Fråga AI" panel with the question, also in a new tab.
           <Link
-            href={`?${new URLSearchParams({ flik: "fraga", fraga: question })}`}
+            href={`?${new URLSearchParams({ fraga: question })}`}
             label={`Fråga om kravet ”${title}”`}
             isStandalone
             size="sm"
             onClick={(event) => {
               if (!isPlainClick(event)) return;
               event.preventDefault();
-              goTo("fraga", { fraga: question });
+              askAi.open({ question });
             }}
           >
             Fråga om kravet

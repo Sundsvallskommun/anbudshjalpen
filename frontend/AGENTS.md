@@ -39,6 +39,9 @@ The design as built is in `docs/design.md`. Comments that cite "direction.md, se
 - `public/favicon.svg` is the mark (Gnistan), shown by the top bar's `Brand` and the browser tab. `npm run icons`
   (`scripts/icons.mjs`) builds `favicon.ico`, the home-screen and manifest icons and the README logo from it; rerun it
   after changing the mark, and never edit the generated files by hand.
+- `src/components/ask/` is "Fråga AI" (decision 0014): `AskAiProvider` owns the panel and the conversations
+  (`askAiState.ts`, session storage), `AskAiPanel` is the panel (Astryx Dialog or BottomSheet with the Chat
+  components) and `AskAiButton` the button that follows the reader. `useAskAi().open({ question })` opens it anywhere.
 - `src/components/` also holds the status tokens (`tokens.tsx`), `states.tsx` (loading and errors), `TermText`,
   `RowList`, `UrlTabs`, `NoticeRow`, `FormalQuestionAdvice`, `DocumentUpload` and the checklist's sections
   (`checklist/`). `src/lib/` has pure helpers: dates and numbers (`format.ts`), the Swedish words for the contract's

@@ -1,29 +1,13 @@
-import { Button } from "@astryxdesign/core/Button";
-import { Icon } from "@astryxdesign/core/Icon";
 import { useRef, useState } from "react";
 import { useReviewDraft } from "../../../api/queries";
 import type { ChecklistView, NoticeDetail, UserView } from "../../../api/types";
 import { DeadlineBlock } from "../../../components/ui/DeadlineBlock";
 import { noticeDeadlineLabel } from "../../../lib/labels";
-import { ArrowRightIcon } from "../../../components/ui/icons";
-import { NextStepCard } from "../../../components/ui/NextStepCard";
-import { StepNav, useStepNav, type StepMark, type StepValue } from "../../../components/ui/StepNav";
-import { QuestionStep } from "./question/QuestionStep";
+import { StepNav, type StepMark, type StepValue } from "../../../components/ui/StepNav";
 import { RequirementsStep } from "./requirements/RequirementsStep";
 import { reviewGroups, reviewVerdict } from "./review/reviewModel";
 import { ReviewStep, type ReviewControls, type ReviewedDraft } from "./review/ReviewStep";
 import { SubmitStep } from "./submit/SubmitStep";
-
-/** "Nästa steg" at the end of step 2: on to the review. */
-function QuestionStepEnd() {
-  const { goTo } = useStepNav();
-  return (
-    <NextStepCard
-      text="Har du ett utkast till anbud? Låt Anbudsklar jämföra det med kraven."
-      action={<Button label="Gå till steg 3 Granska" endContent={<Icon icon={ArrowRightIcon} />} onClick={() => goTo("granska")} />}
-    />
-  );
-}
 
 /**
  * The latest review of this visit, above the steps: step 3 shows it, step 4 ticks what it found and the step bar marks
@@ -67,9 +51,9 @@ function reviewMark(reviewed: ReviewedDraft | null, view: ChecklistView): StepMa
 }
 
 /**
- * The four steps of a notice with a checklist (direction.md, section 4): 1 Krav, 2 Fråga, 3 Granska and 4 Lämna in in
- * a sticky bar, with sista anbudsdag at its end once it has stuck. Step 3 is marked when a review found gaps, or when
- * everything looked fine.
+ * The three steps of a notice with a checklist (direction.md, section 4, with step 2 Fråga replaced by the "Fråga AI"
+ * panel in decision 0014): 1 Krav, 2 Granska and 3 Lämna in in a sticky bar, with sista anbudsdag at its end once it
+ * has stuck. Granska is marked when a review found gaps, or when everything looked fine.
  */
 export function NoticeSteps({ notice, view, user }: { notice: NoticeDetail; view: ChecklistView; user: UserView | null }) {
   const review = useReview(notice);
@@ -85,7 +69,6 @@ export function NoticeSteps({ notice, view, user }: { notice: NoticeDetail; view
       }
       panels={{
         checklista: () => <RequirementsStep notice={notice} view={view} user={user} />,
-        fraga: () => <QuestionStep notice={notice} nextStep={<QuestionStepEnd />} />,
         granska: () => <ReviewStep notice={notice} view={view} user={user} controls={review} />,
         inlamning: () => <SubmitStep notice={notice} view={view} review={review.reviewed?.view ?? null} />,
       }}
