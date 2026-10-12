@@ -39,8 +39,9 @@ export function groupByDivision(codes: readonly SearchableItem[], divisions: Rec
 
 /**
  * The chosen codes as rows under their CPV division (direction.md, principle "dense data = rows"), each named
- * first with the code below and "Ta bort" at the end. Chips in the search field lost their shape past a handful of
- * codes; rows grouped by area stay readable at twenty.
+ * first with the code after it in a quieter colour, the way the search field and the suggestions name a code, and
+ * a quiet "Ta bort" at the end. Chips in the search field lost their shape past a handful of codes; rows grouped
+ * by area stay readable at twenty.
  */
 export function ChosenCodes({ codes, divisions, onRemove }: ChosenCodesProps) {
   const headingId = useId();
@@ -48,29 +49,40 @@ export function ChosenCodes({ codes, divisions, onRemove }: ChosenCodesProps) {
     return <Text color="secondary">Inga koder valda ännu. Sök ovan eller tryck Föreslå koder.</Text>;
   }
   return (
-    <VStack gap={4} role="group" aria-labelledby={headingId}>
+    <VStack gap={5} role="group" aria-labelledby={headingId}>
       <Text id={headingId} weight="semibold">
         {`Era koder · ${codes.length}`}
       </Text>
       {groupByDivision(codes, divisions).map((group) => (
-        <VStack key={group.division} gap={1}>
-          <Heading level={4} accessibilityLevel={3}>
+        <VStack key={group.division} gap={2}>
+          <Heading level={5} accessibilityLevel={3} color="secondary">
             {group.title}
           </Heading>
           <List density="compact" hasDividers>
             {group.items.map((item) => (
               <ListItem
                 key={item.code}
-                label={item.label}
-                description={item.code}
+                // A node, not a string: Astryx cuts a string label to one line, and a long name ("Delar av eller
+                // kompletta bygg- och anläggningsarbeten…") must wrap, on a phone above all.
+                label={
+                  <>
+                    <Text>{item.label}</Text>
+                    {/* A no-break space keeps the dot with the last word, so no line starts with "· 45200000". */}
+                    <Text color="secondary" hasTabularNumbers textWrap="nowrap">
+                      {`\u00a0· ${item.code}`}
+                    </Text>
+                  </>
+                }
                 endContent={
+                  // The visible word is the children; `label` is the accessible name, which says which code goes.
                   <Button
-                    label="Ta bort"
-                    aria-label={`Ta bort ${item.label} · ${item.code}`}
+                    label={`Ta bort ${item.label} · ${item.code}`}
                     size="sm"
                     variant="ghost"
                     onClick={() => onRemove(item.code)}
-                  />
+                  >
+                    Ta bort
+                  </Button>
                 }
               />
             ))}

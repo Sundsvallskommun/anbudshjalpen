@@ -32,17 +32,29 @@ function QuestionStepEnd() {
 function useReview(notice: NoticeDetail): ReviewControls {
   const mutation = useReviewDraft(notice.id);
   const [reviewed, setReviewed] = useState<ReviewedDraft | null>(null);
+  const [reviewingFileName, setReviewingFileName] = useState<string | null>(null);
   const count = useRef(0);
+  // The last draft, so a failed review can be run again without choosing the file anew. Gone with the page.
+  const lastFile = useRef<File | null>(null);
+  const review = (file: File) => {
+    lastFile.current = file;
+    setReviewingFileName(file.name);
+    mutation.mutate(file, {
+      onSuccess: (view) => {
+        count.current += 1;
+        setReviewed({ view, fileName: file.name, number: count.current });
+      },
+      onSettled: () => setReviewingFileName(null),
+    });
+  };
   return {
     reviewed,
-    review: (file) =>
-      mutation.mutate(file, {
-        onSuccess: (view) => {
-          count.current += 1;
-          setReviewed({ view, fileName: file.name, number: count.current });
-        },
-      }),
+    review,
+    retry: () => {
+      if (lastFile.current) review(lastFile.current);
+    },
     isReviewing: mutation.isPending,
+    reviewingFileName,
     error: mutation.isError ? mutation.error : null,
   };
 }

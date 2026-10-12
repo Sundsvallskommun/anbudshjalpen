@@ -3,7 +3,7 @@ import { Card } from "@astryxdesign/core/Card";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Icon } from "@astryxdesign/core/Icon";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 import type { ChecklistView, NoticeDetail, ReviewView, UserView } from "../../../../api/types";
 import { ErrorNotice } from "../../../../components/states";
@@ -14,7 +14,7 @@ import { StepLayout } from "../StepLayout";
 import { ReviewRail } from "./ReviewRail";
 import { ReviewResult } from "./ReviewResult";
 import { reviewGroups, reviewVerdict } from "./reviewModel";
-import { ReviewedFile, ReviewUpload } from "./ReviewUpload";
+import { ReviewedFile, ReviewInProgress, ReviewUpload } from "./ReviewUpload";
 
 /** The latest reviewed draft: kept above the steps, so step 4 can tick what it found. The file itself is gone. */
 export interface ReviewedDraft {
@@ -27,7 +27,11 @@ export interface ReviewedDraft {
 export interface ReviewControls {
   reviewed: ReviewedDraft | null;
   review: (file: File) => void;
+  /** Review the last draft again, after a failure. */
+  retry: () => void;
   isReviewing: boolean;
+  /** The draft under review, by name, while `isReviewing`. */
+  reviewingFileName: string | null;
   error: unknown;
 }
 
@@ -93,8 +97,10 @@ function StepEnd({
 
 /**
  * Step 3 Granska (direction.md, section 4): the draft is checked against the published checklist and never stored.
- * Before a review the upload area, with the privacy rules beside it; after one the form folds into a row with
- * "Granska en ny version", and the result follows. Only a company can review, and only a published checklist.
+ * Before a review the upload area, with the privacy rules beside it; choosing the file starts the review, and a card
+ * shows the work while it runs. After it the form folds into a row with "Granska en ny version", and the result
+ * follows and takes the focus, so the answer is where the reader lands. Only a company can review, and only a
+ * published checklist.
  */
 export function ReviewStep({
   notice,
@@ -109,7 +115,16 @@ export function ReviewStep({
 }) {
   const { pathname, search } = useLocation();
   const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const { reviewed, isReviewing, error } = controls;
+  const { reviewed, isReviewing, reviewingFileName, error } = controls;
+  const resultTitle = useRef<HTMLHeadingElement>(null);
+  // A result that arrives while the step is open takes the focus; one already there when the step opens does not.
+  const seen = useRef(reviewed?.number ?? 0);
+
+  useEffect(() => {
+    if (!reviewed || reviewed.number === seen.current) return;
+    seen.current = reviewed.number;
+    resultTitle.current?.focus();
+  }, [reviewed]);
 
   if (view.status !== "published") {
     return (
@@ -136,16 +151,22 @@ export function ReviewStep({
     controls.review(file);
     setIsUploadOpen(false);
   };
-  const showsUpload = !reviewed || isUploadOpen || isReviewing;
+  const showsUpload = !isReviewing && (!reviewed || isUploadOpen);
+  const showsReviewedRow = !isReviewing && reviewed !== null && !isUploadOpen;
 
   return (
     <StepLayout rail={<ReviewRail showsNotKept={!showsUpload} />} railLabel="Om granskningen">
       <Heading level={2}>Granska ditt anbudsutkast</Heading>
-      {reviewed && !isUploadOpen && !isReviewing && (
+      {isReviewing && (
+        <ReviewInProgress fileName={reviewingFileName ?? "Ditt utkast"} requirementCount={view.checklist.requirements.length} />
+      )}
+      {showsReviewedRow && reviewed && (
         <ReviewedFile fileName={reviewed.fileName} onNewVersion={() => setIsUploadOpen(true)} />
       )}
-      {showsUpload && <ReviewUpload onReview={review} isReviewing={isReviewing} takesFocus={isUploadOpen} />}
-      {error !== null && error !== undefined && <ErrorNotice title="Utkastet kunde inte granskas" error={error} />}
+      {!isReviewing && error !== null && error !== undefined && (
+        <ErrorNotice title="Utkastet kunde inte granskas" error={error} onRetry={controls.retry} />
+      )}
+      {showsUpload && <ReviewUpload onReview={review} takesFocus={isUploadOpen} />}
       {reviewed && (
         <ReviewResult
           key={reviewed.number}
@@ -153,13 +174,16 @@ export function ReviewStep({
           checklist={view.checklist}
           noticeId={notice.id}
           documentId={view.document_id}
+          titleRef={resultTitle}
         />
       )}
-      <StepEnd
-        mustFix={reviewed ? reviewVerdict(reviewGroups(reviewed.view, view.checklist)).mustFix : null}
-        isUploadOpen={showsUpload}
-        onNewVersion={() => setIsUploadOpen(true)}
-      />
+      {!isReviewing && (
+        <StepEnd
+          mustFix={reviewed ? reviewVerdict(reviewGroups(reviewed.view, view.checklist)).mustFix : null}
+          isUploadOpen={showsUpload}
+          onNewVersion={() => setIsUploadOpen(true)}
+        />
+      )}
     </StepLayout>
   );
 }

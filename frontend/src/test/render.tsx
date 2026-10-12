@@ -17,6 +17,8 @@ export interface MockRoute {
   status?: number;
   /** The JSON body to answer with, or a function of the parsed request body. */
   body?: unknown | ((requestBody: unknown) => unknown);
+  /** Answer this late, so a test can see what the page shows while it waits. */
+  delayMs?: number;
 }
 
 export interface RecordedCall {
@@ -48,6 +50,7 @@ export function mockApi(routes: MockRoute[]): RecordedCall[] {
     if (!route) {
       return new Response(JSON.stringify({ detail: `Ingen testdata för ${method} ${url.pathname}` }), { status: 404 });
     }
+    if (route.delayMs) await new Promise((resolve) => setTimeout(resolve, route.delayMs));
     const status = route.status ?? 200;
     const payload = typeof route.body === "function" ? route.body(body) : route.body;
     if (status === 204) return new Response(null, { status });
