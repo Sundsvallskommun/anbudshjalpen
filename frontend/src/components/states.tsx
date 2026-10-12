@@ -13,7 +13,9 @@ export function Loading({ label }: { label: string }) {
   );
 }
 
+/** The words for a failed request: the server's own (ApiError), or ones already written for the reader (a string). */
 export function errorMessage(error: unknown): string {
+  if (typeof error === "string" && error.trim()) return error;
   return error instanceof ApiError ? error.message : "Något gick fel. Försök igen.";
 }
 

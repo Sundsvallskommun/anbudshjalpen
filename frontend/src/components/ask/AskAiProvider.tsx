@@ -2,6 +2,7 @@ import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, 
 import { useSearchParams } from "react-router";
 import { useAskQuestion, useAskRules } from "../../api/queries";
 import type { NoticeDetail } from "../../api/types";
+import { errorMessage } from "../states";
 import {
   historyOf,
   latestRulesSession,
@@ -56,10 +57,6 @@ export const QUESTION_PARAM = "fraga";
 /** The old step's address (`?flik=fraga`), which still opens the panel. */
 const OLD_STEP = "fraga";
 
-function errorWords(error: unknown): string {
-  return error instanceof Error && error.message ? error.message : "Något gick fel. Försök igen.";
-}
-
 /**
  * Owns the "Fråga AI" panel (decision 0014): whether it is open, what it is about and every conversation, so the
  * panel is the same wherever it is opened from and a conversation follows the reader between pages. Mounted once in
@@ -106,7 +103,7 @@ export function AskAiProvider({ children }: { children: ReactNode }) {
         ...previous,
         [targetKey]: [...(previous[targetKey] ?? []), { id, question: text, answer: null, rules: null, error: null }],
       }));
-      const fail = (error: unknown) => updateTurn(targetKey, id, { error: errorWords(error) });
+      const fail = (error: unknown) => updateTurn(targetKey, id, { error: errorMessage(error) });
       if (target.kind === "notice") {
         askNotice.mutate(
           { question: text, history: historyOf(earlier) },

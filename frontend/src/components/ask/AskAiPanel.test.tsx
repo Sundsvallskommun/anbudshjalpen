@@ -215,6 +215,8 @@ describe("Fråga AI (decision 0014)", () => {
     await ask(panel, "Vilka försäkringar måste vi ha?");
     const answer = await within(panel).findByRole("article", { name: "Svar på ”Vilka försäkringar måste vi ha?”" });
     expect(await within(answer).findByText("Frågan kunde inte besvaras")).toBeInTheDocument();
+    // The server's reason, not a generic "Något gick fel".
+    expect(within(answer).getByText("AI-tjänsten svarar inte just nu.")).toBeInTheDocument();
     expect(within(answer).getByRole("button", { name: "Försök igen" })).toBeInTheDocument();
   });
 
