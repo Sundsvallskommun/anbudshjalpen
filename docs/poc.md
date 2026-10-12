@@ -48,6 +48,10 @@ loggar man in som Anna Berg på firman ([beslut 0007](decisions/0007-poc-login-p
 Regelhjälpen svarar på allmänna frågor om upphandling med hänvisning till LOU och vägledningar. Varje paragraf som
 svaret bygger på visas med lagens egna ord.
 
+För den som visar demon finns växeln "Visa hur underlaget lästes" under "Om demon och AI". Upphandlingens sida får då
+knappen "Så lästes underlaget", som visar vad som hände med varje fil från hämtningen till checklistan, se
+[Design](design.md#upphandlingens-sida). Valet sparas i webbläsaren och ändrar inget för andra.
+
 Inköparens vy (demopersonen Lars Holm) har två flikar: Att granska, där inköparen granskar, rättar, godkänner och
 publicerar checklistan innan företagen ser den, och Företagens frågor med de sammanställda frågorna. Jobben finns på
 sidan Drift i kontomenyn.

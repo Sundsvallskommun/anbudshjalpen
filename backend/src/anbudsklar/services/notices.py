@@ -7,11 +7,13 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import get_args
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.api.schemas import (
     DocumentInfo,
+    DocumentOrigin,
+    DocumentReading,
     Fit,
     MatchView,
     NoticeBuyer,
@@ -25,10 +27,13 @@ from anbudsklar.api.schemas import (
     NoticeSummary,
     PageView,
     PublishedAnswerView,
+    ReadingReport,
     UnreadFile,
 )
 from anbudsklar.contracts import Checklist, MatchAssessment
-from anbudsklar.documents.extract import DocumentError
+from anbudsklar.documents.archives import MEMBER_SEPARATOR
+from anbudsklar.documents.bundle import BUNDLE_BUDGET_CHARS
+from anbudsklar.documents.extract import EXTRACTION_VERSION, DocumentError
 from anbudsklar.documents.store import is_current, store_document
 from anbudsklar.models import Document, DocumentPage, MatchRecord, Notice, PublishedAnswer
 from anbudsklar.search.queries import (
@@ -284,15 +289,102 @@ async def notice_detail(session: AsyncSession, notice_id: uuid.UUID, viewer: Vie
         estimated_value_sek=notice.estimated_value_sek,
         cpv_labels=await cpv_labels(session, notice.cpv_codes or []),
         documents=[document_info(document) for document in documents],
-        unread_files=[
-            UnreadFile(filename=str(item.get("filename", "")), reason=str(item.get("reason", "")))
-            for item in notice.unread_files or []
-            if item.get("filename")
-        ],
+        unread_files=unread_files(notice),
         checklist=to_checklist_view(checklist) if checklist else None,
         checklist_progress=progress,
         match=match_view(match, summary) if match else None,
         published_answers=[published_answer_view(answer) for answer in answers],
+    )
+
+
+def unread_files(notice: Notice) -> list[UnreadFile]:
+    """The files the source lists that were not read in, as the ingestion recorded them."""
+
+    return [
+        UnreadFile(filename=str(item.get("filename", "")), reason=str(item.get("reason", "")))
+        for item in notice.unread_files or []
+        if item.get("filename")
+    ]
+
+
+def document_origin(document: Document, source: str) -> tuple[DocumentOrigin, str | None]:
+    """Where a stored file came from, and the archive it was unpacked from.
+
+    An upload has a user; an archive member carries the archive's name in its own; the
+    rest came with the notice from its source.
+    """
+
+    if document.uploaded_by is not None:
+        return "upload", None
+    if MEMBER_SEPARATOR in document.filename:
+        return "archive", document.filename.split(MEMBER_SEPARATOR, 1)[0]
+    if source == "eavrop":
+        return "eavrop", None
+    if source == "fixture":
+        return "fixture", None
+    return "manual", None
+
+
+def _document_reading(
+    document: Document, source: str, characters: int, stored_at: dict[uuid.UUID, datetime]
+) -> DocumentReading:
+    origin, archive = document_origin(document, source)
+    return DocumentReading(
+        id=document.id,
+        filename=document.filename,
+        origin=origin,
+        archive=archive,
+        mimetype=document.mimetype,
+        size_bytes=document.size_bytes,
+        stored_at=document.created_at,
+        page_count=document.page_count,
+        empty_pages=document.empty_pages,
+        characters=characters,
+        layout=document.layout,
+        extraction_version=document.extraction_version,
+        is_main=document.auto_interpret,
+        superseded_by=document.superseded_by,
+        superseded_at=stored_at.get(document.superseded_by) if document.superseded_by else None,
+    )
+
+
+async def reading_report(session: AsyncSession, notice_id: uuid.UUID) -> ReadingReport:
+    """What happened to the notice's files, for the demo panel "Så lästes underlaget".
+
+    Read off the stored rows, replaced versions included, so the trace never disagrees
+    with the rest of the app and nothing has to be logged for it. The documents are
+    public, so the report is too.
+    """
+
+    notice = await get_notice(session, notice_id)
+    documents = list(
+        await session.scalars(
+            select(Document)
+            .where(Document.notice_id == notice.id)
+            .order_by(Document.created_at, Document.filename, Document.id)
+        )
+    )
+    characters: dict[uuid.UUID, int] = {}
+    if documents:
+        rows = await session.execute(
+            select(DocumentPage.document_id, func.sum(func.length(DocumentPage.text)))
+            .where(DocumentPage.document_id.in_([document.id for document in documents]))
+            .group_by(DocumentPage.document_id)
+        )
+        characters = {document_id: int(total or 0) for document_id, total in rows.all()}
+    stored_at = {document.id: document.created_at for document in documents}
+    return ReadingReport(
+        notice_id=notice.id,
+        source=notice.source,
+        fetched_at=notice.created_at,
+        updated_at=notice.updated_at,
+        documents=[
+            _document_reading(document, notice.source, characters.get(document.id, 0), stored_at)
+            for document in documents
+        ],
+        unread_files=unread_files(notice),
+        budget_chars=BUNDLE_BUDGET_CHARS,
+        extraction_version=EXTRACTION_VERSION,
     )
 
 

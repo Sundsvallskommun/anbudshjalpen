@@ -345,6 +345,56 @@ export interface UnreadFile {
   reason: string;
 }
 
+/** How a stored file got here: fetched from e-Avrop, uploaded by inköp, unpacked from an archive, demo data, or by hand. */
+export type DocumentOrigin = "eavrop" | "upload" | "archive" | "fixture" | "manual";
+
+/**
+ * How one stored file was read in, for "Så lästes underlaget" (the demo's trace). Every value is something the app
+ * already keeps about the file; nothing is logged for the trace. Replaced versions are included.
+ */
+export interface DocumentReading {
+  id: Uuid;
+  filename: string;
+  origin: DocumentOrigin;
+  /** The archive the file was unpacked from, when origin is "archive". */
+  archive: string | null;
+  mimetype: string;
+  size_bytes: number;
+  /** When the file was fetched, uploaded or unpacked. */
+  stored_at: IsoDateTime;
+  page_count: number;
+  empty_pages: number;
+  /** The text of all pages: what the engines and the search read. */
+  characters: number;
+  /** "eavrop" for an export from e-Avrop's forms, whose footer was stripped (decision 0020); null otherwise. */
+  layout: string | null;
+  /** The text extraction that made the pages. */
+  extraction_version: number;
+  /** The document the worker interprets to a checklist on its own. */
+  is_main: boolean;
+  /** The newer file that took over, when the source replaced it. */
+  superseded_by: Uuid | null;
+  /** When that newer file was stored. */
+  superseded_at: IsoDateTime | null;
+}
+
+/** What happened to a notice's files, as the demo panel "Så lästes underlaget" shows it. */
+export interface ReadingReport {
+  notice_id: Uuid;
+  source: string;
+  /** When the notice was first stored. */
+  fetched_at: IsoDateTime;
+  /** When the source last changed it. */
+  updated_at: IsoDateTime;
+  /** Every stored file, oldest first, replaced ones included. */
+  documents: DocumentReading[];
+  unread_files: UnreadFile[];
+  /** What one interpretation or answer may be given at most (decision 0012). */
+  budget_chars: number;
+  /** The extraction the app runs now; an older document is read again. */
+  extraction_version: number;
+}
+
 /** What the engine was given (decision 0012), so the app can say so. */
 export interface ReadSummary {
   documents_read: number;

@@ -4,12 +4,29 @@ import { Heading } from "@astryxdesign/core/Heading";
 import { useScrollableArea } from "@astryxdesign/core/hooks";
 import { HStack } from "@astryxdesign/core/HStack";
 import { Layout, LayoutContent, LayoutFooter } from "@astryxdesign/core/Layout";
+import { Switch } from "@astryxdesign/core/Switch";
 import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import type { ReactNode } from "react";
 import type { AppConfig } from "../api/types";
 import { engineSummary } from "../lib/labels";
 import { FALLBACK_AI_DISCLOSURE, FALLBACK_DEMO_NOTICE } from "./AboutDemo";
+import { useReadingTrace } from "./readingTrace";
+
+export const READING_SWITCH = "Visa hur underlaget lästes";
+
+/** The demo's switch for the trace of the files; a convenience kept in this browser, like the appearance. */
+function ReadingTraceSwitch() {
+  const [isShown, setShown] = useReadingTrace();
+  return (
+    <Switch
+      label={READING_SWITCH}
+      description="Valet sparas i den här webbläsaren."
+      value={isShown}
+      onChange={(checked) => setShown(checked)}
+    />
+  );
+}
 
 function Part({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -46,6 +63,13 @@ function AboutText({ config }: { config: AppConfig | undefined }) {
           <Text as="p">{config?.ai_disclosure ?? FALLBACK_AI_DISCLOSURE}</Text>
           {config && <Text as="p">{engineSummary(config.ai_engine)}</Text>}
           <Text as="p">Varje uppgift visar sin källa i underlaget. Det är alltid förfrågningsunderlaget som gäller.</Text>
+        </Part>
+        <Part title="Så lästes underlaget">
+          <Text as="p">
+            För den som vill se vad som händer bakom kulisserna: varje upphandlings sida får knappen ”Så lästes
+            underlaget”, som visar steg för steg vad som hände med varje fil, från hämtningen till checklistan.
+          </Text>
+          <ReadingTraceSwitch />
         </Part>
       </VStack>
     </LayoutContent>

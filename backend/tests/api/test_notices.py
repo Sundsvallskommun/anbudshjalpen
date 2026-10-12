@@ -722,3 +722,58 @@ async def test_the_sources_question_deadline_goes_before_the_checklists(
         await client.post(f"/api/notices/{demo.notice.id}/questions", json={"question": "Krävs försäkring?"})
     ).json()
     assert datetime.fromisoformat(answer["question_deadline"]) == from_source
+
+
+async def test_the_reading_report_traces_every_file_from_its_source_to_its_text(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    """The demo panel "Så lästes underlaget" is read off what is stored: nothing is logged for it."""
+
+    demo.notice.unread_files = [{"filename": "Foto entré.jpg", "reason": "Filformatet .jpg stöds inte"}]
+    demo.document.layout = "eavrop"
+    demo.document.empty_pages = 1
+    old = await add_document(db_session, demo.notice, ["Gammal version."], filename="gammal.txt")
+    old.superseded_by = demo.document.id
+    old.created_at = demo.document.created_at - timedelta(hours=1)
+    member_name = "Ritningar.zip › plan.txt"
+    member = await add_document(db_session, demo.notice, ["Planritning."], filename=member_name)
+    member.auto_interpret = False
+    member.created_at = demo.document.created_at + timedelta(hours=1)
+    upload = await add_document(db_session, demo.notice, ["Bilaga."], filename="bilaga.txt")
+    upload.uploaded_by = demo.buyer.id
+    upload.auto_interpret = False
+    upload.created_at = demo.document.created_at + timedelta(hours=2)
+    await db_session.flush()
+
+    response = await client.get(f"/api/notices/{demo.notice.id}/reading")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source"] == "fixture"
+    assert body["budget_chars"] == 150_000
+    assert body["extraction_version"] == 3
+    assert body["unread_files"] == [{"filename": "Foto entré.jpg", "reason": "Filformatet .jpg stöds inte"}]
+    # Oldest first, the replaced version included.
+    assert [item["filename"] for item in body["documents"]] == [
+        "gammal.txt",
+        "underlag.txt",
+        member_name,
+        "bilaga.txt",
+    ]
+    by_name = {item["filename"]: item for item in body["documents"]}
+    main = by_name["underlag.txt"]
+    assert main["origin"] == "fixture"
+    assert main["archive"] is None
+    assert main["is_main"] is True
+    assert main["layout"] == "eavrop"
+    assert main["empty_pages"] == 1
+    assert main["characters"] == sum(len(page) for page in document_pages(demo.fragestopp, demo.deadline))
+    assert main["superseded_by"] is None
+    replaced = by_name["gammal.txt"]
+    assert replaced["superseded_by"] == str(demo.document.id)
+    assert replaced["superseded_at"] == main["stored_at"]
+    assert by_name[member_name]["origin"] == "archive"
+    assert by_name[member_name]["archive"] == "Ritningar.zip"
+    assert by_name["bilaga.txt"]["origin"] == "upload"
+    assert by_name["bilaga.txt"]["is_main"] is False
+    assert (await client.get(f"/api/notices/{uuid.uuid4()}/reading")).status_code == 404

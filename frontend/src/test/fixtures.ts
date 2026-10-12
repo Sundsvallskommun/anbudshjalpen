@@ -16,6 +16,7 @@ import type {
   PageView,
   Persona,
   PublishedAnswerView,
+  ReadingReport,
   ReminderView,
   ReviewView,
   SessionView,
@@ -199,6 +200,36 @@ export const noticeDetail: NoticeDetail = {
   checklist_progress: null,
   match: null,
   published_answers: [],
+};
+
+/** The demo's trace of the notice's files ("Så lästes underlaget"): the one document, fetched and read whole. */
+export const readingReport: ReadingReport = {
+  notice_id: NOTICE_ID,
+  source: "fixture",
+  fetched_at: "2026-09-21T06:30:00+02:00",
+  updated_at: "2026-09-21T06:30:00+02:00",
+  documents: [
+    {
+      id: DOCUMENT_ID,
+      filename: "Förfrågningsunderlag Solbacken.pdf",
+      origin: "fixture",
+      archive: null,
+      mimetype: "application/pdf",
+      size_bytes: 1_258_291,
+      stored_at: "2026-09-21T06:30:00+02:00",
+      page_count: 16,
+      empty_pages: 0,
+      characters: 42_000,
+      layout: null,
+      extraction_version: 3,
+      is_main: true,
+      superseded_by: null,
+      superseded_at: null,
+    },
+  ],
+  unread_files: [],
+  budget_chars: 150_000,
+  extraction_version: 3,
 };
 
 /** An answer the buyer published in e-Avrop, as the question step lists them. */

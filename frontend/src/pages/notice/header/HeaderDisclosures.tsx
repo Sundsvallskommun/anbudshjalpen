@@ -9,7 +9,9 @@ import { useId, type ReactNode } from "react";
 import type { NoticeDetail, UserView } from "../../../api/types";
 import { externalLink } from "../../../lib/links";
 import { useIsPhone } from "../../../lib/usePhone";
+import { useReadingTrace } from "../../../shell/readingTrace";
 import { primaryDocumentId, publishedChecklist, requirementTitles } from "../noticeData";
+import { READING_TITLE, ReadingTrace } from "../reading/ReadingTrace";
 import { AboutNotice } from "./AboutNotice";
 import { DocumentLinks } from "./Documents";
 import { FIT_HEADING, FitReasons } from "./FitReasons";
@@ -68,12 +70,18 @@ interface DisclosureProps {
   user: UserView | null;
 }
 
-/** Wide screens: the two disclosures side by side and the document link at the end of the row; panels below. */
+/**
+ * Wide screens: the disclosures side by side and the document link at the end of the row; panels below. The demo's
+ * "Så lästes underlaget" joins the row while its switch in "Om demon och AI" is on.
+ */
 function DisclosureRow({ notice, user }: DisclosureProps) {
   const fit = useCollapsible({ isCollapsible: { defaultIsOpen: false } });
   const about = useCollapsible({ isCollapsible: { defaultIsOpen: false } });
+  const reading = useCollapsible({ isCollapsible: { defaultIsOpen: false } });
+  const [showsReading] = useReadingTrace();
   const fitId = useId();
   const aboutId = useId();
+  const readingId = useId();
   const match = notice.match;
   return (
     <VStack gap={3}>
@@ -89,6 +97,9 @@ function DisclosureRow({ notice, user }: DisclosureProps) {
             />
           )}
           <DisclosureButton title={ABOUT} isOpen={about.isOpen} controls={aboutId} onToggle={about.toggle} />
+          {showsReading && (
+            <DisclosureButton title={READING_TITLE} isOpen={reading.isOpen} controls={readingId} onToggle={reading.toggle} />
+          )}
         </HStack>
         <DocumentLinks notice={notice} />
       </HStack>
@@ -106,6 +117,11 @@ function DisclosureRow({ notice, user }: DisclosureProps) {
       <Panel id={aboutId} isOpen={about.isOpen}>
         <AboutNotice notice={notice} user={user} showsDocuments={notice.documents.length > 1} />
       </Panel>
+      {showsReading && (
+        <Panel id={readingId} isOpen={reading.isOpen}>
+          <ReadingTrace notice={notice} />
+        </Panel>
+      )}
     </VStack>
   );
 }
@@ -117,6 +133,7 @@ function DisclosureRow({ notice, user }: DisclosureProps) {
  */
 function DisclosureCard({ notice, user }: DisclosureProps) {
   const match = notice.match;
+  const [showsReading] = useReadingTrace();
   const hasDocuments = notice.documents.length > 0 || externalLink(notice.documents_url) !== null;
   const aboutTitle = hasDocuments ? `${ABOUT} och underlaget` : ABOUT;
   return (
@@ -145,6 +162,11 @@ function DisclosureCard({ notice, user }: DisclosureProps) {
           <Collapsible value="om" trigger={<Text weight="medium">{aboutTitle}</Text>}>
             <AboutNotice notice={notice} user={user} showsDocuments />
           </Collapsible>
+          {showsReading && (
+            <Collapsible value="lasning" trigger={<Text weight="medium">{READING_TITLE}</Text>}>
+              <ReadingTrace notice={notice} />
+            </Collapsible>
+          )}
         </CollapsibleGroup>
       </VStack>
     </Card>

@@ -199,6 +199,55 @@ class UnreadFile(ApiModel):
     reason: str  # Swedish, as the ingestion wrote it: the format, the size or an unreadable file
 
 
+DocumentOrigin = Literal["eavrop", "upload", "archive", "fixture", "manual"]
+"""How a stored file got here: fetched from e-Avrop, uploaded by inköp, unpacked from an
+archive among the notice's files, loaded as demo data, or added by hand."""
+
+
+class DocumentReading(ApiModel):
+    """How one stored file was read in, for "Så lästes underlaget" (the demo's trace).
+
+    Every value is something the app already keeps about the file; nothing is logged for
+    the trace. Replaced versions are included, so the reader sees that a newer file took
+    over, and the page count and the characters say what the engines could read.
+    """
+
+    id: uuid.UUID
+    filename: str
+    origin: DocumentOrigin
+    archive: str | None = None  # the archive the file was unpacked from, when origin is "archive"
+    mimetype: str
+    size_bytes: int
+    stored_at: datetime  # when the file was fetched, uploaded or unpacked
+    page_count: int
+    empty_pages: int
+    characters: int  # the text of all pages, what the engines and the search read
+    # "eavrop" when the file is an export from e-Avrop's forms, whose footer was stripped and
+    # whose fields the engines are told about (decision 0020); None otherwise.
+    layout: str | None
+    extraction_version: int  # the text extraction that made the pages
+    is_main: bool  # the document the worker interprets to a checklist on its own
+    superseded_by: uuid.UUID | None  # the newer file that took over, when the source replaced it
+    superseded_at: datetime | None  # when that newer file was stored
+
+
+class ReadingReport(ApiModel):
+    """What happened to a notice's files, as the demo panel "Så lästes underlaget" shows it.
+
+    The checklist's own events (interpreted, approved, published) and the published answers
+    are already on the notice detail; this adds the files, replaced versions included.
+    """
+
+    notice_id: uuid.UUID
+    source: str
+    fetched_at: datetime  # when the notice was first stored
+    updated_at: datetime  # when the source last changed it
+    documents: list[DocumentReading]  # every stored file, oldest first, replaced ones included
+    unread_files: list[UnreadFile] = Field(default_factory=list)
+    budget_chars: int  # what one interpretation or answer may be given at most (decision 0012)
+    extraction_version: int  # the extraction the app runs now; an older document is read again
+
+
 class ReadSummary(ApiModel):
     """What the engine was given (decision 0012), so the app can say so."""
 

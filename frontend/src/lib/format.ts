@@ -126,6 +126,15 @@ export function plural(count: number, one: string, many: string): string {
   return `${formatNumber(count)} ${count === 1 ? one : many}`;
 }
 
+const megabyteFormat = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 1 });
+
+/** "1,2 MB", "340 kB" or "900 B": a file's size in the reader's words. */
+export function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${megabyteFormat.format(bytes / (1024 * 1024))} MB`;
+  if (bytes >= 1024) return `${formatNumber(Math.round(bytes / 1024))} kB`;
+  return `${formatNumber(bytes)} B`;
+}
+
 const wallClockFormat = new Intl.DateTimeFormat("en-CA", {
   timeZone: ZONE,
   year: "numeric",
