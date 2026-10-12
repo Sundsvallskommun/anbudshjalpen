@@ -523,7 +523,7 @@ describe("NoticePage without a checklist", () => {
     expect(await screen.findByRole("heading", { level: 2, name: "Checklistan tas fram" })).toBeInTheDocument();
     expect(screen.getByText(/^Underlaget tolkas automatiskt, och kraven visas här så fort checklistan är klar/u)).toBeInTheDocument();
     // Where the interpretation is, and that the page keeps asking.
-    expect(screen.getByRole("status")).toHaveTextContent("Står i kö. Nästa tolkning väntas kl. 10:04.");
+    expect(screen.getByRole("status", { name: "Tolkningens läge" })).toHaveTextContent("Står i kö. Nästa tolkning väntas kl. 10:04.");
     expect(screen.getByText(/^Sidan uppdateras automatiskt\. Senast kontrollerad kl\. 10:00:\d\d\.$/u)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Fråga underlaget" })).toBeInTheDocument();
     expect(screen.queryByText(/Ingen checklista/u)).not.toBeInTheDocument();
@@ -533,13 +533,13 @@ describe("NoticePage without a checklist", () => {
     const withoutReview: MockRoute = { method: "GET", path: "/api/config", body: { ...config, review_required: false } };
     mockApi([withoutReview, ...baseRoutes(companyUser), noticeWith({ checklist: null, checklist_status: "none", checklist_progress: { ...queued, state: "running" }, question_deadline: null })]);
     const view = renderApp(`/upphandlingar/${NOTICE_ID}`);
-    expect(await screen.findByRole("status")).toHaveTextContent("Tolkning pågår. Tar oftast under en minut.");
+    expect(await screen.findByRole("status", { name: "Tolkningens läge" })).toHaveTextContent("Tolkning pågår. Tar oftast under en minut.");
     view.unmount();
 
     const retrying: ChecklistProgress = { ...queued, state: "retrying", attempts: 2, retry_at: "2026-10-05T10:30:00+02:00" };
     mockApi([withoutReview, ...baseRoutes(companyUser), noticeWith({ checklist: null, checklist_status: "none", checklist_progress: retrying, question_deadline: null })]);
     renderApp(`/upphandlingar/${NOTICE_ID}`);
-    expect(await screen.findByRole("status")).toHaveTextContent("Försök 2 av 5 misslyckades. Försöker igen tidigast kl. 10:30.");
+    expect(await screen.findByRole("status", { name: "Tolkningens läge" })).toHaveTextContent("Försök 2 av 5 misslyckades. Försöker igen tidigast kl. 10:30.");
   });
 
   it("tells inköp whether a checklist is on its way while the review is off", async () => {
@@ -550,7 +550,7 @@ describe("NoticePage without a checklist", () => {
     expect(await screen.findByRole("heading", { level: 2, name: "Checklistan tas fram" })).toBeInTheDocument();
     expect(screen.getByText(/^Underlaget tolkas automatiskt till en checklista som publiceras direkt/u)).toBeInTheDocument();
     // Without a recent run there is no time to promise.
-    expect(screen.getByRole("status")).toHaveTextContent("Står i kö för tolkning.");
+    expect(screen.getByRole("status", { name: "Tolkningens läge" })).toHaveTextContent("Står i kö för tolkning.");
     expect(screen.queryByText(/granskad/u)).not.toBeInTheDocument();
     view.unmount();
 

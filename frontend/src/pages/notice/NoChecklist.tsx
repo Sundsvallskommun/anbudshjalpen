@@ -97,7 +97,7 @@ export function progressText(progress: ChecklistProgress, now: Date = new Date()
 function Progress({ progress, checkedAt }: { progress: ChecklistProgress; checkedAt: number }) {
   return (
     <VStack gap={1} hAlign="center">
-      <HStack gap={2} vAlign="center" role="status">
+      <HStack gap={2} vAlign="center" role="status" aria-label="Tolkningens läge">
         <HStack aria-hidden="true">
           <Spinner size="sm" />
         </HStack>
