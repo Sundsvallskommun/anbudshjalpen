@@ -3,9 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnswerView } from "../api/types";
 import { STORAGE_KEY, type Turn } from "../components/ask/askAiState";
-import { answerNotInDocument, companyUser, NOTICE_ID, noticeDetail } from "../test/fixtures";
+import { answerNotInDocument, companyUser, NOTICE_ID, noticeDetail, publishedAnswer } from "../test/fixtures";
 import { baseRoutes, mockApi, renderApp } from "../test/render";
-import { citationLine } from "./AskAiExportPage";
+import { answerCitationLine, citationLine } from "./AskAiExportPage";
 
 const answerInDocument: AnswerView = {
   ...answerNotInDocument,
@@ -13,6 +13,7 @@ const answerInDocument: AnswerView = {
     answer: "Ni behöver en ansvarsförsäkring på minst 5 miljoner kronor. Försäkringsbeviset ska bifogas anbudet.",
     found_in_document: true,
     citations: [{ page: 4, quote: "Leverantören ska ha en ansvarsförsäkring", check: "verified", found_page: null, document: null, document_id: null }],
+    answer_citations: [],
     suggest_formal_question: false,
   },
 };
@@ -78,5 +79,14 @@ describe("The conversation as a document (decision 0014)", () => {
       { id: "b", filename: "Bilaga 6.6 Krav.pdf", page_count: 3, is_fictitious: true },
     ];
     expect(citationLine({ ...base, check: "verified", document_id: "b" }, documents)).toBe("s. 5 · Bilaga 6.6 Krav.pdf");
+  });
+
+  it("words a quote of inköp's answer by its entry, or that it was not found (decision 0018)", () => {
+    const quote = { answer: 1, quote: "Ja.", found_answer: null, answer_key: publishedAnswer.key } as const;
+    expect(answerCitationLine({ ...quote, check: "verified" }, [publishedAnswer])).toBe(
+      "inköps svar i e-Avrop, fråga 1 · besvarad 30 sep",
+    );
+    expect(answerCitationLine({ ...quote, check: "unverified" }, [publishedAnswer])).toBe("hittades inte bland inköps svar");
+    expect(answerCitationLine({ ...quote, check: "verified" }, [])).toBe("hittades inte bland inköps svar");
   });
 });

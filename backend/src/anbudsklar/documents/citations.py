@@ -48,6 +48,7 @@ from rapidfuzz import fuzz
 from anbudsklar.api.schemas import VerificationSummary
 from anbudsklar.contracts import (
     Answer,
+    AnswerCitation,
     Checklist,
     Citation,
     CitationCheck,
@@ -55,6 +56,7 @@ from anbudsklar.contracts import (
     KeyDate,
     MatchAssessment,
     PagedDocument,
+    PublishedAnswerInput,
     RequiredAttachment,
     Requirement,
     ReviewResult,
@@ -552,21 +554,32 @@ def verify_citation(citation: Citation, pages: Sequence[str]) -> Citation:
     return _verify(citation, PageIndex(pages))
 
 
-def verify_checklist(checklist: Checklist, pages: Sequence[str]) -> tuple[Checklist, VerificationSummary]:
+def verify_checklist(
+    checklist: Checklist, pages: Sequence[str], answers: Sequence[PublishedAnswerInput] = ()
+) -> tuple[Checklist, VerificationSummary]:
     """Verify every citation in a checklist against the document it was made from.
 
     A date or weight that its quote does not state makes that citation unverified, so it
-    is counted in the summary and the buyer is asked to check it before publishing.
+    is counted in the summary and the buyer is asked to check it before publishing. A
+    requirement's quote from a published answer is checked against the answers (decision
+    0018); the summary counts the document's citations, which the provenance line names.
     """
 
     index = PageIndex(pages)
+    answer_index = AnswerIndex(answers)
 
     def cited[T: (Requirement, RequiredAttachment)](items: Sequence[T]) -> list[T]:
         return [item.model_copy(update={"citation": _verify(item.citation, index)}) for item in items]
 
+    requirements = [
+        item.model_copy(update={"answer_citation": answer_index.verify(item.answer_citation)})
+        if item.answer_citation is not None
+        else item
+        for item in cited(checklist.requirements)
+    ]
     verified = checklist.model_copy(
         update={
-            "requirements": cited(checklist.requirements),
+            "requirements": requirements,
             "attachments": cited(checklist.attachments),
             "evaluation": [_verify_criterion(item, index) for item in checklist.evaluation],
             "dates": [_verify_date(item, index) for item in checklist.dates],
@@ -579,19 +592,87 @@ def verify_checklist(checklist: Checklist, pages: Sequence[str]) -> tuple[Checkl
     return verified, summarize(checklist_citations(verified))
 
 
-def verify_answer(answer: Answer, documents: Sequence[PagedDocument]) -> Answer:
-    """Verify an answer's citations against the documents it was answered from.
+def verify_answer(
+    answer: Answer, documents: Sequence[PagedDocument], answers: Sequence[PublishedAnswerInput] = ()
+) -> Answer:
+    """Verify an answer's citations against the documents and published answers it rests on.
 
     A citation names its document; the quote is looked for there first, then in the
     others, the main document (the first) before the rest. Found elsewhere, it is marked
     moved and points at the document and page that hold it, so the source link opens the
-    right file. `document_id` is always set, so the web app never has to guess.
+    right file. `document_id` is always set, so the web app never has to guess. A quote
+    from a published answer is checked against the answers (decision 0018).
     """
 
     indexes = [(document, PageIndex(document.pages)) for document in documents]
+    answer_index = AnswerIndex(answers)
     return answer.model_copy(
-        update={"citations": [_verify_in_documents(c, indexes) for c in answer.citations]}
+        update={
+            "citations": [_verify_in_documents(c, indexes) for c in answer.citations],
+            "answer_citations": [answer_index.verify(c) for c in answer.answer_citations],
+        }
     )
+
+
+class _SeparatePages(PageIndex):
+    """Pages that do not run on into each other: a quote never starts in one answer and ends in the next."""
+
+    def spill(self, page_no: int, length: int) -> str:
+        return ""
+
+
+class AnswerIndex:
+    """The buyer's published answers, prepared for quote lookups like a document's pages.
+
+    Answer n is "page" n: its question and its answer, since a short answer ("Ja, 25 %
+    per poäng") often only makes sense with the question it answers. A quote shorter than
+    the fuzzy minimum ("Ja") is only accepted as whole words in the answer it names,
+    because so few characters would match inside some word in almost any other answer.
+    """
+
+    def __init__(self, answers: Sequence[PublishedAnswerInput]) -> None:
+        self._answers = list(answers)
+        self._index = _SeparatePages([f"{item.question}\n{item.answer}" for item in self._answers])
+
+    def verify(self, citation: AnswerCitation) -> AnswerCitation:
+        if not self._answers:
+            return citation.model_copy(
+                update={"check": "unverified", "found_answer": None, "answer_key": None}
+            )
+        quote = normalize(citation.quote)
+        if len(quote.replace(" ", "")) < FUZZY_MIN_CHARS:
+            named = self._named(citation.answer)
+            holds = named is not None and re.search(
+                rf"(?<!\w){re.escape(quote)}(?!\w)", normalize(f"{named.question}\n{named.answer}")
+            )
+            return citation.model_copy(
+                update={
+                    "check": "verified" if holds else "unverified",
+                    "found_answer": None,
+                    "answer_key": named.key if named is not None else None,
+                }
+            )
+        match = match_quote(citation.quote, self._index, citation.answer)
+        if match.page is None:
+            named = self._named(citation.answer)
+            return citation.model_copy(
+                update={
+                    "check": "unverified",
+                    "found_answer": None,
+                    "answer_key": named.key if named else None,
+                }
+            )
+        found = self._answers[match.page - 1]
+        return citation.model_copy(
+            update={
+                "check": match.check,
+                "found_answer": match.page if match.check == "moved" else None,
+                "answer_key": found.key,
+            }
+        )
+
+    def _named(self, number: int) -> PublishedAnswerInput | None:
+        return self._answers[number - 1] if 1 <= number <= len(self._answers) else None
 
 
 def _verify_in_documents(citation: Citation, indexes: Sequence[tuple[PagedDocument, PageIndex]]) -> Citation:

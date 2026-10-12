@@ -6,7 +6,8 @@ import { MoreMenu } from "@astryxdesign/core/MoreMenu";
 import { Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import { VStack } from "@astryxdesign/core/VStack";
-import type { Citation } from "../../../api/types";
+import type { Citation, PublishedAnswerView } from "../../../api/types";
+import { findPublishedAnswer } from "../../../components/ui/PublishedAnswerQuote";
 import { SourceLink } from "../../../components/ui/source/SourceLink";
 import { citationPage } from "../../../lib/labels";
 import { groupInfo, type ReviewRow as Row } from "./rows";
@@ -54,6 +55,8 @@ export interface ReviewRowProps {
   row: Row;
   noticeId: string;
   documentId: string;
+  /** Inköp's published answers, to name the one a requirement quotes by its number on the page (decision 0018). */
+  publishedAnswers?: readonly PublishedAnswerView[];
   /** What the automatic checks say about the row ("Står under 2 Kvalificering"). */
   hints: readonly string[];
   isChanged: boolean;
@@ -73,13 +76,14 @@ export interface ReviewRowProps {
 
 /**
  * One row of the checklist under review (direction.md, section 4): "Kontrollerad", the title with what the checks
- * found, the source's page, and "Ändra" and "Ta bort" in a menu. Beside the source pane the whole row is a button
+ * found and, for a requirement inköp's published answer changes, "Bygger på inköps svar, fråga 3", the source's page, and "Ändra" and "Ta bort" in a menu. Beside the source pane the whole row is a button
  * that shows its page there.
  */
 export function ReviewRow({
   row,
   noticeId,
   documentId,
+  publishedAnswers = [],
   hints,
   isChanged,
   isChecked,
@@ -93,6 +97,13 @@ export function ReviewRow({
   onRemove,
 }: ReviewRowProps) {
   const name = shortTitle(row.title);
+  // A requirement inköp's published answer changes (decision 0018); one whose quote is off is a hint instead.
+  const answerCitation = row.item.section === "requirement" ? row.item.value.answer_citation : null;
+  // The page's number, by the answer's key, so it stays right if e-Avrop's list has moved since the interpretation.
+  const answerNumber = answerCitation
+    ? (findPublishedAnswer(publishedAnswers, answerCitation.answer_key)?.number ?? answerCitation.answer)
+    : null;
+  const basedOnAnswer = answerCitation?.check === "verified" ? `Bygger på inköps svar, fråga ${answerNumber}` : null;
   const source = row.citation ? (
     hasPane ? (
       <PageLabel citation={row.citation} />
@@ -127,8 +138,11 @@ export function ReviewRow({
       }
       label={<Text>{row.title}</Text>}
       description={
-        hints.length > 0 || isChanged || isEditing ? (
-          <Hints hints={hints} isChanged={isChanged} isEditing={isEditing} />
+        hints.length > 0 || isChanged || isEditing || basedOnAnswer ? (
+          <VStack gap={1}>
+            {basedOnAnswer && <Token label={basedOnAnswer} color="blue" size="sm" />}
+            {(hints.length > 0 || isChanged || isEditing) && <Hints hints={hints} isChanged={isChanged} isEditing={isEditing} />}
+          </VStack>
         ) : undefined
       }
       endContent={

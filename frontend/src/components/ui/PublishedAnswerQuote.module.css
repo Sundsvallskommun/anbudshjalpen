@@ -1,0 +1,16 @@
+/* Inköp's answer in e-Avrop (decision 0018): the design system has no question-and-answer pair, so the buyer's words
+   sit on a muted surface with an accent edge, apart from the question they answer. Tokens only. Forced colours keep
+   the edge as the system's highlight. */
+.answer {
+  border-inline-start: var(--spacing-1) solid var(--color-accent);
+  background: var(--color-background-muted);
+  border-radius: var(--radius-inner);
+  padding-block: var(--spacing-2);
+  padding-inline: var(--spacing-3);
+}
+
+@media (forced-colors: active) {
+  .answer {
+    border-inline-start-color: Highlight;
+  }
+}

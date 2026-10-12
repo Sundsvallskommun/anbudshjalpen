@@ -202,6 +202,7 @@ export const noticeDetail: NoticeDetail = {
 /** An answer the buyer published in e-Avrop, as the question step lists them. */
 export const publishedAnswer: PublishedAnswerView = {
   source: "eavrop",
+  key: "a".repeat(64),
   question: "Ska ställning ingå i priset för fasadmålningen?",
   answer: "Ja, ställning ingår i anbudspriset. Prisbilagan är uppdaterad.",
   asked_at: "2026-09-28T16:42:46+02:00",
@@ -220,6 +221,7 @@ export const answerNotInDocument: AnswerView = {
     answer: "Underlaget säger inget om arbete på helger.",
     found_in_document: false,
     citations: [{ page: 4, quote: "Leverantören ska ha en ansvarsförsäkring", check: "verified", found_page: null, document: null, document_id: null }],
+    answer_citations: [],
     suggest_formal_question: true,
   },
   engine: "heuristic",

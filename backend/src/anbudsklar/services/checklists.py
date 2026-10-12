@@ -21,7 +21,7 @@ from collections.abc import Sequence
 from datetime import date, datetime, timedelta
 from typing import NamedTuple
 
-from sqlalchemy import exists, or_, select
+from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.ai.engine import AiEngine, EngineError, EngineOutputError
@@ -37,8 +37,9 @@ from anbudsklar.api.schemas import (
 from anbudsklar.contracts import CONTRACT_VERSION, Checklist, deadline_kind
 from anbudsklar.documents.citations import verify_checklist
 from anbudsklar.documents.store import load_paged_document
-from anbudsklar.models import ChecklistRecord, Document, Notice
+from anbudsklar.models import ChecklistRecord, Document, Notice, PublishedAnswer
 from anbudsklar.services.access import Viewer
+from anbudsklar.services.answers import answer_inputs, answers_digest
 from anbudsklar.services.app_settings import review_required
 from anbudsklar.services.contexts import notice_context
 from anbudsklar.services.dates import end_of_local_day, utcnow
@@ -183,6 +184,8 @@ async def interpret_document(
 
     A draft for inköp to review, or, when the review is turned off (decision 0011), a
     published checklist at once, with no `approved_at`, so the app says nobody reviewed it.
+    The buyer's published answers go with the document (decision 0018), and the record
+    keeps their digest, so that `interpret_answered` sees when they change.
     """
 
     document = await session.get(Document, document_id)
@@ -195,8 +198,9 @@ async def interpret_document(
     if not any(page.strip() for page in paged.pages):
         raise InvalidInputError("Dokumentet innehåller ingen läsbar text att tolka.")
 
-    checklist, run = await engine.interpret_document(notice_context(notice), paged)
-    verified, summary = verify_checklist(checklist, paged.pages)
+    answers = await answer_inputs(session, notice.id)
+    checklist, run = await engine.interpret_document(notice_context(notice), paged, answers)
+    verified, summary = verify_checklist(checklist, paged.pages, answers)
     document.interpret_attempts = 0
     document.interpret_error = None
     document.interpret_retry_at = None
@@ -211,6 +215,7 @@ async def interpret_document(
         contract_version=CONTRACT_VERSION,
         payload=verified.model_dump(mode="json"),
         verification=summary.model_dump(),
+        answers_digest=answers_digest(answers),
         # Wall-clock time, not the transaction's: several drafts made in one transaction stay ordered.
         created_at=utcnow(),
     )
@@ -274,6 +279,82 @@ async def interpret_pending(
     return {"pending": len(document_ids), "interpreted": interpreted, "failed": failed, "gave_up": gave_up}
 
 
+# Set on a draft that a new interpretation replaced because the answers changed.
+SUPERSEDED_NOTE = "Ersatt av en ny tolkning som tar hänsyn till inköps senaste svar i e-Avrop."
+
+
+async def interpret_answered(
+    session: AsyncSession, engine: AiEngine, *, limit: int = PENDING_BATCH_SIZE
+) -> dict[str, int]:
+    """Interpret open notices again whose published answers changed since their checklist (decision 0018).
+
+    An answer can settle an open question or change a requirement, and it reaches every
+    supplier, so the checklist must follow it. The notice's latest checklist decides: a
+    published one gets a successor (a draft for inköp, or published at once with the review
+    off), and a draft nobody has saved or commented on is replaced and marked so. A draft
+    inköp has worked on, an approved checklist and a rejected one are left to inköp. A
+    failure backs off and gives up as `interpret_pending` does, on the checklist's document,
+    so a document that cannot succeed is not sent to the model every run. A few per run,
+    each committed.
+    """
+
+    now = utcnow()
+    has_answers = exists().where(PublishedAnswer.notice_id == Notice.id)
+    had_answers = exists().where(
+        ChecklistRecord.notice_id == Notice.id, ChecklistRecord.answers_digest.is_not(None)
+    )
+    notice_ids = list(
+        await session.scalars(
+            select(Notice.id)
+            .where(Notice.status == "open", shown_notices(), or_(has_answers, had_answers))
+            .order_by(Notice.deadline_at.asc().nulls_last(), Notice.id)
+        )
+    )
+    interpreted = failed = 0
+    for notice_id in notice_ids:
+        if interpreted + failed >= limit:
+            break
+        latest = await latest_checklist(session, notice_id)
+        if latest is None or not _follows_answers(latest):
+            continue
+        if answers_digest(await answer_inputs(session, notice_id)) == latest.answers_digest:
+            continue
+        document = await session.get(Document, latest.document_id)
+        if document is None or not _may_try(document, now):
+            continue
+        try:
+            await interpret_document(session, engine, latest.document_id)
+        except (EngineError, InvalidInputError) as error:
+            # The engine fails before anything is written, so only the failure needs storing.
+            logger.warning("Interpreting notice %s again after new answers failed", notice_id, exc_info=True)
+            await record_interpret_failure(session, latest.document_id, error, utcnow())
+            await session.commit()
+            failed += 1
+            continue
+        if latest.status == DRAFT:
+            latest.status = REJECTED
+            latest.reviewer_note = SUPERSEDED_NOTE
+        await session.commit()
+        interpreted += 1
+    return {"reinterpreted": interpreted, "reinterpret_failed": failed}
+
+
+def _follows_answers(record: ChecklistRecord) -> bool:
+    """What a new interpretation may follow: a published checklist, or a draft inköp never saved."""
+
+    if record.status == PUBLISHED:
+        return True
+    return record.status == DRAFT and record.edited_at is None and record.reviewer_note is None
+
+
+def _may_try(document: Document, now: datetime) -> bool:
+    """Not while a failure waits for its retry time, and never once the worker gave up on the document."""
+
+    if document.interpret_attempts == 0:
+        return True
+    return document.interpret_retry_at is not None and document.interpret_retry_at <= now
+
+
 def is_permanent_failure(error: Exception) -> bool:
     """True when retrying the same document cannot help.
 
@@ -328,13 +409,20 @@ async def reset_interpretation(session: AsyncSession, document_id: uuid.UUID) ->
 
 
 async def list_interpretations(session: AsyncSession) -> list[InterpretationView]:
-    """Documents still waiting for a checklist: new, retrying or given up (not attachments)."""
+    """Documents still waiting for a checklist: new, retrying or given up (not attachments).
+
+    Also a document whose new interpretation after inköp's published answers failed
+    (decision 0018): it has a checklist, but the worker retries or has given up on the
+    successor, and only inköp's "Tolka igen" gets a given-up one going again.
+    """
 
     has_checklist = exists().where(ChecklistRecord.document_id == Document.id)
+    waiting = and_(~has_checklist, Document.auto_interpret)
+    reinterpreting = and_(has_checklist, Document.interpret_attempts > 0)
     rows = await session.execute(
         select(Document, Notice.title)
         .join(Notice, Notice.id == Document.notice_id)
-        .where(~has_checklist, Document.page_count > 0, Document.auto_interpret, shown_notices())
+        .where(or_(waiting, reinterpreting), Document.page_count > 0, shown_notices())
         .order_by(Document.created_at.desc())
     )
     return [interpretation_view(document, title) for document, title in rows]
@@ -415,10 +503,12 @@ async def update_checklist(
             "En publicerad checklista kan inte ändras. Tolka underlaget på nytt för att få ett nytt utkast."
         )
     paged = await load_paged_document(session, record.document_id)
-    verified, summary = verify_checklist(update.checklist, paged.pages)
+    answers = await answer_inputs(session, record.notice_id)
+    verified, summary = verify_checklist(update.checklist, paged.pages, answers)
     record.payload = verified.model_dump(mode="json")
     record.verification = summary.model_dump()
     record.reviewer_note = update.reviewer_note
+    record.edited_at = utcnow()  # inköp's work: new answers never replace this draft (decision 0018)
     record.status = DRAFT
     record.approved_by = None
     record.approved_at = None

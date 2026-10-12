@@ -1,0 +1,21 @@
+/* Frågor och svar från inköp (decision 0018): the entries as a list with hairlines between them, and room above an
+   entry a quote links to, so it does not land under the step bar. The answer's own surface is in
+   components/ui/PublishedAnswerQuote.module.css. Tokens only. */
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.entry {
+  padding-block: var(--spacing-4);
+  scroll-margin-block-start: var(--spacing-10);
+}
+
+.entry + .entry {
+  border-block-start: var(--border-width) solid var(--color-border);
+}
+
+.entry:first-child {
+  padding-block-start: 0;
+}

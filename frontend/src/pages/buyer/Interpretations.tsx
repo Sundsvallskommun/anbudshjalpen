@@ -63,7 +63,7 @@ function InterpretationRow({ item }: { item: InterpretationView }) {
 }
 
 /**
- * Documents without a checklist yet, above the queue (direction.md, section 4: "Underlag som inte kunde tolkas visas
+ * Documents without a checklist yet, and ones whose new interpretation after inköp's answers failed, above the queue (direction.md, section 4: "Underlag som inte kunde tolkas visas
  * som Banner överst"). A document the worker gave up on needs the buyer and is shown open; ones still being
  * interpreted are only mentioned, with the list behind a toggle.
  */
@@ -96,7 +96,7 @@ export function Interpretations() {
       }
       collapsible={failed === 0}
     >
-      <VStack as="ul" role="list" gap={0} aria-label="Underlag utan checklista">
+      <VStack as="ul" role="list" gap={0} aria-label="Underlag att tolka">
         {items.map((item) => (
           <InterpretationRow key={item.document_id} item={item} />
         ))}

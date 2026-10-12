@@ -35,7 +35,7 @@ The design as built is in `docs/design.md`. Comments that cite "direction.md, se
   komponenter"): `DeadlineBlock`, `ReminderState`, `SourceLink` and the source dialog (`source/`: `SourceDialog`,
   `PageText`, and `sourceTarget.ts`, the address that opens a source), `AiProvenance` (with `basis="law"` for
   Regelhjälpen), `StatTile`, `ResultSummary`, `NextStepCard` and `AccentCard`, `RequirementRow`, `CollapsibleSection`,
-  `StepNav`, and the app's own glyphs (`icons.tsx`, among them `DownloadIcon` and `UploadIcon`).
+  `StepNav`, `PublishedAnswerQuote` (inköp's answer in e-Avrop and its quote, decision 0018), and the app's own glyphs (`icons.tsx`, among them `DownloadIcon` and `UploadIcon`).
 - `public/favicon.svg` is the mark (Toppen), shown by the top bar's `Brand` and the browser tab. `npm run icons`
   (`scripts/icons.mjs`) builds `favicon.ico`, the home-screen and manifest icons and the README logo from it; rerun it
   after changing the mark, and never edit the generated files by hand.
@@ -78,7 +78,8 @@ The stack serves the code it was built from: rebuild it before judging a change 
   page as paper and the quote mark), `SourceLink` (the hit area), `TermText` (inline term buttons), `RowList` (rows
   whose titles wrap instead of being cut off), `CollapsibleSection` (a disclosure button inside a heading, which
   Astryx's Collapsible cannot do), `StepNav` (the sticky bar and the step number), `AccentCard` (the accent edge of
-  "Nästa steg" and "Nästa frist"), `RequirementRow` (the row inset), `checklist/SectionRow` (rows edge to edge in a
+  "Nästa steg" and "Nästa frist"), `RequirementRow` (the row inset), `PublishedAnswerQuote` (the answer's surface and
+  accent edge), `checklist/SectionRow` (rows edge to edge in a
   section card, with a straight divider and a fixed date column), `checklist/Evaluation` (the price and quality split
   bar), `shell/Page` (the rail grid) and `shell/SiteFooter` (the foot on the frame's content line). Global rules live
   in `src/app.css`, such as the step bar's scroll padding and the frame following the 1 344 px workspace. Pages keep

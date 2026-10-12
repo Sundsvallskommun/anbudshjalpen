@@ -171,7 +171,7 @@ export function RequirementsStep({ notice, view, user }: { notice: NoticeDetail;
   return (
     <StepLayout
       rail={
-        <RequirementsRail items={requirementsOutline(checklist)} questionDeadline={questionDeadline} onNavigate={sections.reveal} />
+        <RequirementsRail items={requirementsOutline(checklist, notice.published_answers.length)} questionDeadline={questionDeadline} onNavigate={sections.reveal} />
       }
       railLabel="På den här sidan"
       isRailSticky
@@ -196,7 +196,13 @@ export function RequirementsStep({ notice, view, user }: { notice: NoticeDetail;
       <Summary checklist={checklist} />
       <CollapsibleGroup type="multiple" value={sections.open} onChange={sections.onChange}>
         {REQUIREMENT_SECTIONS.slice(0, 2).map((section) => (
-          <RequirementGroup key={section.kind} section={section} requirements={byKind[section.kind]} {...groupProps} />
+          <RequirementGroup
+            key={section.kind}
+            section={section}
+            requirements={byKind[section.kind]}
+            publishedAnswers={notice.published_answers}
+            {...groupProps}
+          />
         ))}
         <Attachments attachments={checklist.attachments} noticeId={notice.id} documentId={documentId} />
         <Evaluation evaluation={checklist.evaluation} {...groupProps} />
@@ -208,12 +214,19 @@ export function RequirementsStep({ notice, view, user }: { notice: NoticeDetail;
           canRemind={notice.status === "open" && isPublished}
         />
         {REQUIREMENT_SECTIONS.slice(2).map((section) => (
-          <RequirementGroup key={section.kind} section={section} requirements={byKind[section.kind]} {...groupProps} />
+          <RequirementGroup
+            key={section.kind}
+            section={section}
+            requirements={byKind[section.kind]}
+            publishedAnswers={notice.published_answers}
+            {...groupProps}
+          />
         ))}
         <Terms terms={checklist.terms} noticeId={notice.id} documentId={documentId} />
         <OpenQuestions
           questions={checklist.open_questions}
           questionDeadline={questionDeadline ? formatLongDate(questionDeadline, "auto") : null}
+          answeredCount={notice.published_answers.length}
         />
       </CollapsibleGroup>
       <PublishedAnswers notice={notice} />

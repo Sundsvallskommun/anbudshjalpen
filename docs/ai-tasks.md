@@ -48,15 +48,16 @@ Checklistor och matchningar sparas med motorns namn.
 
 | | |
 |---|---|
-| Metod | `interpret_document(notice, document)` |
-| Indata | Annonsen (`NoticeContext`) och underlaget (`PagedDocument`) |
+| Metod | `interpret_document(notice, document, answers)` |
+| Indata | Annonsen (`NoticeContext`), underlaget (`PagedDocument`) och inköps publicerade svar i e-Avrop (`PublishedAnswerInput`, blocket `<publicerade_svar>` med `[SVAR n]`, [beslut 0018](decisions/0018-publicerade-svar-i-ai-uppgifterna.md)) |
 | Svar | `Checklist`: sammanfattning, förfarande, krav, bilagor, utvärderingskriterier, datum, termer och oklarheter |
-| Krav | Varje krav har `id` (K1, K2 …), typ (`skallkrav`, `kvalificeringskrav`, `krav_pa_uppdraget` eller `avtalsvillkor`), rubrik, förklaring på enkel svenska, vad som ska lämnas in och ett citat |
+| Krav | Varje krav har `id` (K1, K2 …), typ (`skallkrav`, `kvalificeringskrav`, `krav_pa_uppdraget` eller `avtalsvillkor`), rubrik, förklaring på enkel svenska, vad som ska lämnas in och ett citat. Ändrar eller förtydligar ett publicerat svar kravet säger förklaringen vad som gäller efter svaret, och kravet har `answer_citation` med svarets nummer och ordagrann text |
+| Svar från inköp | Det som ett publicerat svar besvarar tas inte med bland oklarheterna (`open_questions`). Checklistan sparar ett fingeravtryck av svaren (`answers_digest`), och jobbet `interpret_pending` tolkar om när de ändras, se [beslut 0018](decisions/0018-publicerade-svar-i-ai-uppgifterna.md) |
 | Datum | Typerna `fragestopp`, `sista_anbudsdag`, `anbudets_giltighet`, `tilldelning`, `avtalsstart` och `annat`, var och en med citat. Instruktionen ber om högst ett datum av varje typ utom `annat`. Frågestopp är sista dagen för leverantörerna att ställa frågor; dagen då köparen svarar eller publicerar svaren, anmälan till platsbesök, sista dag för anbudsansökan i ett selektivt förfarande och slutdatumet i "från … till och med …" är `annat` |
 | Förfarande | Med dagens namn i LOU. Ett underlag som bara säger att upphandlingen görs under tröskelvärdena eller enligt 19 kap. ger "Upphandling under tröskelvärdena (19 kap. LOU)", aldrig "förenklat förfarande" eller "urvalsförfarande" |
-| Kontroll | Alla citat kontrolleras. Ett datum (`KeyDate.date`) och en vikt i utvärderingen (`weight_percent`) måste dessutom stå i sitt citat, annars räknas citatet som okontrollerat. Antalet verifierade, flyttade och okontrollerade citat sparas med checklistan |
+| Kontroll | Alla citat kontrolleras, ett citat ur ett publicerat svar mot svarens frågor och svar, ett svar i taget. Antalen som sparas med checklistan räknar dokumentets citat; ett citat ur ett svar som inte stämmer flaggas i inköps granskning. Ett datum (`KeyDate.date`) och en vikt i utvärderingen (`weight_percent`) måste dessutom stå i sitt citat, annars räknas citatet som okontrollerat. Antalet verifierade, flyttade och okontrollerade citat sparas med checklistan |
 | Med `heuristic` | Se [Den heuristiska motorn](#den-heuristiska-motorn) |
-| Körs av | Direkt efter att inköparen laddat upp underlaget, jobbet `interpret_pending` var femte minut, eller `anbudsklar interpret` |
+| Körs av | Direkt efter att inköparen laddat upp underlaget, jobbet `interpret_pending` var femte minut (också när svaren har ändrats), eller `anbudsklar interpret` |
 
 Checklistan går från utkast till godkänd till publicerad, eller avvisas. Bara publicerade checklistor visas för företag
 och via MCP. Har inköp slagit av granskningen på sidan Inställningar ([beslut 0011](decisions/0011-installningar-granskning-valfri.md))
@@ -123,11 +124,11 @@ Granskningen pekar ut brister men skriver aldrig om utkastet.
 
 | | |
 |---|---|
-| Metod | `answer_question(notice, documents, question, history)` |
-| Indata | Annonsen, underlaget, frågan och de senaste tidigare frågorna och svaren. API:t tar emot högst tio, och appen skickar de nyaste som ryms i 12 000 tecken vidare till motorn |
+| Metod | `answer_question(notice, documents, question, history, answers)` |
+| Indata | Annonsen, underlaget, inköps publicerade svar i e-Avrop ([beslut 0018](decisions/0018-publicerade-svar-i-ai-uppgifterna.md)), frågan och de senaste tidigare frågorna och svaren. API:t tar emot högst tio, och appen skickar de nyaste som ryms i 12 000 tecken vidare till motorn |
 | Underlag | Alla dokument i upphandlingen, som ett `DocumentSet` ([beslut 0012](decisions/0012-fragor-mot-alla-dokument.md)). Huvuddokumentet är det bakom den checklista som den som frågar ser, alltså den publicerade för företag och besökare, annars annonsens första dokument; övriga följer. Ryms inte allt i budgeten (150 000 tecken) väljer `documents/bundle.py` sidor: huvuddokumentet helt, sedan bilagor som huvuddokumentet hänvisar till där det matchar frågan, sedan sökningens bästa sidor. Utelämnade sidor behåller sitt nummer och säger att de saknas |
-| Svar | `Answer`: svaret, om det står i underlaget, citat och om frågan bör ställas formellt (`suggest_formal_question`). API:t lägger till vilket dokument som lästes (`document_id`), frågestoppet ur checklistan (`question_deadline`, slutet av dagen 23:59:59 svensk tid) och var frågan ställs formellt (`formal_question_url`). Svaret börjar med slutsatsen i en mening, som webbappen visar i fetstil. Med `heuristic` är första raden "Det här står i underlaget:" och därefter en rad per citat |
-| Kontroll | Citaten kontrolleras i det dokument de anger (`document`), sedan i de andra. `document_id` sätts av vår kod. API:t säger hur mycket som lästes (`read`) |
+| Svar | `Answer`: svaret, om det står i underlaget, citat, citat ur inköps publicerade svar (`answer_citations`), som går före dokumentets text där de säger olika, och om frågan bör ställas formellt (`suggest_formal_question`). API:t lägger till vilket dokument som lästes (`document_id`), frågestoppet ur checklistan (`question_deadline`, slutet av dagen 23:59:59 svensk tid) och var frågan ställs formellt (`formal_question_url`). Svaret börjar med slutsatsen i en mening, som webbappen visar i fetstil. Med `heuristic` är första raden "Det här står i underlaget:" och därefter en rad per citat. Är ett publicerat svars fråga nästan densamma som läsarens (minst 70 % av orden i de två frågorna tillsammans) börjar den i stället med "Inköp har svarat på en liknande fråga i e-Avrop:" och svaret |
+| Kontroll | Citaten kontrolleras i det dokument de anger (`document`), sedan i de andra. `document_id` sätts av vår kod. Ett citat ur ett publicerat svar kontrolleras mot svarets fråga och svar och får svarets fasta nyckel (`answer_key`); ett citat kortare än 20 tecken godtas bara som hela ord i det svar det anger. API:t säger hur mycket som lästes (`read`) |
 | Körs av | Vem som helst på annonsens sida, även utan inloggning |
 
 Frågan sparas för inköparens sammanställning utan att visa vem som frågade. Frågor som ställs efter sista anbudsdag

@@ -328,6 +328,7 @@ export function ReviewPage({ view, notice }: ReviewPageProps) {
                 filter={filter}
                 noticeId={view.notice_id}
                 documentId={view.document_id}
+                publishedAnswers={notice?.published_answers ?? []}
                 selectedKey={shownKey}
                 editingKey={editingKey}
                 isEditable={isEditable}

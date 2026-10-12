@@ -98,7 +98,7 @@ describe("Inköp: Att granska", () => {
     renderApp("/inkop");
 
     expect(await screen.findByText("1 underlag kunde inte tolkas")).toBeInTheDocument();
-    const list = screen.getByRole("list", { name: "Underlag utan checklista" });
+    const list = screen.getByRole("list", { name: "Underlag att tolka" });
     expect(within(list).getByText("Tolkningen gav upp")).toBeInTheDocument();
     expect(within(list).getByText(`Senaste fel: ${failed.error}`)).toBeInTheDocument();
     await userEvent.click(within(list).getByRole("button", { name: "Tolka igen: Förfrågningsunderlag.pdf" }));

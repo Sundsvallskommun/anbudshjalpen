@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { Checklist } from "../../../api/types";
 import { draftChecklistView } from "../../../test/fixtures";
-import { autoChecks, kindMismatches, needsCheck, rowHints, summaryIssue, summaryProblem, type CheckContext } from "./checks";
+import {
+  answerHints,
+  autoChecks,
+  kindMismatches,
+  needsCheck,
+  rowHints,
+  summaryIssue,
+  summaryProblem,
+  type CheckContext,
+} from "./checks";
 import { checklistRows } from "./rows";
 
 const base: Checklist = draftChecklistView.checklist;
@@ -134,5 +143,24 @@ describe("rows to check", () => {
       .map((row) => row.key);
     expect(flagged).toEqual(["krav:K1", "krav:K2", "bilaga:Prisbilaga"]);
     expect(rowHints(current.rows[0]!, current, mismatches)).toEqual(["Står under 2 Kvalificering"]);
+  });
+});
+
+describe("quotes of inköp's published answers (decision 0018)", () => {
+  const quote = { answer: 2, quote: "Ja, det minskar med 25 % per poäng.", found_answer: null, answer_key: "k2" } as const;
+
+  it("flags a quote that was not found or stands in another answer, and counts it among the sources", () => {
+    expect(answerHints({ ...quote, check: "verified" })).toEqual([]);
+    expect(answerHints({ ...quote, check: "moved", found_answer: 4 })).toEqual(["Citatet ur inköps svar står i fråga 4, inte 2"]);
+    expect(answerHints({ ...quote, check: "unverified" })).toEqual(["Citatet ur inköps svar hittades inte"]);
+
+    const [first, ...rest] = base.requirements;
+    const checklist = { ...base, requirements: [{ ...first!, answer_citation: { ...quote, check: "unverified" as const } }, ...rest] };
+    const current = context(checklist);
+    const row = current.rows.find((item) => item.key === "krav:K1")!;
+    expect(needsCheck(row, rowHints(row, current, kindMismatches(current)))).toBe(true);
+    expect(autoChecks(current).find((item) => item.id === "sources")?.text).toBe(
+      "3 källhänvisningar behöver kontrolleras: 1 hittades inte, 1 står på en annan sida än AI:n angav och 1 ur inköps svar stämmer inte.",
+    );
   });
 });

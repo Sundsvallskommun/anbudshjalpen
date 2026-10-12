@@ -6,10 +6,11 @@ import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useNavigate, useSearchParams } from "react-router";
 import { useNotice } from "../api/queries";
-import type { AnswerView, Citation, DocumentInfo, RulesView } from "../api/types";
+import type { AnswerCitation, AnswerView, Citation, DocumentInfo, PublishedAnswerView, RulesView } from "../api/types";
 import { useAskAi } from "../components/ask/AskAiProvider";
 import { isAnswered, parseScopeKey, scopeKey, type AskScope, type Turn } from "../components/ask/askAiState";
 import { formalQuestionSentence } from "../components/FormalQuestionAdvice";
+import { answerMeta, findPublishedAnswer } from "../components/ui/PublishedAnswerQuote";
 import { formatDateTime } from "../lib/format";
 import { citationPage, engineLabel } from "../lib/labels";
 import { usePageTitle } from "../shell/Page";
@@ -31,6 +32,13 @@ export function citationLine(citation: Citation, documents: readonly DocumentInf
   return name && documents.length > 1 ? `${where} · ${name}` : where;
 }
 
+/** "fråga 3 · besvarad 9 okt" for a quote of inköp's answer, or that it was not found among the answers (decision 0018). */
+export function answerCitationLine(citation: AnswerCitation, answers: readonly PublishedAnswerView[]): string {
+  const found = findPublishedAnswer(answers, citation.answer_key);
+  if (citation.check === "unverified" || !found) return "hittades inte bland inköps svar";
+  return `inköps svar i e-Avrop, ${answerMeta(found.number, found.entry).toLocaleLowerCase("sv")}`;
+}
+
 function Paragraphs({ text }: { text: string }) {
   return (
     <>
@@ -47,8 +55,17 @@ function Paragraphs({ text }: { text: string }) {
   );
 }
 
-function NoticeAnswer({ view, documents }: { view: AnswerView; documents: readonly DocumentInfo[] }) {
+function NoticeAnswer({
+  view,
+  documents,
+  answers,
+}: {
+  view: AnswerView;
+  documents: readonly DocumentInfo[];
+  answers: readonly PublishedAnswerView[];
+}) {
   const parts = answerParts(view.answer);
+  const answerCitations = view.answer.answer_citations ?? [];
   const needsFormalQuestion = view.answer.suggest_formal_question || !view.answer.found_in_document;
   return (
     <VStack gap={2}>
@@ -62,6 +79,18 @@ function NoticeAnswer({ view, documents }: { view: AnswerView; documents: readon
           {paragraph}
         </Text>
       ))}
+      {answerCitations.length > 0 && (
+        <VStack gap={2}>
+          <Text type="supporting">Inköp har svarat i e-Avrop:</Text>
+          <VStack as="ul" role="list" gap={2}>
+            {answerCitations.map((citation, index) => (
+              <li key={index}>
+                <Blockquote>{`”${citation.quote}” (${answerCitationLine(citation, answers)})`}</Blockquote>
+              </li>
+            ))}
+          </VStack>
+        </VStack>
+      )}
       {view.answer.citations.length > 0 && (
         <VStack gap={2}>
           <Text type="supporting">Det här står i underlaget:</Text>
@@ -108,14 +137,24 @@ function RulesAnswer({ view }: { view: RulesView }) {
   );
 }
 
-function PrintedTurn({ turn, number, documents }: { turn: Turn; number: number; documents: readonly DocumentInfo[] }) {
+function PrintedTurn({
+  turn,
+  number,
+  documents,
+  answers,
+}: {
+  turn: Turn;
+  number: number;
+  documents: readonly DocumentInfo[];
+  answers: readonly PublishedAnswerView[];
+}) {
   const engine = turn.answer?.engine ?? turn.rules?.engine ?? "";
   return (
     <VStack as="li" gap={3} className={styles.turn}>
       <Heading level={2}>{`Fråga ${number}`}</Heading>
       <Text weight="semibold">{turn.question}</Text>
       <Text type="supporting">{`Svar, ${engineLabel(engine)}, inte granskat av inköp`}</Text>
-      {turn.answer && <NoticeAnswer view={turn.answer} documents={documents} />}
+      {turn.answer && <NoticeAnswer view={turn.answer} documents={documents} answers={answers} />}
       {turn.rules && <RulesAnswer view={turn.rules} />}
     </VStack>
   );
@@ -161,7 +200,13 @@ export default function AskAiExportPage() {
         ) : (
           <VStack as="ol" role="list" gap={8} aria-label="Frågorna och svaren">
             {turns.map((turn, index) => (
-              <PrintedTurn key={turn.id} turn={turn} number={index + 1} documents={notice.data?.documents ?? []} />
+              <PrintedTurn
+                key={turn.id}
+                turn={turn}
+                number={index + 1}
+                documents={notice.data?.documents ?? []}
+                answers={notice.data?.published_answers ?? []}
+              />
             ))}
           </VStack>
         )}

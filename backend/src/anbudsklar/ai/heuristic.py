@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from anbudsklar.ai.engine import EngineRun, QuestionTurn, RuleContext
 from anbudsklar.contracts import (
     Answer,
+    AnswerCitation,
     AttachmentCheck,
     Checklist,
     Citation,
@@ -33,6 +34,7 @@ from anbudsklar.contracts import (
     MatchReason,
     NoticeContext,
     PagedDocument,
+    PublishedAnswerInput,
     RequiredAttachment,
     Requirement,
     RequirementCheck,
@@ -1044,6 +1046,65 @@ def _check_attachment(attachment: RequiredAttachment, draft_text: str) -> Attach
 # Leads of the texts the engine builds from excerpts. Without a language model there is no
 # conclusion to draw, so the lead only says what follows.
 ANSWER_LEAD = "Det här står i underlaget:"
+PUBLISHED_LEAD = "Inköp har svarat på en liknande fråga i e-Avrop:"
+# A published answer is offered when its question and the reader's share this share of all
+# their content words together (Jaccard), and at least two of them. The reader's distinctive
+# word counts even when no published question uses it, so "Gäller kravet på referenser även
+# underleverantörer?" does not get the answer about F-skatt for underleverantörer.
+_PUBLISHED_MATCH = 0.7
+_PUBLISHED_MIN_WORDS = 2
+
+
+def _published_answer_for(
+    question: str, answers: Sequence[PublishedAnswerInput]
+) -> PublishedAnswerInput | None:
+    """The published answer whose question is nearly the reader's, if one is."""
+
+    query = _stems(question)
+    best: tuple[float, PublishedAnswerInput] | None = None
+    for answer in answers:
+        stems = _stems(answer.question)
+        shared = len(query & stems)
+        if shared < _PUBLISHED_MIN_WORDS:
+            continue
+        score = shared / len(query | stems)
+        if score >= _PUBLISHED_MATCH and (best is None or score > best[0]):
+            best = (score, answer)  # strictly better only: the oldest wins ties
+    return best[1] if best else None
+
+
+def _answer_quote(published: PublishedAnswerInput) -> str:
+    """The answer's start, or the question's when the answer is too short to quote ("5")."""
+
+    reply = published.answer.strip()
+    return _excerpt(reply if len(reply) >= 2 else published.question.strip())
+
+
+def _answer_from_published(
+    published: PublishedAnswerInput, best: Sequence[tuple[PagedDocument, Sentence]], *, several: bool
+) -> Answer:
+    """The buyer's own answer first, as it reaches every supplier, then what the documents say."""
+
+    reply = " ".join(published.answer.split())
+    lines = [f"– {_excerpt(reply)} (svar {published.number} i e-Avrop)"]
+    lines.extend(
+        f"– {_excerpt(sentence.text)} ({document.filename}, sida {sentence.page})"
+        if several
+        else f"– {_excerpt(sentence.text)} (sida {sentence.page})"
+        for document, sentence in best
+    )
+    return Answer(
+        answer=f"{PUBLISHED_LEAD}\n" + "\n".join(lines),
+        found_in_document=True,
+        citations=[
+            _citation(sentence).model_copy(update={"document": document.filename})
+            for document, sentence in best
+        ],
+        answer_citations=[AnswerCitation(answer=published.number, quote=_answer_quote(published))],
+        suggest_formal_question=False,
+    )
+
+
 RULES_LEAD = "Paragrafer som kan handla om din fråga:"
 
 
@@ -1056,8 +1117,13 @@ class HeuristicEngine:
         return EngineRun(engine=self.name, notes=["Automatisk sammanställning utan språkmodell."])
 
     async def interpret_document(
-        self, notice: NoticeContext, document: PagedDocument
+        self,
+        notice: NoticeContext,
+        document: PagedDocument,
+        answers: Sequence[PublishedAnswerInput] = (),
     ) -> tuple[Checklist, EngineRun]:
+        # Without a model the rules cannot tell which requirement an answer changes, so the
+        # published answers are left to the page's own list of them (decision 0018).
         sentences = document_sentences(document.pages)
         requirements = _requirements(sentences)
         attachments = _attachments(sentences)
@@ -1140,7 +1206,9 @@ class HeuristicEngine:
         documents: DocumentSet,
         question: str,
         history: list[QuestionTurn],
+        answers: Sequence[PublishedAnswerInput] = (),
     ) -> tuple[Answer, EngineRun]:
+        published = _published_answer_for(question, answers)
         by_document = [(document, document_sentences(document.pages)) for document in documents.documents]
         # Question words the documents never use ("hur stor", "krävs") cannot match anything,
         # so only the words the documents share count towards the score.
@@ -1157,6 +1225,10 @@ class HeuristicEngine:
             key=lambda item: -item[0],  # stable: the main document wins ties
         )
         best = [(document, sentence) for score, document, sentence in ranked[:3] if score >= 0.5]
+        if published is not None:
+            return _answer_from_published(
+                published, best[:2], several=len(documents.documents) > 1
+            ), self._run()
         if not best:
             answer = Answer(
                 answer=(

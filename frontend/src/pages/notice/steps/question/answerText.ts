@@ -13,7 +13,8 @@ export const QUOTES_LEAD = "Det här står i underlaget:";
 /** The rule-based engine's advice after "Inget i underlaget verkar besvara frågan." */
 const NOT_FOUND_ADVICE = "Ställ frågan i e-Avrop före sista dag för frågor, så får alla leverantörer samma svar.";
 
-const CITATION_LINE = /^\s*[–-]\s+.*\(sida\s+\d+\)\s*$/u;
+// "– … (sida 5)", "– … (6.6 Krav.pdf, sida 8)" and, for inköp's published answers (decision 0018), "– … (svar 2 i e-Avrop)".
+const CITATION_LINE = /^\s*[–-]\s+.*\((?:[^()]*,\s*)?(?:sida\s+\d+|svar\s+\d+\s+i\s+e-Avrop)\)\s*$/u;
 // A sentence ends at . ! or ? before a capital letter or the end of the text, but not after an abbreviation: "19 kap.
 // LOU" and "t.ex. Matfors" go on.
 const SENTENCE_END = /[.!?](?=\s+[\p{Lu}"”(]|\s*$)/gu;

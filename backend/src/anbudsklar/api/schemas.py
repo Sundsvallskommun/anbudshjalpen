@@ -224,6 +224,7 @@ class PublishedAnswerView(ApiModel):
     """
 
     source: str  # eavrop
+    key: str  # stable across reads; a citation of the answer names it (decision 0018)
     question: str
     answer: str
     asked_at: datetime | None
@@ -456,7 +457,7 @@ class NoticeCreate(ApiModel):
 
 
 class InterpretationView(ApiModel):
-    """A document that has no checklist yet, and where its interpretation stands."""
+    """A document without a checklist yet, or whose new interpretation after inköp's answers failed (0018)."""
 
     document_id: uuid.UUID
     notice_id: uuid.UUID

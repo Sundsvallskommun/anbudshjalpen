@@ -73,6 +73,7 @@ const STAT_WORDS: readonly [key: string, words: string][] = [
   ["deleted", "borttagna"],
   ["closed", "stängda"],
   ["interpreted", "tolkade"],
+  ["reinterpreted", "tolkade om efter nya svar"],
   ["companies", "företag"],
   ["assessed", "bedömda"],
   ["removed", "borttagna"],
@@ -85,6 +86,7 @@ const STAT_WORDS: readonly [key: string, words: string][] = [
   ["documents_skipped", "dokument hoppades över"],
   ["skipped", "hoppades över"],
   ["gave_up", "gav upp"],
+  ["reinterpret_failed", "omtolkningar misslyckades"],
   ["failed", "misslyckades"],
 ];
 

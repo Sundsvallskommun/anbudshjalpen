@@ -4,7 +4,7 @@
  * headings, sources to look at, and a summary still in the engine's words. Each check says what it found and what the
  * buyer can do; the same findings flag the rows ("Flaggade"). Pure functions, tested without rendering.
  */
-import type { Checklist, DateKind, NoticeDeadlineKind, RequirementKind } from "../../../api/types";
+import type { AnswerCitation, Checklist, DateKind, NoticeDeadlineKind, RequirementKind } from "../../../api/types";
 import { calendarDateOf, formatLongDate, formatNumber } from "../../../lib/format";
 import { keyDateIndex } from "../../../lib/keyDates";
 import { REQUIREMENT_KINDS } from "../../../lib/labels";
@@ -211,20 +211,29 @@ function kindsCheck(context: CheckContext): AutoCheck | null {
   return { id: "kinds", tone: "warning", text, action: { label: "Visa", target: { kind: "toCheck" } } };
 }
 
+/** "a, b och c": Swedish lists join the last two with "och", the rest with commas. */
+const LIST_FORMAT = new Intl.ListFormat("sv", { style: "long", type: "conjunction" });
+
 function sourcesCheck(context: CheckContext): AutoCheck | null {
   const citations = context.rows.flatMap((row) => (row.citation ? [row.citation] : []));
   const missing = citations.filter((citation) => citation.check === "unverified").length;
   const moved = citations.filter((citation) => citation.check === "moved").length;
-  if (missing + moved === 0) return null;
+  // Quotes of inköp's published answers (decision 0018) are checked too, and companies see a missing one.
+  const answerQuotes = context.checklist.requirements.flatMap((requirement) =>
+    requirement.answer_citation ? [requirement.answer_citation] : [],
+  );
+  const answersOff = answerQuotes.filter((citation) => citation.check !== "verified").length;
+  if (missing + moved + answersOff === 0) return null;
   const parts = [
     missing > 0 ? `${formatNumber(missing)} hittades inte` : null,
     moved > 0 ? `${formatNumber(moved)} står på en annan sida än AI:n angav` : null,
-  ].filter(Boolean);
-  const total = missing + moved;
+    answersOff > 0 ? `${formatNumber(answersOff)} ur inköps svar stämmer inte` : null,
+  ].filter((part): part is string => part !== null);
+  const total = missing + moved + answersOff;
   return {
     id: "sources",
     tone: "warning",
-    text: `${formatNumber(total)} ${total === 1 ? "källhänvisning" : "källhänvisningar"} behöver kontrolleras: ${parts.join(" och ")}.`,
+    text: `${formatNumber(total)} ${total === 1 ? "källhänvisning" : "källhänvisningar"} behöver kontrolleras: ${LIST_FORMAT.format(parts)}.`,
     action: { label: "Visa", target: { kind: "toCheck" } },
   };
 }
@@ -250,13 +259,22 @@ export function autoChecks(context: CheckContext): AutoCheck[] {
 export function rowHints(row: ReviewRow, context: CheckContext, mismatches: ReadonlyMap<string, KindMismatch>): string[] {
   if (row.item.section === "requirement") {
     const mismatch = mismatches.get(row.item.value.id);
-    return mismatch ? [`Står under ${mismatch.heading}`] : [];
+    return [...(mismatch ? [`Står under ${mismatch.heading}`] : []), ...answerHints(row.item.value.answer_citation)];
   }
   if (row.item.section === "date" && row.key === deadlineRow(context)?.key) {
     const dates = deadlineDisagreement(context);
     if (dates?.checklist && dates.checklist !== dates.notice) return [`Annonsen anger ${formatLongDate(dates.notice)}`];
   }
   return [];
+}
+
+/** What a requirement's quote of inköp's published answer needs said (decision 0018): nothing when it was found. */
+export function answerHints(citation: AnswerCitation | null | undefined): string[] {
+  if (!citation || citation.check === "verified") return [];
+  if (citation.check === "moved" && citation.found_answer) {
+    return [`Citatet ur inköps svar står i fråga ${citation.found_answer}, inte ${citation.answer}`];
+  }
+  return ["Citatet ur inköps svar hittades inte"];
 }
 
 /** Whether a row belongs under "Flaggade": its source was not found or moved, or a check points at it. */

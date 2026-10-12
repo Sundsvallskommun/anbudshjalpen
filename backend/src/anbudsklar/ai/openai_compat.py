@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Sequence
 from typing import Any, Literal
 
 import openai
@@ -34,6 +35,7 @@ from anbudsklar.contracts import (
     MatchAssessment,
     NoticeContext,
     PagedDocument,
+    PublishedAnswerInput,
     ReviewResult,
     RulesAnswer,
     RuleSource,
@@ -176,9 +178,14 @@ class OpenAICompatEngine:
         return result, run
 
     async def interpret_document(
-        self, notice: NoticeContext, document: PagedDocument
+        self,
+        notice: NoticeContext,
+        document: PagedDocument,
+        answers: Sequence[PublishedAnswerInput] = (),
     ) -> tuple[Checklist, EngineRun]:
-        return await self._run_task(Task.INTERPRET_DOCUMENT, Checklist, notice=notice, document=document)
+        return await self._run_task(
+            Task.INTERPRET_DOCUMENT, Checklist, notice=notice, document=document, answers=list(answers)
+        )
 
     async def assess_match(
         self, profile: CompanyProfile, notice: NoticeContext, checklist: Checklist | None
@@ -198,12 +205,14 @@ class OpenAICompatEngine:
         documents: DocumentSet,
         question: str,
         history: list[QuestionTurn],
+        answers: Sequence[PublishedAnswerInput] = (),
     ) -> tuple[Answer, EngineRun]:
         return await self._run_task(
             Task.ANSWER_QUESTION,
             Answer,
             notice=notice,
             documents=documents,
+            answers=list(answers),
             history=history,
             question=question,
         )

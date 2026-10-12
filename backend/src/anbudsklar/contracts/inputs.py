@@ -9,12 +9,15 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from pydantic import Field
 
 from anbudsklar.contracts.common import ContractModel
 
 PAGE_MARKER = "[SIDA {page}]"
+ANSWER_MARKER = "[SVAR {number}]"
+_STOCKHOLM = ZoneInfo("Europe/Stockholm")
 
 # What a notice's deadline is the last day for: tenders, or requests to participate
 # (anbudsansökan), which is all a restricted procedure's notice gives (eForms BT-1311).
@@ -129,6 +132,39 @@ class DocumentSet(ContractModel):
             included = "alla med" if item.pages_included == item.page_count else f"{item.pages_included} med"
             lines.append(f"{index}. {item.filename} – {item.page_count} sidor, {included}")
         return "\n".join(lines) + "\n\n" + "\n\n".join(document.render() for document in self.documents)
+
+
+class PublishedAnswerInput(ContractModel):
+    """A question a supplier asked in e-Avrop and the answer the buyer published (decisions 0013 and 0018).
+
+    Public for every supplier, and never who asked. `number` is the answer's place in the
+    notice's list, oldest first, as the web app numbers it; `key` is its stable key in the
+    source, which only our code uses.
+    """
+
+    number: int = Field(ge=1)
+    key: str
+    question: str
+    answer: str
+    answered_at: datetime
+
+    def render(self) -> str:
+        local = self.answered_at.astimezone(_STOCKHOLM) if self.answered_at.tzinfo else self.answered_at
+        day = local.date().isoformat()
+        marker = ANSWER_MARKER.format(number=self.number)
+        return f"{marker} besvarad {day}\nFråga: {self.question.strip()}\nSvar: {self.answer.strip()}"
+
+
+def render_published_answers(answers: list[PublishedAnswerInput]) -> str:
+    """The buyer's answers as one block of material, each behind its [SVAR n] marker."""
+
+    if not answers:
+        return ""
+    lead = (
+        "Inköp har publicerat de här svaren på leverantörernas frågor i e-Avrop. Svaren gäller alla "
+        "leverantörer och hör till underlaget. Säger ett svar något annat än dokumenten gäller svaret."
+    )
+    return lead + "\n\n" + "\n\n".join(answer.render() for answer in answers)
 
 
 class CompanyProfile(ContractModel):

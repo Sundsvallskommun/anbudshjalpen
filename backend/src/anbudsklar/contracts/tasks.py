@@ -12,9 +12,9 @@ from typing import Literal
 
 from pydantic import Field
 
-from anbudsklar.contracts.common import Citation, CitationCheck, ContractModel
+from anbudsklar.contracts.common import AnswerCitation, Citation, CitationCheck, ContractModel
 
-CONTRACT_VERSION = "2026-10-12"
+CONTRACT_VERSION = "2026-10-13"
 
 
 class Task(StrEnum):
@@ -45,6 +45,11 @@ class Requirement(ContractModel):
         default=None, description="What the supplier must submit to prove it, if stated."
     )
     citation: Citation
+    answer_citation: AnswerCitation | None = Field(
+        default=None,
+        description="A published answer that changes or clarifies this requirement. plain_language "
+        "then says what applies after the answer.",
+    )
 
 
 class RequiredAttachment(ContractModel):
@@ -84,7 +89,8 @@ class Checklist(ContractModel):
     dates: list[KeyDate] = Field(default_factory=list)
     terms: list[TermExplanation] = Field(default_factory=list)
     open_questions: list[str] = Field(
-        default_factory=list, description="Things the document does not make clear."
+        default_factory=list,
+        description="Things the document does not make clear and no published answer settles.",
     )
 
 
@@ -147,6 +153,11 @@ class Answer(ContractModel):
     answer: str
     found_in_document: bool
     citations: list[Citation] = Field(default_factory=list)
+    answer_citations: list[AnswerCitation] = Field(
+        default_factory=list,
+        description="Quotes from the buyer's published answers that support the answer. A published "
+        "answer goes before the documents where they differ.",
+    )
     suggest_formal_question: bool = Field(
         description="True when the document does not settle the question and it should be asked "
         "formally in e-Avrop before the question deadline, so the answer reaches all suppliers."

@@ -8,6 +8,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
 import { VStack } from "@astryxdesign/core/VStack";
+import type { PublishedAnswerView } from "../../../api/types";
 import { formatNumber, plural } from "../../../lib/format";
 import { ViewSwitch } from "../ViewSwitch";
 import type { SummaryIssue } from "./checks";
@@ -147,6 +148,8 @@ export interface ListGroupsProps {
   filter: RowFilter;
   noticeId: string;
   documentId: string;
+  /** Inköp's published answers, so a requirement that quotes one names it by its number on the page (decision 0018). */
+  publishedAnswers?: readonly PublishedAnswerView[];
   selectedKey: string | null;
   /** The row whose form is open beside the list. */
   editingKey: string | null;

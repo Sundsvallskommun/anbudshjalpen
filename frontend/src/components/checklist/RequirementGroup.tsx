@@ -1,4 +1,4 @@
-import type { Requirement, TermExplanation } from "../../api/types";
+import type { PublishedAnswerView, Requirement, TermExplanation } from "../../api/types";
 import { CollapsibleSection } from "../ui/CollapsibleSection";
 import { RequirementRow } from "../ui/RequirementRow";
 import type { RequirementSection } from "./checklistModel";
@@ -14,12 +14,15 @@ export function RequirementGroup({
   noticeId,
   documentId,
   terms,
+  publishedAnswers,
 }: {
   section: RequirementSection;
   requirements: readonly Requirement[];
   noticeId: string;
   documentId?: string;
   terms?: readonly TermExplanation[];
+  /** Inköp's published answers, which a requirement may quote (decision 0018). */
+  publishedAnswers?: readonly PublishedAnswerView[];
 }) {
   if (requirements.length === 0) return null;
   return (
@@ -41,6 +44,7 @@ export function RequirementGroup({
             documentId={documentId}
             origin={section.title}
             terms={terms}
+            publishedAnswers={publishedAnswers}
           />
         ))}
       </SectionRows>
