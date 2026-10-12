@@ -58,7 +58,8 @@ Checklistor och matchningar sparas med motorns namn.
 | Körs av | Direkt efter att inköparen laddat upp underlaget, jobbet `interpret_pending` var femte minut, eller `anbudsklar interpret` |
 
 Checklistan går från utkast till godkänd till publicerad, eller avvisas. Bara publicerade checklistor visas för företag
-och via MCP. En publicerad checklista som visar sig vara fel kan inköparen dra tillbaka med en motivering
+och via MCP. Har inköp slagit av granskningen på sidan Inställningar ([beslut 0011](decisions/0011-installningar-granskning-valfri.md))
+publiceras en tolkning direkt, utan godkännande, och märks "inte granskad av inköp". En publicerad checklista som visar sig vara fel kan inköparen dra tillbaka med en motivering
 (knappen "Dra tillbaka", `POST /api/admin/checklists/{id}/withdraw`). Den blir avvisad, företagen ser den förra publicerade
 checklistan om det finns någon, matchningarna mot annonsen bedöms om, och checklistan kan rättas och publiceras igen.
 När inköparen rättar en checklista kontrolleras citaten igen, med samma regel för datum och vikter. En avvisad
@@ -153,10 +154,11 @@ e-Avrop.
 
 | | |
 |---|---|
-| Metod | `suggest_cpv(description, candidates)` |
-| Indata | Företagets beskrivning och kandidater som vår sökning hittat i den officiella CPV-listan |
+| Metod | `suggest_cpv(description, candidates)`, två anrop per förslag |
+| Indata | Företagets beskrivning och kandidater ur den officiella CPV-listan. Första anropet får alla områden (huvudgrupper och grupper, cirka 320 rader) och väljer högst åtta. Andra anropet får koderna under de valda områdena (högst 400, breda först, men aldrig en hel huvudgrupp som "Transporter", eftersom en sådan kod i profilen skulle matcha varje annons under den) och de koder som vår ordsökning i benämningarna hittar |
 | Svar | `CpvSuggestions`: högst åtta koder med åtta siffror, benämning och motivering |
-| Kontroll | Modellen väljer bland kandidaterna, så koderna kommer från CPV-listan |
+| Kontroll | Modellen väljer bland kandidaterna, så koderna kommer från CPV-listan. Ett val utanför listan tas bort |
+| Varför två steg | Betydelsen avgör områdena. En sökning i benämningarna kommer aldrig från "renoverar badrum" till "Plattsättning", och företag beskriver sig med vardagsord. Ordsökningen är ett komplement, inte urvalet |
 | Körs av | Profilsidan, som visar förslagen som rutor att kryssa i, med motiveringen under varje kod |
 
 ### Regelhjälpen (`regelhjalpen`)

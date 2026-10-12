@@ -28,11 +28,13 @@ _STOPWORDS = frozenset(_STOPWORD_TEXT.split())
 _WORD = re.compile(r"[a-zåäöéü]{4,}", re.IGNORECASE)
 
 
-def keywords(text: str, *, limit: int = 12) -> list[str]:
+def keywords(text: str, *, limit: int | None = None) -> list[str]:
     """Distinct lower-case words of four letters or more, in order of first appearance.
 
-    Only letters survive, so the result is safe to join into a `websearch_to_tsquery`
-    expression without quoting.
+    Every word counts: a company often opens its description with its history and names
+    what it does last, so `limit` is only a bound on query size, never a way to pick the
+    "important" words. Only letters survive, so the result is safe to join into a
+    `websearch_to_tsquery` expression without quoting.
     """
 
     found: dict[str, None] = {}
@@ -40,6 +42,6 @@ def keywords(text: str, *, limit: int = 12) -> list[str]:
         word = match.group(0).lower()
         if word not in _STOPWORDS:
             found.setdefault(word, None)
-        if len(found) >= limit:
+        if limit is not None and len(found) >= limit:
             break
     return list(found)
