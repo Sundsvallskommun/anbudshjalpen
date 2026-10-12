@@ -125,7 +125,7 @@ function Facts({ match }: { match: MatchView }) {
   return (
     <HStack gap={2} vAlign="center" wrap="wrap">
       {meta && <Text type="supporting">{meta}</Text>}
-      {hasChecklist && <PublishedChecklistToken size="sm" />}
+      {hasChecklist && <PublishedChecklistToken size="sm" reviewed={notice.checklist_reviewed} />}
     </HStack>
   );
 }

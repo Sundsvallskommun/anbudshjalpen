@@ -15,7 +15,7 @@ import {
 } from "./noticeData";
 
 function dated(kind: KeyDate["kind"], date: string | null): KeyDate {
-  return { kind, date, description: "", citation: { page: 1, quote: "Datum", check: "verified", found_page: null } };
+  return { kind, date, description: "", citation: { page: 1, quote: "Datum", check: "verified", found_page: null, document: null, document_id: null } };
 }
 
 function withDates(dates: KeyDate[], view = checklistView, changes: Partial<NoticeDetail> = {}): NoticeDetail {

@@ -57,8 +57,12 @@ describe("ProfilePage", () => {
     expect(screen.getByRole("link", { name: "Se träffarna" })).toHaveAttribute("href", "/start");
     const activity = screen.getByRole("region", { name: "Vad ni gör (CPV-koder)" });
     expect(within(activity).getByRole("textbox", { name: "Beskriv företaget" })).toHaveValue(profileView.description);
-    expect(within(activity).getByText("Målning · 45442100")).toBeInTheDocument();
-    expect(within(activity).getByRole("button", { name: "Ta bort Målning · 45442100" })).toBeInTheDocument();
+    // The chosen codes as rows under their division, named first with the code below.
+    const codes = within(activity).getByRole("group", { name: "Era koder · 1" });
+    expect(within(codes).getByRole("heading", { level: 3, name: "Anläggningsarbete" })).toBeInTheDocument();
+    expect(within(codes).getByText("Målning")).toBeInTheDocument();
+    expect(within(codes).getByText("45442100")).toBeInTheDocument();
+    expect(within(codes).getByRole("button", { name: "Ta bort Målning · 45442100" })).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "Om företaget" })).getByText("Sundsvall")).toBeInTheDocument();
     expect(screen.queryByText("Du har ändringar som inte är sparade.")).not.toBeInTheDocument();
   });

@@ -118,7 +118,7 @@ export function CitationFields({
   useEffect(() => () => reportCitation?.(null), [reportCitation]);
 
   const set = (changes: Partial<Pick<Citation, "page" | "quote">>) =>
-    onChange({ ...citation, ...changes, check: null, found_page: null });
+    onChange({ ...citation, ...changes, check: null, found_page: null, document: null, document_id: null });
 
   const takeSelection = () => {
     const selection = tools?.readSelection();

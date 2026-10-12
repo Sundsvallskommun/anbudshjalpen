@@ -20,6 +20,9 @@ from anbudsklar.api.deps import (
 )
 from anbudsklar.api.limits import rate_limited
 from anbudsklar.api.schemas import (
+    AppSettingsSaved,
+    AppSettingsUpdate,
+    AppSettingsView,
     ChecklistAdminItem,
     ChecklistStatus,
     ChecklistUpdate,
@@ -36,6 +39,7 @@ from anbudsklar.api.schemas import (
 from anbudsklar.api.uploads import UPLOAD_OPENAPI, read_upload
 from anbudsklar.services import checklists, insights, jobs, notices, reminders
 from anbudsklar.services.access import Viewer
+from anbudsklar.services.app_settings import get_app_settings, save_app_settings
 from anbudsklar.services.background import interpret_in_background
 from anbudsklar.services.dates import utcnow
 
@@ -189,6 +193,28 @@ async def interpret_document(
 @router.get("/insights")
 async def list_insights(session: SessionDep) -> list[InsightItem]:
     return await insights.list_insights(session, utcnow())
+
+
+@router.get("/settings")
+async def app_settings(session: SessionDep) -> AppSettingsView:
+    """The settings inköp can change (decision 0011)."""
+
+    return await get_app_settings(session)
+
+
+@router.put("/settings")
+async def update_app_settings(
+    body: AppSettingsUpdate, session: SessionDep, user: BuyerDep
+) -> AppSettingsSaved:
+    """Save the settings. Turning the review off publishes the checklists waiting for it."""
+
+    before = await get_app_settings(session)
+    saved = await save_app_settings(session, body, user.id)
+    published = 0
+    if before.review_required and not saved.review_required:
+        published = await checklists.publish_pending(session)
+    await session.commit()
+    return AppSettingsSaved(**saved.model_dump(), published_now=published)
 
 
 @router.get("/jobs")

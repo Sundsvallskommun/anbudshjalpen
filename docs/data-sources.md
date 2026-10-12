@@ -7,14 +7,14 @@ Läs detta när: Du ska ändra insamlingen, lägga till en källa, förklara fö
 
 Hör ihop med: [PoC](poc.md), [Drift](operations.md), [Öppna frågor](open-questions.md), [Ordlista](glossary.md)
 
-> Kontrollerat 2026-10-05. Koden ligger i `backend/src/anbudsklar/ingest/`.
+> Kontrollerat 2026-10-05, e-Avrop 2026-10-08. Koden ligger i `backend/src/anbudsklar/ingest/`.
 
 ## Översikt
 
 | Källa | Innehåll | Hämtas | Villkor | I PoC:n |
 |---|---|---|---|---|
 | TED | Annonser över EU:s tröskelvärden | Öppet API, varje dag 06:15 | Fri återanvändning | Riktiga |
-| e-Avrop | Alla kommunens annonser och planerade upphandlingar | Inte automatiskt, se nedan | `robots.txt` förbjuder automatisk hämtning | Saknas tills vi får tillstånd |
+| e-Avrop | Kommunens annonserade upphandlingar, även under tröskelvärdena, och deras underlag | Kommunens Projekt-API, varje dag 06:30 | Kommunens nyckel. Bara publicerat sparas ([beslut 0009](decisions/0009-eavrop-projekt-api.md)) | Riktiga när nyckeln är inlagd |
 | Riksdagen | LOU (SFS 2016:1145), paragraf för paragraf | Öppna data, varje måndag 05:00 | Lagtext är fri | Riktig |
 | EU:s CPV-lista | 9 454 CPV-koder med svenska benämningar | Fil i repot | EU:s regler för återanvändning | Riktig |
 | Avtalskatalog | Avtal och när de löper ut | CSV-fil | – | Påhittad |
@@ -45,8 +45,8 @@ Kontaktpersoners namn, e-post och telefonnummer i annonser sparas inte.
   som `reference_number`. Det visas efter köparen på upphandlingens sida och i MCP-verktyget
   `hamta_upphandling`. Annonser som e-Avrop har skickat till TED saknar det: den 2026-10-05 gällde det alla 165
   annonser från Sundsvalls köpare. De har bara e-Avrops URN:er per delområde (`urn:…`), som inte räknas som
-  referensnummer. Annonser ur e-Avrops lista Aktuella får e-Avrops id, de påhittade sitt DEMO-nummer, och inköparen kan
-  ange ett för en upphandling som läggs in för hand. Sökningen hittar inte annonser på referensnumret.
+  referensnummer. Annonser från e-Avrops API får kommunens diarienummer (till exempel "UH-2026-120"), de påhittade
+  sitt DEMO-nummer, och inköparen kan ange ett för en upphandling som läggs in för hand. Sökningen hittar inte annonser på referensnumret.
 - **Villkor:** TED:s annonser får återanvändas fritt, kommersiellt och icke-kommersiellt.
 - **Begränsning:** TED har bara upphandlingar över tröskelvärdena. Den 2026-10-05 fanns 9 öppna annonser från Sundsvalls
   köpare i TED och 13 i e-Avrop.
@@ -65,20 +65,16 @@ Kontaktpersoners namn, e-post och telefonnummer i annonser sparas inte.
 
 ## e-Avrop
 
-Sundsvalls kommun annonserar alla upphandlingar i e-Avrop, även de under tröskelvärdena. Listorna "Aktuella" och
-"Planerade" är öppna utan inloggning, men e-Avrops `robots.txt` förbjuder all automatisk hämtning. Insamlaren läser
-`robots.txt` först och hämtar ingenting så länge förbudet gäller.
+Sundsvalls kommun annonserar alla upphandlingar i e-Avrop, även de under tröskelvärdena, och underlagen finns bara där.
+Anbudsklar läser kommunens upphandlingar via e-Avrops Projekt-API med kommunens nyckel (`EAVROP_API_TOKEN`,
+`EAVROP_CLIENT_ID`). Hur det går till, reglerna som skyddar sekretessbelagda uppgifter och det API:t saknar står i
+[e-Avrops API](eavrop.md).
 
-Insamlaren följer högst fem omdirigeringar till `robots.txt`. Bara en fil som saknas (404 eller 410) räknas som att
-allt är tillåtet. Alla andra svar som inte lyckas, till exempel 429, 403 och 5xx, och omdirigeringar som inte leder
-fram till en fil räknas som att allt är förbjudet.
-
-- Hämtningen kräver skriftligt tillstånd från Antirio AB, som driver e-Avrop, eller tillgång till e-Avrops API via inköp.
-  Det är en [öppen fråga](open-questions.md).
-- Får vi tillstånd gäller: en `User-Agent` som anger vem vi är (`HTTP_USER_AGENT`), listorna högst var tredje timme,
-  minst fem sekunder mellan anrop, inga nedladdningar av underlag och stopp vid CAPTCHA, 403 eller 429. Skydd mot
-  automatiska anrop kringgås aldrig.
-- Samma annons i TED och e-Avrop känns igen på länken: TED:s länk till underlaget är e-Avrops annonslänk.
+- Nyckeln läser allt i kommunens projekt. Insamlaren sparar bara publicerade upphandlingar och fälten i en vitlista
+  ([beslut 0009](decisions/0009-eavrop-projekt-api.md)).
+- e-Avrops webbplats hämtas inte automatiskt. Dess `robots.txt` förbjuder det, och API:t gör det onödigt.
+- Samma upphandling i TED och e-Avrop känns igen på länken: TED:s länk till underlaget är e-Avrops annonslänk med
+  upphandlingens id. Den blir en annons, och underlaget från e-Avrop läggs på den.
 
 ## LOU från Riksdagen
 
@@ -117,6 +113,10 @@ inköp kan lämna ett.
 `data/fixtures/` innehåller tre påhittade förfrågningsunderlag med facit, ett anbudsutkast med avsiktliga brister och
 två demoföretag. Underlagen byggs av `data/fixtures/build_fixtures.py`, och varje sida har sidfoten "FIKTIVT UNDERLAG –
 endast för demonstration". `anbudsklar seed` läser in allt. Facit beskrivs i [Kvalitetstest](quality-test.md).
+
+Med `SHOW_FICTITIOUS=false` döljs de påhittade annonserna, underlagen och avtalen överallt, utan att raderas. Det
+passar när riktiga underlag finns från e-Avrop. Demopersonerna och deras företag finns kvar, eftersom inloggningen
+bygger på dem.
 
 ## Bolagsverket
 

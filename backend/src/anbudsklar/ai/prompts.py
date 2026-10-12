@@ -29,6 +29,7 @@ from anbudsklar.contracts import (
     Checklist,
     CompanyProfile,
     CpvCandidate,
+    DocumentSet,
     NoticeContext,
     PagedDocument,
     Task,
@@ -66,7 +67,7 @@ TASK_INPUTS: dict[Task, tuple[str, ...]] = {
     Task.INTERPRET_DOCUMENT: ("notice", "document"),
     Task.ASSESS_MATCH: ("profile", "notice", "checklist"),
     Task.REVIEW_DRAFT: ("checklist", "draft"),
-    Task.ANSWER_QUESTION: ("notice", "document", "history", "question"),
+    Task.ANSWER_QUESTION: ("notice", "documents", "history", "question"),
     Task.SUGGEST_CPV: ("description", "candidates"),
     Task.ANSWER_RULES: ("context", "question"),
 }
@@ -150,6 +151,10 @@ def _render_document(document: PagedDocument) -> str:
     return _block("underlag", document.render())
 
 
+def _render_documents(documents: DocumentSet) -> str:
+    return _block("underlag", documents.render())
+
+
 def _render_draft(draft: PagedDocument) -> str:
     return _block("anbudsutkast", draft.render())
 
@@ -225,6 +230,7 @@ def _render_context(context: Sequence[RuleContext]) -> str:
 _RENDERERS: dict[str, Callable[[Any], str]] = {
     "notice": _render_notice,
     "document": _render_document,
+    "documents": _render_documents,
     "draft": _render_draft,
     "profile": _render_profile,
     "checklist": _render_checklist,

@@ -41,8 +41,10 @@ function history(turns: readonly Turn[]): QuestionTurnIn[] {
 function Pending() {
   return (
     <Card>
-      <HStack gap={2} vAlign="center">
-        <Spinner size="sm" label="Letar i underlaget" />
+      <HStack gap={2} vAlign="center" role="status">
+        <HStack aria-hidden="true">
+          <Spinner size="sm" />
+        </HStack>
         <Text color="secondary">Letar i underlaget …</Text>
       </HStack>
     </Card>

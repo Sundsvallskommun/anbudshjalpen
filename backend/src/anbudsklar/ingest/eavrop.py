@@ -1,395 +1,476 @@
-"""Notices from e-Avrop's public pages for Sundsvall: the advertised list and the planned list.
+"""Notices and their published documents from e-Avrop's Projekt API (decision 0009).
 
-e-Avrop has no open API, and its robots.txt currently disallows automated access to
-everything except `/Places.aspx`. This job therefore reads robots.txt once per run and
-fetches nothing it disallows: with today's robots.txt a run stores nothing and reports the
-blocked pages. The parser and storage are ready for the day Antirio AB (the operator)
-allows access, and are tested on pages saved by hand. Even then the job stays polite: an
-identifiable user agent, one request per page, a pause between requests, no login, no
-detail pages or document downloads, and it stops at any robot check (never bypass one).
+The API is the buyer's own: the municipality's token reads every procurement project of the
+client, including what must never leave e-Avrop. That covers who tendered and at what price, the
+evaluation, the project's working files, unannounced projects and the staff on them. This
+module therefore reads by allowlist:
 
-TED covers notices above the EU thresholds; e-Avrop also lists the smaller ones.
+- only projects with the event `Announced` and a request (`RequestForTender` or, in the first
+  stage of a two-step procedure, `RequestForApplications`) that has an `AnnouncementDate`.
+  An invitation sent only to chosen suppliers is not public and is skipped;
+- only the fields in `PublicProcurement`. The response is never stored as a whole, and
+  `Suppliers`, `Members`, `AgreementOwner`, `QualityResponsible`, `Reports`, `LogFiles`,
+  `Assignment` and the project's own `Documents` are never read. `IsClassified` on the
+  project's documents cannot be trusted: evaluation protocols and credit checks of tenderers
+  carry False;
+- only documents attached to the public request, and only from the announcement-document
+  address. A document address outside it is skipped.
+
+A procurement that e-Avrop also sent to TED is the same procurement: its documents are added
+to the TED notice instead of creating a second notice. The other way round, the TED job does
+not create a notice for a procurement already stored from e-Avrop.
 """
 
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import json
 import logging
-import re
-import time
-from collections.abc import Sequence
-from dataclasses import asdict, dataclass, field
-from datetime import UTC, date, datetime
-from typing import Any
-from urllib.parse import urljoin, urlsplit
-from urllib.robotparser import RobotFileParser
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime, time, timedelta
+from pathlib import PurePosixPath
+from typing import Any, Literal
 
 import httpx
-from bs4 import BeautifulSoup, Tag
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.config import Settings
+from anbudsklar.documents.extract import DocumentError
+from anbudsklar.documents.store import safe_filename, store_document
 from anbudsklar.ingest.common import IngestError, IngestStats
-from anbudsklar.ingest.http import ensure_ok, send, user_agent
+from anbudsklar.ingest.http import ensure_ok, send
 from anbudsklar.ingest.notices import (
+    STOCKHOLM,
+    NoticeStatus,
     NoticeValues,
-    end_of_day,
+    eavrop_procurement_id,
     notices_by_external_id,
     save_notice,
     start_of_day,
     status_from_deadline,
     unique,
 )
+from anbudsklar.ingest.ted import LOOKBACK_MONTHS, months_before
+from anbudsklar.models import Document, Notice
 
 log = logging.getLogger(__name__)
 
 SOURCE = "eavrop"
-REQUEST_INTERVAL_SECONDS = 5.0
-MAX_PLANNED_PAGES = 10
-MAX_ROBOTS_REDIRECTS = 5
-ROBOTS_MISSING_STATUSES = frozenset({404, 410})
-GRID_ID = "mainContent_tenderGridView"
+# Pause between calls: about 300 projects a run, which a buyer's API handles without strain.
+REQUEST_INTERVAL_SECONDS = 0.5
+MAX_DOCUMENT_BYTES = 50 * 1024 * 1024
+# Formats the document extraction reads; other files (xlsx, images, video) are not fetched.
+SUPPORTED_SUFFIXES = frozenset({".pdf", ".docx", ".txt", ".md"})
+# The only API paths a token is sent to, below `EAVROP_API_URL`.
+DETAIL_PATHS = ("/v1/procurements/", "/v1/simple-procurements/")
+DOCUMENT_PATH = "/v1/announcement-documents/"
+# Words that mark the document a supplier reads first. The first word that matches any file
+# wins, and a PDF beats a Word file with the same words. A notice with a single readable file
+# has that as its main document. Otherwise, without a match, nothing is interpreted on its
+# own: a wrong guess costs a model call and a draft for inköp to reject.
+MAIN_DOCUMENT_WORDS = (
+    "administrativa föreskrifter",
+    "upphandlingsföreskrifter",
+    "förfrågningsunderlag",
+    "upphandlingsdokument",
+    "anbudsförfrågan",
+    "förfrågan",
+    "inbjudan",
+    "krav på leverantör",
+    "kravspecifikation",
+)
+# How far before the last successful run a project's change is still fetched again, for
+# clocks that differ and changes made while that run was going.
+CHANGE_MARGIN = timedelta(days=1)
+AWARDED_EVENTS = frozenset({"Assigned", "ContractAssigned"})
 
-CPV_RE = re.compile(r"(\d{8})(?:-\d)?:\s*(.+?)\s*(?=\d{8}(?:-\d)?:|$)", re.S)
-ID_RE = re.compile(r"[?&]id=(\d+)")
-DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
-PERIOD_RE = re.compile(r"Kvartal\s+([1-4])\s+(\d{4})", re.I)
-PAGER_RE = re.compile(r"__doPostBack\('([^']+)','(Page\$(\d+))'\)")
-INVALID_CPV = "00000000"  # e-Avrop shows "00000000: cpv utanför giltigt intervall!"
+# e-Avrop's procedure types, in LOU's words. The national procedures are those under the
+# EU thresholds (19 kap. LOU), which LOU since 2022 no longer calls "förenklat förfarande".
+PROCEDURE_LABELS: dict[str, str] = {
+    "Open": "Öppet förfarande",
+    "Selective": "Selektivt förfarande",
+    "Negotiated": "Förhandlat förfarande med föregående annonsering",
+    "CompetitiveDialog": "Konkurrenspräglad dialog",
+    "InnovationPartnership": "Innovationspartnerskap",
+    "NationalOneStep": "Upphandling under tröskelvärdena (19 kap. LOU)",
+    "NationalTwoStep": "Upphandling under tröskelvärdena (19 kap. LOU), med ansökan först",
+    "Simplified": "Upphandling under tröskelvärdena (19 kap. LOU)",
+    "Selection": "Upphandling under tröskelvärdena (19 kap. LOU), med ansökan först",
+    "DirectPublic": "Annonserad direktupphandling",
+    "NewCompetition": "Förnyad konkurrensutsättning",
+    "Lov": "Valfrihetssystem (LOV)",
+    "LovAdvanced": "Valfrihetssystem (LOV)",
+    "DynamicPurchasingSystem": "Dynamiskt inköpssystem",
+}
+
+Stage = Literal["tender", "application"]
 
 
 @dataclass(frozen=True)
-class CpvEntry:
-    code: str
-    label: str
-
-
-@dataclass(frozen=True)
-class AdvertisedRow:
-    eavrop_id: int
-    title: str
+class PublicDocument:
+    filename: str
     url: str
-    published: date | None
-    cpv: tuple[CpvEntry, ...]
-    deadline: date | None
-    deadline_text: str | None  # e.g. "anbud kan lämnas löpande" for continuous intake
-    html: str
+    updated: datetime | None
 
 
 @dataclass(frozen=True)
-class PlannedRow:
-    planned_id: str
+class PublicProcurement:
+    """Everything this module reads from a project. Nothing else leaves the response."""
+
+    procurement_id: str
     title: str
     description: str | None
-    cpv: tuple[CpvEntry, ...]
-    period: str | None  # e.g. "Kvartal 3 2026"
-    html: str
+    diary_number: str | None
+    cpv_codes: tuple[str, ...]
+    procedure_type: str | None
+    events: tuple[str, ...]
+    stage: Stage
+    announced_at: datetime
+    request_updated: datetime | None
+    deadline: datetime | None
+    question_deadline: datetime | None
+    documents: tuple[PublicDocument, ...]
 
 
-@dataclass(frozen=True)
-class PagerTarget:
-    event_target: str
-    event_argument: str
+# --- Reading a project ------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class PlannedPage:
-    rows: list[PlannedRow]
-    next_page: PagerTarget | None
-    form_fields: dict[str, str] = field(default_factory=dict)
+def parse_moment(value: Any) -> datetime | None:
+    """A moment from the API. Midnight means the end of the day before, as on TED.
 
-
-# --- Parsing (pure) --------------------------------------------------------------------
-
-
-def parse_advertised(html: str, base_url: str) -> list[AdvertisedRow]:
-    """Rows of the advertised list (`e-Upphandling/Default.aspx`)."""
-
-    rows = (_advertised_row(tr, base_url) for tr in _data_rows(_grid(_soup(html))))
-    return [row for row in rows if row is not None]
-
-
-def parse_planned(html: str) -> PlannedPage:
-    """Rows of one page of the planned list (`e-Upphandling/planedComing.aspx`) and its pager."""
-
-    soup = _soup(html)
-    grid = _grid(soup)
-    rows = [row for row in map(_planned_row, _data_rows(grid)) if row is not None]
-    return PlannedPage(rows=rows, next_page=_next_page(grid), form_fields=_postback_fields(soup))
-
-
-def _advertised_row(tr: Tag, base_url: str) -> AdvertisedRow | None:
-    """Columns: Rubrik (link with ?id=N), Publicerad, Område (CPV), Anbuds-/ansökningsdag."""
-
-    cells = tr.select(":scope > td")
-    link = cells[0].select_one("a[href]") if len(cells) >= 4 else None
-    href = str(link.get("href", "")) if link else ""
-    match = ID_RE.search(href)
-    if link is None or match is None:
-        return None
-    deadline_cell = cells[3].get_text(" ", strip=True)
-    countdown = cells[3].select_one("span.futureText, span.pastText")  # "9 dagar kvar"
-    if countdown is not None:
-        deadline_cell = deadline_cell.removesuffix(countdown.get_text(" ", strip=True)).strip()
-    deadline = _parse_date(deadline_cell)
-    return AdvertisedRow(
-        eavrop_id=int(match.group(1)),
-        title=link.get_text(" ", strip=True),
-        url=urljoin(base_url, href),
-        published=_parse_date(cells[1].get_text(" ", strip=True)),
-        cpv=parse_cpv(cells[2].get_text(" ", strip=True)),
-        deadline=deadline,
-        deadline_text=None if deadline or not deadline_cell else deadline_cell,
-        html=str(tr),
-    )
-
-
-def _planned_row(tr: Tag) -> PlannedRow | None:
-    """Columns: Rubrik (title with a hidden description box), cpv-kod, Planerad ("Kvartal 3 2026")."""
-
-    cells = tr.select(":scope > td")
-    title_element = cells[0].select_one("span.link") if len(cells) >= 3 else None
-    if title_element is None:
-        return None
-    title = title_element.get_text(" ", strip=True)
-    description = cells[0].select_one("div.dialogueBody td")
-    cpv = parse_cpv(cells[1].get_text(" ", strip=True))
-    period = cells[2].get_text(" ", strip=True) or None
-    return PlannedRow(
-        planned_id=_planned_id(cells[0], title, period, cpv),
-        title=title,
-        description=description.get_text(" ", strip=True) if description else None,
-        cpv=cpv,
-        period=period,
-        html=str(tr),
-    )
-
-
-def parse_cpv(text: str) -> tuple[CpvEntry, ...]:
-    """CPV entries from a cell such as "90919000: Kontorsstädning90910000: Städning".
-
-    e-Avrop separates entries with an invalid `</br>` that the HTML parser drops, so the
-    next eight-digit code is what ends a label.
+    e-Avrop shows a deadline stored as midnight at the start of 31 October as 30 October, and
+    TED gets the same value; `anbudsklar.ingest.ted.parse_deadline` stores it as 23:59:59 on
+    the last day, and so does this.
     """
 
-    entries = (CpvEntry(code, label) for code, label in CPV_RE.findall(text) if code != INVALID_CPV)
-    return tuple(dict.fromkeys(entries))
-
-
-def parse_period(period: str | None) -> tuple[int, int] | None:
-    """(year, quarter) from "Kvartal 3 2026"."""
-
-    match = PERIOD_RE.search(period or "")
-    return (int(match.group(2)), int(match.group(1))) if match else None
-
-
-def _soup(html: str) -> BeautifulSoup:
-    if "recaptcha" in html.lower():
-        raise IngestError(
-            "e-Avrop visade en robotkontroll. Insamlingen avbröts; kontrollen ska inte kringgås."
-        )
-    return BeautifulSoup(html, "lxml")
-
-
-def _grid(soup: BeautifulSoup) -> Tag:
-    grid = soup.select_one(f"table#{GRID_ID}")
-    if grid is None:
-        raise IngestError("e-Avrops sida saknade upphandlingstabellen. Sidans format kan ha ändrats.")
-    return grid
-
-
-def _data_rows(grid: Tag) -> list[Tag]:
-    return grid.select("tr.rowline, tr.alternatingRow")
-
-
-def _parse_date(text: str) -> date | None:
-    match = DATE_RE.match(text)
-    return date.fromisoformat(match.group(1)) if match else None
-
-
-def _planned_id(cell: Tag, title: str, period: str | None, cpv: tuple[CpvEntry, ...]) -> str:
-    """e-Avrop's id from the row's description box, else a stable hash of what the row shows."""
-
-    dialog = cell.select_one("div.dialogue[id^='des_']")
-    dialog_id = dialog.get("id") if dialog else None
-    if isinstance(dialog_id, str) and dialog_id.removeprefix("des_").isdigit():
-        return dialog_id.removeprefix("des_")
-    fingerprint = "|".join([title, period or "", *(entry.code for entry in cpv)])
-    return "h" + hashlib.sha256(fingerprint.encode("utf-8")).hexdigest()[:16]
-
-
-def _next_page(grid: Tag) -> PagerTarget | None:
-    pager = grid.select_one("tr.GridViewPager")
-    if pager is None:
+    if not isinstance(value, str) or not value:
         return None
-    current = pager.select_one("span")
-    current_text = current.get_text(strip=True) if current else ""
-    current_page = int(current_text) if current_text.isdigit() else 1
-    for link in pager.select("a[href]"):
-        match = PAGER_RE.search(str(link.get("href", "")))
-        if match and int(match.group(3)) == current_page + 1:
-            return PagerTarget(event_target=match.group(1), event_argument=match.group(2))
+    try:
+        moment = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=STOCKHOLM)
+    if moment.time() == time.min:
+        moment -= timedelta(seconds=1)
+    return moment
+
+
+def _text(value: Any) -> str | None:
+    return (value.strip() or None) if isinstance(value, str) else None
+
+
+def _public_request(detail: Mapping[str, Any]) -> tuple[Stage, Mapping[str, Any]] | None:
+    """The request suppliers can read: the tender request, or the first stage's request."""
+
+    stages: tuple[tuple[Stage, str], ...] = (
+        ("tender", "RequestForTender"),
+        ("application", "RequestForApplications"),
+    )
+    for stage, key in stages:
+        request = detail.get(key)
+        if isinstance(request, Mapping) and request.get("AnnouncementDate"):
+            return stage, request
     return None
 
 
-def _postback_fields(soup: BeautifulSoup) -> dict[str, str]:
-    """The fields a browser posts back for a pager click: hidden inputs and checked radios."""
-
-    form = soup.select_one("form#form") or soup.select_one("form")
-    if form is None:
-        return {}
-    fields: dict[str, str] = {}
-    for element in form.select("input[type=hidden][name], input[type=radio][name][checked]"):
-        name, value = element.get("name"), element.get("value")
-        if isinstance(name, str):
-            fields[name] = value if isinstance(value, str) else ""
-    return fields
-
-
-# --- Mapping (pure) --------------------------------------------------------------------
+def _public_documents(request: Mapping[str, Any], api_url: str) -> tuple[PublicDocument, ...]:
+    documents = []
+    for item in request.get("Documents") or []:
+        if not isinstance(item, Mapping):
+            continue
+        filename, url = _text(item.get("Filename")), _text(item.get("Url"))
+        if filename is None or url is None or not _is_document_url(url, api_url):
+            log.warning("e-Avrop: skipped a document outside the announcement-document address")
+            continue
+        documents.append(PublicDocument(filename, url, parse_moment(item.get("UpdatedDate"))))
+    return tuple(documents)
 
 
-def map_advertised(row: AdvertisedRow, *, now: datetime) -> NoticeValues:
-    deadline = end_of_day(row.deadline) if row.deadline else None
-    raw = _raw(row) | {"list": "advertised"}
+def public_procurement(detail: Mapping[str, Any], api_url: str) -> PublicProcurement | None:
+    """The public part of an announced project, or None when nothing of it is public."""
+
+    events = tuple(str(item.get("Event")) for item in detail.get("Events") or [] if isinstance(item, Mapping))
+    title = _text(detail.get("Title"))
+    procurement_id = detail.get("ProcurementId")
+    if "Announced" not in events or title is None or not isinstance(procurement_id, int):
+        return None
+    public = _public_request(detail)
+    if public is None:
+        return None
+    stage, request = public
+    announced_at = parse_moment(request.get("AnnouncementDate"))
+    if announced_at is None:
+        return None
+    raw_time_table = detail.get("TimeTable")
+    time_table: Mapping[str, Any] = raw_time_table if isinstance(raw_time_table, Mapping) else {}
+    deadline_key, question_key = (
+        ("LastApplication", "LastQuestionApplication")
+        if stage == "application"
+        else ("LastBid", "LastQuestion")
+    )
+    return PublicProcurement(
+        procurement_id=str(procurement_id),
+        title=title,
+        description=_text(detail.get("Description")),
+        diary_number=_text(detail.get("DiaryNumber")),
+        cpv_codes=tuple(
+            unique(
+                str(item.get("Code") or "")[:8]
+                for item in detail.get("CpvCodes") or []
+                if isinstance(item, Mapping)
+            )
+        ),
+        procedure_type=_text(detail.get("ProcurementType")),
+        events=events,
+        stage=stage,
+        announced_at=announced_at,
+        request_updated=parse_moment(request.get("UpdatedDate")),
+        deadline=parse_moment(time_table.get(deadline_key)),
+        question_deadline=parse_moment(time_table.get(question_key)),
+        documents=_public_documents(request, api_url),
+    )
+
+
+def _status(procurement: PublicProcurement, now: datetime) -> NoticeStatus:
+    if "Aborted" in procurement.events:
+        return "closed"
+    if AWARDED_EVENTS.intersection(procurement.events):
+        return "awarded"
+    return status_from_deadline(procurement.deadline, now)
+
+
+def notice_url(settings: Settings, procurement_id: str) -> str:
+    """The public notice page in e-Avrop, the same link TED gives for the procurement."""
+
+    return f"{settings.eavrop_base_url.rstrip('/')}/e-Upphandling/NoticeLink.aspx?id={procurement_id}"
+
+
+def _iso(moment: datetime | None) -> str | None:
+    return moment.isoformat() if moment else None
+
+
+def map_procurement(
+    procurement: PublicProcurement,
+    settings: Settings,
+    *,
+    now: datetime,
+    list_url: str | None = None,
+    list_updated: str | None = None,
+) -> NoticeValues:
+    """The notice columns. `raw` holds only the public facts the columns do not."""
+
+    url = notice_url(settings, procurement.procurement_id)
     return NoticeValues(
         source=SOURCE,
-        external_id=str(row.eavrop_id),
-        title=row.title,
+        external_id=procurement.procurement_id,
+        title=procurement.title,
         notice_type="contract",
-        status=status_from_deadline(deadline, now),
-        raw=raw,
-        reference_number=str(row.eavrop_id),  # the procurement's id in e-Avrop, as its address shows it
-        cpv_codes=unique(entry.code for entry in row.cpv),
-        published_at=start_of_day(row.published) if row.published else None,
-        deadline_at=deadline,
-        url=row.url,
-        documents_url=row.url,  # the document list is on the notice page (downloads need an account)
+        status=_status(procurement, now),
+        raw={
+            "procurement_id": procurement.procurement_id,
+            "list_url": list_url,
+            "list_updated": list_updated,
+            "stage": procurement.stage,
+            "procedure_type": procurement.procedure_type,
+            "events": list(procurement.events),
+            "question_deadline": _iso(procurement.question_deadline),
+            "request_updated": _iso(procurement.request_updated),
+            "documents": [document.filename for document in procurement.documents],
+        },
+        description=procurement.description,
+        # The API names no buyer. The client is the municipality's procurement unit, which
+        # also buys for others; TED names those buyers when the procurement is there too.
+        buyer=settings.organization_name,
+        reference_number=procurement.diary_number,
+        cpv_codes=list(procurement.cpv_codes),
+        procedure=PROCEDURE_LABELS.get(procurement.procedure_type or ""),
+        published_at=procurement.announced_at,
+        deadline_at=procurement.deadline,
+        # The first stage of a two-step procedure closes with requests to participate, not tenders.
+        deadline_kind="request" if procurement.stage == "application" else "tender",
+        url=url,
+        documents_url=url,
     )
 
 
-def map_planned(row: PlannedRow, *, list_url: str) -> NoticeValues:
-    """A planned procurement. It has no reference number yet: the list only names its row."""
+def main_document(documents: Sequence[PublicDocument]) -> str | None:
+    """The filename of the document to interpret on its own, if one is clearly the main one."""
 
-    period = parse_period(row.period)
-    raw = _raw(row) | {"list": "planned"}
-    if period:
-        raw |= {"planned_year": period[0], "planned_quarter": period[1]}
-    return NoticeValues(
-        source=SOURCE,
-        external_id=f"planned-{row.planned_id}",
-        title=row.title,
-        notice_type="planned",
-        status="planned",
-        raw=raw,
-        description=row.description,
-        cpv_codes=unique(entry.code for entry in row.cpv),
-        url=list_url,
-    )
+    candidates = [
+        document.filename for document in documents if _suffix(document.filename) in SUPPORTED_SUFFIXES
+    ]
+    if len(candidates) == 1:
+        return candidates[0]
+    for word in MAIN_DOCUMENT_WORDS:
+        matches = [name for name in candidates if word in name.lower()]
+        if matches:
+            return min(matches, key=lambda name: (_suffix(name) != ".pdf", candidates.index(name)))
+    return None
 
 
-def _raw(row: AdvertisedRow | PlannedRow) -> dict[str, Any]:
-    """The parsed row, including its own HTML, exactly as it reads back from JSONB.
-
-    A JSON round trip turns tuples into lists and dates into ISO strings, so comparing a
-    stored row with a freshly parsed one does not report false changes.
-    """
-
-    return json.loads(json.dumps(asdict(row), default=str))
+def _suffix(filename: str) -> str:
+    return PurePosixPath(filename.replace("\\", "/")).suffix.lower()
 
 
-# --- Fetching ----------------------------------------------------------------------------
+# --- Fetching ---------------------------------------------------------------------------
 
 
 @dataclass
-class _Pacer:
-    """Keeps at least `interval` seconds between consecutive requests to e-Avrop."""
-
+class _Api:
+    client: httpx.AsyncClient
+    settings: Settings
     interval: float
     _last: float | None = None
 
-    async def wait(self) -> None:
+    @property
+    def base(self) -> str:
+        return self.settings.eavrop_api_url.rstrip("/")
+
+    def _headers(self) -> dict[str, str]:
+        token = self.settings.eavrop_api_token
+        assert token is not None
+        return {"Accept": "application/json", "Authorization": f"Bearer {token.get_secret_value()}"}
+
+    async def _pace(self) -> None:
+        loop = asyncio.get_running_loop()
         if self._last is not None:
-            remaining = self.interval - (time.monotonic() - self._last)
+            remaining = self.interval - (loop.time() - self._last)
             if remaining > 0:
                 await asyncio.sleep(remaining)
-        self._last = time.monotonic()
+        self._last = loop.time()
 
-
-def _origin(base_url: str) -> str:
-    parts = urlsplit(base_url)
-    return f"{parts.scheme}://{parts.netloc}"
-
-
-async def _fetch_robots(client: httpx.AsyncClient, settings: Settings, url: str) -> httpx.Response:
-    """GET robots.txt, following up to `MAX_ROBOTS_REDIRECTS` redirects (RFC 9309, 2.3.1.2).
-
-    The shared client never follows redirects, so they are followed here, for robots.txt
-    only and only to http(s) URLs. When the chain is longer, the last 3xx is returned.
-    """
-
-    response = await send(client, "GET", url, settings=settings)
-    for _ in range(MAX_ROBOTS_REDIRECTS):
-        location = response.headers.get("Location")
-        if not response.is_redirect or not location:
-            break
-        target = urljoin(str(response.url), location)
-        if urlsplit(target).scheme not in ("http", "https"):
-            break
-        response = await send(client, "GET", target, settings=settings)
-    return response
-
-
-async def load_robots(client: httpx.AsyncClient, settings: Settings, origin: str) -> RobotFileParser:
-    """robots.txt as a parser.
-
-    Only a robots.txt that is clearly absent (404 or 410) allows everything. Anything else
-    that is not a successful response, including a redirect chain that does not end in a
-    file and a persistent 429, disallows everything: when in doubt, fetch nothing.
-    """
-
-    response = await _fetch_robots(client, settings, f"{origin}/robots.txt")
-    parser = RobotFileParser()
-    if response.is_success:
-        parser.parse(response.text.splitlines())
-    elif response.status_code in ROBOTS_MISSING_STATUSES:
-        parser.parse([])
-    else:
-        parser.parse(["User-agent: *", "Disallow: /"])
-    return parser
-
-
-async def _get_page(client: httpx.AsyncClient, settings: Settings, pacer: _Pacer, url: str) -> str:
-    await pacer.wait()
-    response = await send(client, "GET", url, settings=settings)
-    return ensure_ok(response, "e-Avrop").text
-
-
-async def _fetch_planned(
-    client: httpx.AsyncClient, settings: Settings, pacer: _Pacer, url: str
-) -> list[PlannedRow]:
-    """All pages of the planned list. Later pages are ASP.NET postbacks of the pager link."""
-
-    page = parse_planned(await _get_page(client, settings, pacer, url))
-    rows = list(page.rows)
-    pages = 1
-    while page.next_page is not None and pages < MAX_PLANNED_PAGES:
-        data = page.form_fields | {
-            "__EVENTTARGET": page.next_page.event_target,
-            "__EVENTARGUMENT": page.next_page.event_argument,
-        }
-        await pacer.wait()
-        response = await send(client, "POST", url, settings=settings, data=data)
-        page = parse_planned(ensure_ok(response, "e-Avrop").text)
-        rows.extend(page.rows)
-        pages += 1
-    if page.next_page is not None:
-        log.warning(
-            "e-Avrop planned list has more than %s pages; the rest were not fetched", MAX_PLANNED_PAGES
+    async def get(self, url: str, params: Mapping[str, str] | None = None) -> httpx.Response:
+        await self._pace()
+        response = await send(
+            self.client, "GET", url, settings=self.settings, params=params, headers=self._headers()
         )
-    return rows
+        if response.status_code in (401, 403):
+            raise IngestError("e-Avrop nekade åtkomst. Kontrollera EAVROP_API_TOKEN och EAVROP_CLIENT_ID.")
+        return response
+
+    async def download(self, url: str) -> tuple[bytes, str]:
+        """The file's bytes and content type, refusing files larger than `MAX_DOCUMENT_BYTES`."""
+
+        await self._pace()
+        request = self.client.build_request("GET", url, headers=self._headers())
+        response = await self.client.send(request, stream=True)
+        try:
+            ensure_ok(response, "e-Avrop")
+            chunks, size = [], 0
+            async for chunk in response.aiter_bytes():
+                size += len(chunk)
+                if size > MAX_DOCUMENT_BYTES:
+                    raise DocumentError("Filen är större än 50 MB.")
+                chunks.append(chunk)
+            return b"".join(chunks), response.headers.get("Content-Type", "application/octet-stream")
+        finally:
+            await response.aclose()
+
+
+def _is_detail_url(url: str, api_url: str) -> bool:
+    base = api_url.rstrip("/")
+    return any(url.startswith(f"{base}{path}") for path in DETAIL_PATHS)
+
+
+def _is_document_url(url: str, api_url: str) -> bool:
+    return url.startswith(f"{api_url.rstrip('/')}{DOCUMENT_PATH}")
+
+
+async def _list(api: _Api, client_id: int, since: datetime) -> list[Mapping[str, Any]]:
+    url = f"{api.base}/v1.1/clients/{client_id}/procurements"
+    response = ensure_ok(await api.get(url, {"from": since.strftime("%Y-%m-%dT%H:%M:%SZ")}), "e-Avrop")
+    items = response.json()
+    if not isinstance(items, list):
+        raise IngestError("e-Avrop svarade inte med en lista över upphandlingar.")
+    return [item for item in items if isinstance(item, Mapping)]
+
+
+# --- Storing ----------------------------------------------------------------------------
+
+
+@dataclass
+class EavropStats(IngestStats):
+    not_public: int = 0  # projects that are not announced, or only sent to invited suppliers
+    linked: int = 0  # procurements stored as a TED notice, which got the documents
+    documents_stored: int = 0
+    documents_skipped: int = 0  # formats we cannot read, too large or unreadable
+
+    def as_dict(self) -> dict[str, int]:
+        extra = {
+            "not_public": self.not_public,
+            "linked": self.linked,
+            "documents_stored": self.documents_stored,
+            "documents_skipped": self.documents_skipped,
+        }
+        return super().as_dict() | {key: value for key, value in extra.items() if value}
+
+
+async def _ted_twins(session: AsyncSession) -> dict[str, Notice]:
+    """TED notices by the e-Avrop procurement id in their document link."""
+
+    rows = await session.scalars(
+        select(Notice).where(Notice.source == "ted", Notice.documents_url.is_not(None))
+    )
+    twins: dict[str, Notice] = {}
+    for notice in rows:
+        procurement_id = eavrop_procurement_id(notice.documents_url)
+        if procurement_id is not None:
+            twins.setdefault(procurement_id, notice)
+    return twins
+
+
+def _needs_download(
+    document: PublicDocument, stored: Document | None, request_updated: datetime | None
+) -> bool:
+    """Whether a file may have changed since we stored it under the same name.
+
+    Most announcement documents have no date of their own, so the request's update time
+    stands in for them. A file with unchanged content is not stored again (same sha256).
+    """
+
+    if stored is None:
+        return True
+    changed = document.updated or request_updated
+    return changed is not None and changed > stored.created_at
+
+
+async def _sync_documents(
+    session: AsyncSession, api: _Api, notice: Notice, procurement: PublicProcurement, stats: EavropStats
+) -> None:
+    existing = await session.scalars(
+        select(Document).where(Document.notice_id == notice.id).order_by(Document.created_at.desc())
+    )
+    by_name: dict[str, Document] = {}
+    for document in existing:
+        by_name.setdefault(document.filename, document)
+    main = main_document(procurement.documents)
+    # The main document first, so that it is the notice's first document (questions use it).
+    ordered = sorted(procurement.documents, key=lambda document: document.filename != main)
+    for document in ordered:
+        if _suffix(document.filename) not in SUPPORTED_SUFFIXES:
+            stats.documents_skipped += 1
+            continue
+        if not _needs_download(
+            document, by_name.get(safe_filename(document.filename)), procurement.request_updated
+        ):
+            continue
+        try:
+            data, content_type = await api.download(document.url)
+            await store_document(
+                session,
+                notice_id=notice.id,
+                filename=document.filename,
+                mimetype=content_type,
+                data=data,
+                auto_interpret=document.filename == main,
+            )
+        except DocumentError as error:
+            log.warning("e-Avrop document %r for %s skipped: %s", document.filename, notice.id, error)
+            stats.documents_skipped += 1
+            continue
+        stats.documents_stored += 1
 
 
 async def ingest_eavrop(
@@ -398,48 +479,97 @@ async def ingest_eavrop(
     settings: Settings,
     *,
     now: datetime | None = None,
+    changed_since: datetime | None = None,
     request_interval: float = REQUEST_INTERVAL_SECONDS,
 ) -> dict[str, int]:
-    """Fetch the advertised and planned lists (when robots.txt allows) and upsert them.
+    """Upsert the announced procurements of the last 18 months and the open ones' documents.
 
-    Pages that robots.txt disallows are counted as `blocked` instead of fetched.
+    `changed_since` is when the last successful run started. A project e-Avrop has not
+    changed since then is not fetched again: announcing it, correcting its documents and
+    awarding it all change its `UpdatedDate`. About two thirds of the projects are never
+    public, and fetching each one takes a few seconds, so this keeps a daily run short.
+
+    Without `EAVROP_API_TOKEN` and `EAVROP_CLIENT_ID` the job does nothing: e-Avrop is then
+    simply not a source, as in every environment without the municipality's token.
     """
 
     now = now or datetime.now(UTC)
-    base_url = settings.eavrop_base_url.rstrip("/")
-    advertised_url = f"{base_url}/e-Upphandling/Default.aspx"
-    planned_url = f"{base_url}/e-Upphandling/planedComing.aspx"
-    agent = user_agent(settings)
-    pacer = _Pacer(request_interval)
-    stats = IngestStats()
+    stats = EavropStats()
+    if settings.eavrop_api_token is None or settings.eavrop_client_id is None:
+        log.info("e-Avrop ingestion skipped: EAVROP_API_TOKEN and EAVROP_CLIENT_ID are not set")
+        return stats.as_dict() | {"not_configured": 1}
 
-    await pacer.wait()
-    robots = await load_robots(client, settings, _origin(base_url))
-    pacer.interval = max(request_interval, float(robots.crawl_delay(agent) or 0))
+    api = _Api(client, settings, request_interval)
+    since = start_of_day(months_before(now.astimezone(STOCKHOLM).date(), LOOKBACK_MONTHS))
+    items = await _list(api, settings.eavrop_client_id, since)
+    stats.fetched = len(items)
+    twins = await _ted_twins(session)
+    ours = list(await session.scalars(select(Notice).where(Notice.source == SOURCE)))
+    by_procurement = {notice.external_id: notice for notice in ours}
+    # The list gives the project's address, whose id is not the procurement id.
+    by_list_url = {notice.raw.get("list_url"): notice for notice in ours if notice.raw.get("list_url")}
 
-    values: list[NoticeValues] = []
-    if robots.can_fetch(agent, advertised_url):
-        html = await _get_page(client, settings, pacer, advertised_url)
-        values += [map_advertised(row, now=now) for row in parse_advertised(html, base_url)]
-    else:
-        stats.blocked += 1
-    if robots.can_fetch(agent, planned_url):
-        rows = await _fetch_planned(client, settings, pacer, planned_url)
-        values += [map_planned(row, list_url=planned_url) for row in rows]
-    else:
-        stats.blocked += 1
-    if stats.blocked:
-        log.warning("e-Avrop robots.txt disallows %s of 2 list pages; they were not fetched", stats.blocked)
-
-    await _upsert(session, values, stats)
+    for item in items:
+        url = str(item.get("Url") or "")
+        if not _is_detail_url(url, settings.eavrop_api_url):
+            log.warning("e-Avrop: skipped a list item outside the API's procurement addresses")
+            stats.skipped += 1
+            continue
+        list_updated = _text(item.get("UpdatedDate"))
+        known = by_list_url.get(url)
+        if (known is not None and known.raw.get("list_updated") == list_updated) or _unchanged_since(
+            list_updated, changed_since
+        ):
+            stats.record("unchanged")  # nothing changed in e-Avrop since the last run
+            continue
+        response = await api.get(url)
+        if response.status_code == 404:
+            stats.skipped += 1
+            continue
+        detail = ensure_ok(response, "e-Avrop").json()
+        procurement = (
+            public_procurement(detail, settings.eavrop_api_url) if isinstance(detail, Mapping) else None
+        )
+        if procurement is None:
+            stats.not_public += 1
+            continue
+        notice = await _store_procurement(
+            session, procurement, settings, now, url, list_updated, twins, by_procurement, stats
+        )
+        if _status(procurement, now) == "open":
+            await _sync_documents(session, api, notice, procurement, stats)
+    await session.flush()
     log.info("e-Avrop ingestion: %s", stats.as_dict())
     return stats.as_dict()
 
 
-async def _upsert(session: AsyncSession, values: Sequence[NoticeValues], stats: IngestStats) -> None:
-    unique_values = list({value.external_id: value for value in values}.values())
-    stats.fetched = len(unique_values)
-    existing = await notices_by_external_id(session, SOURCE, (value.external_id for value in unique_values))
-    for value in unique_values:
-        stats.record(save_notice(session, existing.get(value.external_id), value))
+async def _store_procurement(
+    session: AsyncSession,
+    procurement: PublicProcurement,
+    settings: Settings,
+    now: datetime,
+    list_url: str,
+    list_updated: str | None,
+    twins: Mapping[str, Notice],
+    by_procurement: dict[str, Notice],
+    stats: EavropStats,
+) -> Notice:
+    """The notice the procurement's documents belong to: its TED twin, or our own row."""
+
+    existing = by_procurement.get(procurement.procurement_id)
+    twin = twins.get(procurement.procurement_id)
+    if existing is None and twin is not None:
+        stats.linked += 1
+        return twin
+    values = map_procurement(procurement, settings, now=now, list_url=list_url, list_updated=list_updated)
+    stats.record(save_notice(session, existing, values))
     await session.flush()
+    if existing is None:
+        existing = (await notices_by_external_id(session, SOURCE, [values.external_id]))[values.external_id]
+        by_procurement[values.external_id] = existing
+    return existing
+
+
+def _unchanged_since(list_updated: str | None, changed_since: datetime | None) -> bool:
+    updated = parse_moment(list_updated)
+    return changed_since is not None and updated is not None and updated < changed_since - CHANGE_MARGIN

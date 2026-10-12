@@ -66,7 +66,7 @@ function sameCitation(a: Pick<Citation, "page" | "quote"> | null, b: Pick<Citati
 
 /** What the edited item's source is, for the pane: as typed in the form, else as saved. */
 function editedCitation(target: EditTarget, typed: Pick<Citation, "page" | "quote"> | null): PaneFocus["citation"] {
-  if (typed) return { ...typed, check: null, found_page: null };
+  if (typed) return { ...typed, check: null, found_page: null, document: null, document_id: null };
   if (target.mode === "summary" || target.item.section === "question") return null;
   return target.item.value.citation;
 }

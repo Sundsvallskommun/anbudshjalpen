@@ -13,6 +13,7 @@ const profile: CompanyView = {
   description: "Invändig och utvändig målning.",
   cpv_codes: ["45442100", "45442110"],
   cpv_labels: { "45442100": "Målning", "45442110": "Målning av byggnader" },
+  cpv_divisions: {},
   municipalities: ["Sundsvall", "Timrå"],
   employees: 4,
   annual_turnover_sek: 3_000_000,

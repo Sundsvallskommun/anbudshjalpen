@@ -17,6 +17,7 @@ from anbudsklar.config import Settings
 from anbudsklar.models import Company, User
 from anbudsklar.services.access import ROLE_BUYER, ROLE_COMPANY
 from anbudsklar.services.errors import NotFoundError
+from anbudsklar.services.lab import lab_info
 
 ROLES: tuple[Role, ...] = ("foretagare", "inkopare")
 _DESCRIPTIONS = {
@@ -77,6 +78,7 @@ async def user_view(session: AsyncSession, user: User) -> UserView:
             "email": user.email,
             "role": user.role,
             "company": CompanyRef(id=company.id, name=company.name) if company else None,
+            "lab": lab_info(company) if company else None,
         }
     )
 

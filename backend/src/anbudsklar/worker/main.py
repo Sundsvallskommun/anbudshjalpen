@@ -45,6 +45,7 @@ def schedule() -> list[tuple[str, BaseTrigger]]:
         ("match_all", IntervalTrigger(minutes=30, timezone=STOCKHOLM)),
         ("send_reminders", IntervalTrigger(minutes=1, timezone=STOCKHOLM)),
         ("notify_matches", IntervalTrigger(minutes=10, timezone=STOCKHOLM)),
+        ("purge_lab", CronTrigger(hour=4, minute=30, timezone=STOCKHOLM)),
     ]
 
 

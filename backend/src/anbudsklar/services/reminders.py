@@ -30,6 +30,7 @@ from anbudsklar.services.checklists import (
 from anbudsklar.services.dates import STOCKHOLM, end_of_local_day, local_date, local_datetime
 from anbudsklar.services.errors import InvalidInputError, NotFoundError
 from anbudsklar.services.notices import get_notice, notice_url, page_url
+from anbudsklar.visibility import shown_notices
 from anbudsklar.worker.mail import REMINDER_LABELS, Mailer, MailError, reminder_message
 
 logger = logging.getLogger(__name__)
@@ -125,7 +126,7 @@ async def list_reminders(session: AsyncSession, user_id: uuid.UUID) -> list[Remi
         await session.execute(
             select(Reminder, Notice)
             .join(Notice, Notice.id == Reminder.notice_id)
-            .where(Reminder.user_id == user_id)
+            .where(Reminder.user_id == user_id, shown_notices())
             .order_by(Reminder.due_at, Reminder.id)
         )
     ).all()

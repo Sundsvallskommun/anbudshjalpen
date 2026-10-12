@@ -51,7 +51,7 @@ Hur koden skrivs, till exempel Astryx-komponenter i stället för egen layout oc
 | Vem | Huvudmeny | Kontomeny (avataren) | Landar på |
 |---|---|---|---|
 | Företagare | Start · Upphandlingar · Regelhjälpen | Utseende, Företagsprofil, Påminnelser, Logga ut | Start |
-| Inköpare | Inköp, med antalet att granska · Upphandlingar · Regelhjälpen | Utseende, Drift, Logga ut | Inköp › Att granska |
+| Inköpare | Inköp, med antalet att granska · Upphandlingar · Regelhjälpen | Utseende, Inställningar, Drift, Logga ut | Inköp › Att granska |
 | Besökare | Upphandlingar · Regelhjälpen, och knappen "Logga in" | – | Upphandlingar |
 
 Reglerna står i `frontend/src/shell/navigation.ts`. Adressen `/` skickar var och en till sin startsida, och efter
@@ -69,10 +69,12 @@ sidhuvudet rullar bort med sidan.
 | `/upphandlingar/:id?citat=…&sida=…&pastaende=…` | Öppnar källdialogen på upphandlingens sida. `?flik=underlag` öppnar underlaget på sida 1 |
 | `/regelhjalpen?fraga=…` | Regelhjälpen, som ställer frågan direkt och sedan tar bort den ur adressen |
 | `/profil` och `/paminnelser` | Företagsprofil och Påminnelser. Påminnelsemejlen länkar till `/paminnelser` |
-| `/logga-in?till=…` | Val av demoperson ([beslut 0007](decisions/0007-poc-login-persona-picker.md)) |
+| `/logga-in?till=…` | Val av demoperson ([beslut 0007](decisions/0007-poc-login-persona-picker.md)), och med labbläget på ett eget företag ([beslut 0010](decisions/0010-labblage-egna-foretag.md)) |
+| Alla adresser, med `ACCESS_CODE` satt | Sidan "Ange accesskoden" ([beslut 0010](decisions/0010-labblage-egna-foretag.md)) i ramen, tills koden är inskriven: ett fält, "Fortsätt" och raden "Ingen riktig inloggning: koden är en enkel spärr för testmiljön." |
 | `/inkop?flik=granska\|insikter` | Inköp med flikarna Att granska och Företagens frågor. `?flik=ny` öppnar "Ny upphandling", och `?flik=jobb` leder till Drift |
 | `/inkop/checklistor/:id` | Granska checklista |
 | `/inkop/drift` | Drift |
+| `/inkop/installningar` | Inställningar ([beslut 0011](decisions/0011-installningar-granskning-valfri.md)) |
 
 ## Ramen
 
@@ -205,8 +207,11 @@ tillbaka till länken när dialogen stängs.
   lagtexten som gäller. Exempelfrågorna står kvar efter svaret, utom de som redan har ställts.
 - **Företagsprofil** är ett formulär på 640 px. Det börjar med ett kort som säger vad profilen styr och hur många
   träffar som verkar passa just nu, samma antal som på Start. Under "Vad ni gör (CPV-koder)" står först beskrivningen
-  med egna ord och sedan koderna, med benämningen först ("Målning · 45442100"). "Föreslå koder" visar förslagen som
-  rutor att kryssa i, med skälet under varje och en rad om hur de togs fram. Fälten har tips om vad kraven brukar vara.
+  med egna ord, sedan sökfältet "Lägg till kod" och de valda koderna som rader grupperade under sin huvudgrupp
+  ("Anläggningsarbete"), med benämningen som rubrik, koden under och "Ta bort" i slutet. Rader håller formen vid tjugo
+  koder där chips inte gjorde det. "Föreslå koder" visar förslagen som rutor att kryssa i, med skälet under varje och
+  en rad om hur de togs fram; fler än fem förslag skrollar i en ruta på fast höjd. Fälten har tips om vad kraven
+  brukar vara.
   Raden med "Spara profilen" blir sticky när något har ändrats. Efter sparandet får träffarna en ny bedömning, och en
   avisering säger hur många som verkar passa nu: "Profilen är sparad · 2 upphandlingar verkar passa er" med "Se
   träffarna". Med en språkmodell bedöms träffarna efter svaret, och då står det "Träffarna uppdateras om en stund".
@@ -219,7 +224,12 @@ tillbaka till länken när dialogen stängs.
   dag för anbudsansökan följer annonsens datum; en om sista anbudsdag följer då bara checklistans.
 - **Logga in** heter "Välj vem du är i demon", med raden "Ingen riktig inloggning. I tjänsten loggar företag in med
   e-legitimation." Två rollkort, staplade på telefon, har avatar, namn, roll, tre saker man kan göra, vart man kommer
-  och "Fortsätt som Anna" eller "Fortsätt som Lars". Hela demotexten står under korten.
+  och "Fortsätt som Anna" eller "Fortsätt som Lars". Med labbläget på ([beslut 0010](decisions/0010-labblage-egna-foretag.md))
+  följer kortet "Prova med ditt eget företag": företagets namn och "Skapa testföretag", med texten "Skriv
+  inga personuppgifter och inget som är hemligt. Testföretaget raderas efter 30 dagar." Skapade testföretag listas
+  under rubriken "Testföretag från träffen", som kort i rollkortens form med "Fortsätt som <företaget>". Den som
+  skapar ett företag hamnar på Företagsprofil, där en blå ruta säger att det är ett testföretag, att det hittas igen
+  under Logga in, och när det raderas. Hela demotexten står under korten.
 
 ### Inköp
 
@@ -248,6 +258,11 @@ tillbaka till länken när dialogen stängs.
   "Godkänn och publicera" med bekräftelse. En avvisad eller tillbakadragen checklista visar motiveringen och "Öppna som
   utkast igen".
 - **Drift** visar jobben grupperade som Hämta, Bearbeta och Skicka, se [Drift](operations.md#schemalagda-jobb).
+- **Inställningar** (`/inkop/installningar`) har en strömbrytare per inställning med en förklaring under, och sparar
+  direkt med en toast som säger vad som hände ("Inställningen är sparad. 12 checklistor som väntade på granskning
+  publicerades."). Se [beslut 0011](decisions/0011-installningar-granskning-valfri.md). När granskningen är av märks
+  annonser "Checklista, inte granskad" i stället för "Granskad checklista", och ursprungsraden säger "Automatiskt
+  framtagen · inte granskad av inköp".
 
 ## Delade komponenter
 

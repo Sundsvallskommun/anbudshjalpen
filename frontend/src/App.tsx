@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import { Route, Routes } from "react-router";
+import { useConfig } from "./api/queries";
 import { Loading } from "./components/states";
 import { AppFrame } from "./shell/AppFrame";
 import { HomeRedirect, KeepQueryRedirect } from "./shell/redirects";
@@ -16,7 +17,9 @@ const LoginPage = lazy(() => import("./pages/LoginPage"));
 const BuyerPage = lazy(() => import("./pages/buyer/BuyerPage"));
 const ChecklistReviewPage = lazy(() => import("./pages/buyer/ChecklistReviewPage"));
 const DriftPage = lazy(() => import("./pages/buyer/DriftPage"));
+const SettingsPage = lazy(() => import("./pages/buyer/SettingsPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
+const GatePage = lazy(() => import("./pages/GatePage"));
 
 function Lazy({ children }: { children: ReactNode }) {
   return <Suspense fallback={<Loading label="Hämtar sidan …" />}>{children}</Suspense>;
@@ -27,6 +30,17 @@ function Lazy({ children }: { children: ReactNode }) {
  * and the mails still link to it.
  */
 export function App() {
+  const config = useConfig();
+  if (config.data?.gate_required) {
+    // The door (decision 0010): the frame stays, every address shows the gate until the code is in.
+    return (
+      <Routes>
+        <Route element={<AppFrame />}>
+          <Route path="*" element={<Lazy><GatePage /></Lazy>} />
+        </Route>
+      </Routes>
+    );
+  }
   return (
     <Routes>
       <Route element={<AppFrame />}>
@@ -42,6 +56,7 @@ export function App() {
         <Route path="inkop" element={<Lazy><BuyerPage /></Lazy>} />
         <Route path="inkop/checklistor/:id" element={<Lazy><ChecklistReviewPage /></Lazy>} />
         <Route path="inkop/drift" element={<Lazy><DriftPage /></Lazy>} />
+        <Route path="inkop/installningar" element={<Lazy><SettingsPage /></Lazy>} />
         <Route path="*" element={<Lazy><NotFoundPage /></Lazy>} />
       </Route>
     </Routes>

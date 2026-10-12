@@ -1,16 +1,20 @@
 import { Card } from "@astryxdesign/core/Card";
 import { EmptyState } from "@astryxdesign/core/EmptyState";
 import { Grid } from "@astryxdesign/core/Grid";
+import { Heading } from "@astryxdesign/core/Heading";
 import { Text } from "@astryxdesign/core/Text";
 import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
+import { VStack } from "@astryxdesign/core/VStack";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { useConfig, useLogin, useSession } from "../api/queries";
-import type { Persona, Role } from "../api/types";
+import { useConfig, useLabLogin, useLogin, useSession } from "../api/queries";
+import type { LabCompanyRef, Persona, Role } from "../api/types";
 import { ErrorNotice, Loading } from "../components/states";
 import { FALLBACK_DEMO_NOTICE } from "../shell/AboutDemo";
 import { homePath } from "../shell/navigation";
 import { Page } from "../shell/Page";
+import { LabCard } from "./login/LabCard";
+import { LabCompanyCard } from "./login/LabCompanyCard";
 import { PersonaCard } from "./login/PersonaCard";
 import { personaIdentity } from "./login/personas";
 
@@ -34,13 +38,15 @@ function DemoNote({ notice }: { notice: string | undefined }) {
 
 /**
  * The PoC's persona picker (decision 0007; direction.md, section 4 "Logga in (demo)"): two role cards, and the
- * user lands on the role's start, or back on the page that asked for the login. Production uses e-legitimation and
- * a check that the person may represent the company.
+ * user lands on the role's start, or back on the page that asked for the login. With the lab on (decision 0010) a
+ * third card creates the visitor's own company. Production uses e-legitimation and a check that the person may
+ * represent the company.
  */
 export default function LoginPage() {
   const session = useSession();
   const config = useConfig();
   const login = useLogin();
+  const labLogin = useLabLogin();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const returnPath = safeReturnPath(params.get("till"));
@@ -52,7 +58,14 @@ export default function LoginPage() {
     login.mutate(persona.key, { onSuccess: () => navigate(returnPath ?? homePath(persona.key)) });
   };
 
+  const continueAs = (company: LabCompanyRef) => {
+    if (labLogin.isPending) return;
+    labLogin.mutate(company.id, { onSuccess: () => navigate(returnPath ?? "/start") });
+  };
+
   const organization = config.data?.organization_name;
+  const labCompanies = session.data?.lab_companies ?? [];
+  const currentCompany = session.data?.user?.company?.id ?? null;
   const currentRole: Role | null = session.data?.user?.role ?? null;
   const loggingIn = login.isPending && chosen ? personaIdentity(chosen, organization).name : null;
   return (
@@ -85,6 +98,26 @@ export default function LoginPage() {
         </Grid>
       )}
       {login.isError && <ErrorNotice title="Inloggningen misslyckades" error={login.error} />}
+      {labCompanies.length > 0 && (
+        <VStack gap={3}>
+          <Heading level={3} accessibilityLevel={2}>
+            Testföretag från träffen
+          </Heading>
+          <Grid columns={{ minWidth: 280, max: 2 }} gap={4}>
+            {labCompanies.map((company) => (
+              <LabCompanyCard
+                key={company.id}
+                company={company}
+                isCurrent={currentCompany === company.id}
+                isLoggingIn={labLogin.isPending && labLogin.variables === company.id}
+                onChoose={() => continueAs(company)}
+              />
+            ))}
+          </Grid>
+          {labLogin.isError && <ErrorNotice title="Det gick inte att fortsätta som företaget" error={labLogin.error} />}
+        </VStack>
+      )}
+      {config.data?.lab_enabled && <LabCard onCreated={() => navigate("/profil")} />}
       <DemoNote notice={config.data?.demo_notice} />
       <VisuallyHidden as="div" role="status">
         {loggingIn ? `Loggar in som ${loggingIn} …` : ""}

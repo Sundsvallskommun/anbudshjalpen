@@ -23,7 +23,7 @@ const recent = [
   run("send_reminders", "2026-10-05T11:44:56Z", "ok", { sent: 2, failed: 0 }),
   run("interpret_pending", "2026-10-05T11:40:00Z"),
   run("match_all", "2026-10-05T11:08:56Z", "ok", { companies: 3, assessed: 12 }),
-  run("ingest_eavrop", "2026-10-05T04:30:00Z", "ok", { fetched: 0, inserted: 0, updated: 0, blocked: 2 }),
+  run("ingest_eavrop", "2026-10-05T04:30:00Z", "ok", { fetched: 0, inserted: 0, updated: 0, not_configured: 1 }),
   run("ingest_lou", "2026-09-28T03:00:00Z", "failed"),
 ];
 
@@ -54,7 +54,7 @@ describe("DriftPage", () => {
     expect(within(fetching[0]!).getByText("Misslyckades")).toBeInTheDocument();
     expect(within(fetching[0]!).getByText("Fel: LOU-texten kunde inte hämtas från Riksdagen.")).toBeInTheDocument();
     expect(within(fetching[1]!).getByText("Inte körd")).toBeInTheDocument();
-    expect(within(fetching[2]!).getByText("Inte aktiverad – väntar på tillstånd")).toBeInTheDocument();
+    expect(within(fetching[2]!).getByText("Inte aktiverad – nyckel saknas")).toBeInTheDocument();
 
     // The state, when the run was and what it did are one line: "Klar · Senast för 15 minuter sedan · 2 skickade".
     const sending = within(group("Skicka")).getAllByRole("listitem");

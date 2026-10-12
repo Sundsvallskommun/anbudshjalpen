@@ -41,7 +41,7 @@ describe("item forms", () => {
   it("checks a term's source only when it has one", () => {
     const term = draftChecklistView.checklist.terms[0]!;
     expect(termErrors(term, 16)).toEqual({});
-    expect(termErrors({ ...term, citation: { page: 1, quote: "", check: null, found_page: null } }, 16).quote).toBeDefined();
+    expect(termErrors({ ...term, citation: { page: 1, quote: "", check: null, found_page: null, document: null, document_id: null } }, 16).quote).toBeDefined();
   });
 
   it("asks for a summary", () => {

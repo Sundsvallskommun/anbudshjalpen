@@ -19,7 +19,7 @@ const deadline = (date: string): Checklist => ({
       kind: "sista_anbudsdag",
       date,
       description: "Anbud lämnas i e-Avrop.",
-      citation: { page: 2, quote: "Sista anbudsdag", check: "verified", found_page: null },
+      citation: { page: 2, quote: "Sista anbudsdag", check: "verified", found_page: null, document: null, document_id: null },
     },
   ],
 });

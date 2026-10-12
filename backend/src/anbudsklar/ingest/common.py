@@ -29,7 +29,6 @@ class IngestStats:
     unchanged: int = 0
     deleted: int = 0
     skipped: int = 0  # rows we parsed but could not store (see the job's log)
-    blocked: int = 0  # pages not fetched because robots.txt disallows them
 
     def record(self, outcome: Outcome) -> None:
         setattr(self, outcome, getattr(self, outcome) + 1)
@@ -39,7 +38,6 @@ class IngestStats:
             "unchanged": self.unchanged,
             "deleted": self.deleted,
             "skipped": self.skipped,
-            "blocked": self.blocked,
         }
         return {
             "fetched": self.fetched,

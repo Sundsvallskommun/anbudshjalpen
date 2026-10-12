@@ -90,9 +90,12 @@ Each test session creates its own database (`backend/tests/conftest.py`); use th
   Eneo needs a re-sync and approval for every change.
 - Tender drafts are processed in memory and never stored.
 - PoC login is a persona picker (decision 0007). Never build real authentication into the PoC or let it hold real
-  company data. With `ENVIRONMENT=production` the buyer persona is hidden and refused unless `DEMO_BUYER_ENABLED=true`
+  company data. The one exception is lab mode (decision 0010): behind `ACCESS_CODE`, which gates the whole service,
+  a workshop participant creates a company with only a name and their own description, no personal data, purged
+  after `LAB_RETENTION_DAYS`. With `ENVIRONMENT=production` the buyer persona is hidden and refused unless `DEMO_BUYER_ENABLED=true`
   (only behind basic auth or an IP allowlist), because buyer approval gates what companies and Eneo's assistants read
-  as reviewed by inköp.
+  as reviewed by inköp. Inköp can turn the review off on the settings page (decision 0011); a checklist published
+  that way carries `reviewed=false`, and the UI must never call it reviewed.
 - Equal treatment: the coach never gives one supplier advice that goes beyond the procurement documents; open
   questions go to the formal question function in e-Avrop.
 - The UI is React with Astryx (decision 0002), built with Vite and served by FastAPI (decision 0006).

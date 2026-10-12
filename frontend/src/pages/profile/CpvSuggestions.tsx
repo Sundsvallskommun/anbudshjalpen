@@ -1,4 +1,5 @@
 import { CheckboxList, CheckboxListItem } from "@astryxdesign/core/CheckboxList";
+import { ScrollableArea } from "@astryxdesign/core/ScrollableArea";
 import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import type { CpvSuggestion } from "../../api/types";
@@ -11,6 +12,10 @@ const MADE_BY: Record<string, string> = {
   eneo: "Framtagna med AI via Eneo utifrån beskrivningen och inte granskade.",
 };
 const MADE_BY_MODEL = "Framtagna med AI utifrån beskrivningen och inte granskade.";
+// More suggestions than this scroll inside a viewport of about five rows, so the form keeps its shape
+// whatever the engine returns; fewer are shown in full.
+const ROWS_IN_VIEW = 5;
+const VIEWPORT_HEIGHT = 340;
 
 export interface CpvSuggestionsProps {
   suggestions: readonly CpvSuggestion[];
@@ -50,17 +55,23 @@ export function CpvSuggestions({ suggestions, engine, chosen, onChange }: CpvSug
         onChange={change}
         hasDividers
       >
-        {/* Label and reason are passed as nodes: Astryx cuts a plain string to one line, and a long name or its code
-            must not be cut off on a phone. The box is still named by its visible label. */}
-        {suggestions.map((suggestion) => (
-          <CheckboxListItem
-            key={suggestion.code}
-            value={suggestion.code}
-            label={<>{cpvChipLabel(suggestion.code, suggestion.label)}</>}
-            description={suggestion.reason ? <>{suggestion.reason}</> : undefined}
-            isDisabled={isFull && !chosen.has(suggestion.code)}
-          />
-        ))}
+        <ScrollableArea
+          label="Förslagen"
+          height={suggestions.length > ROWS_IN_VIEW ? VIEWPORT_HEIGHT : undefined}
+          paddingInlineEnd={suggestions.length > ROWS_IN_VIEW ? 2 : 0}
+        >
+          {/* Label and reason are passed as nodes: Astryx cuts a plain string to one line, and a long name or its
+              code must not be cut off on a phone. The box is still named by its visible label. */}
+          {suggestions.map((suggestion) => (
+            <CheckboxListItem
+              key={suggestion.code}
+              value={suggestion.code}
+              label={<>{cpvChipLabel(suggestion.code, suggestion.label)}</>}
+              description={suggestion.reason ? <>{suggestion.reason}</> : undefined}
+              isDisabled={isFull && !chosen.has(suggestion.code)}
+            />
+          ))}
+        </ScrollableArea>
       </CheckboxList>
       {isFull && (
         <Text type="supporting">{`Profilen har det högsta antalet koder, ${formatNumber(LIMITS.cpv)}. Ta bort en för att lägga till en annan.`}</Text>

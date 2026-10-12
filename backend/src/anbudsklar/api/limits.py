@@ -45,6 +45,8 @@ TEN_MINUTES = 600.0
 # cheap and the session store is bounded; the accessibility gate logs in about 70 times.
 DEFAULT_LIMITS: Mapping[str, Limit] = {
     "login": Limit(300, TEN_MINUTES),
+    "gate": Limit(20, TEN_MINUTES),  # guesses at the access code, per address
+    "lab": Limit(20, TEN_MINUTES),  # lab companies created, per address
     "questions": Limit(60, TEN_MINUTES),
     "rules": Limit(60, TEN_MINUTES),
     "review": Limit(20, TEN_MINUTES),

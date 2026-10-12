@@ -14,7 +14,7 @@ from pydantic import Field
 
 from anbudsklar.contracts.common import Citation, CitationCheck, ContractModel
 
-CONTRACT_VERSION = "2026-10-05"
+CONTRACT_VERSION = "2026-10-12"
 
 
 class Task(StrEnum):
@@ -142,7 +142,7 @@ class ReviewResult(ContractModel):
 
 
 class Answer(ContractModel):
-    """Output of besvara_fraga: an answer grounded in one procurement document."""
+    """Output of besvara_fraga: an answer grounded in the procurement's documents."""
 
     answer: str
     found_in_document: bool

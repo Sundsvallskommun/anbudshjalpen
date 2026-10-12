@@ -13,6 +13,7 @@ export const profileView: CompanyView = {
     "Vi är en målerifirma i Matfors med fem anställda. Vi målar invändigt och utvändigt och renoverar fasader.",
   cpv_codes: ["45442100"],
   cpv_labels: { "45442100": "Målning" },
+  cpv_divisions: { "45000000": "Anläggningsarbete", "90000000": "Avlopps- och avfallshantering, sanering och miljötjänster" },
   municipalities: ["Sundsvall", "Timrå"],
   employees: 5,
   annual_turnover_sek: 4_800_000,

@@ -41,6 +41,18 @@ export function cpvChip(code: string, label: string | undefined): SearchableItem
   return { id: code, label: cpvChipLabel(code, label) };
 }
 
+/** The name and code apart again, from a chip made by `cpvChip`. */
+export function splitCpvChip(item: SearchableItem): { code: string; label: string } {
+  const suffix = ` · ${item.id}`;
+  const label = item.label.endsWith(suffix) ? item.label.slice(0, -suffix.length) : item.label;
+  return { code: item.id, label };
+}
+
+/** The CPV division a code belongs to: its first two digits ("45442100" is under "45000000"). */
+export function cpvDivision(code: string): string {
+  return `${code.slice(0, 2)}000000`;
+}
+
 export function draftFromProfile(profile: CompanyView): ProfileDraft {
   return {
     description: profile.description,

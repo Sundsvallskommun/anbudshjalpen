@@ -13,6 +13,7 @@ from anbudsklar.contracts import (
     Citation,
     CompanyProfile,
     CpvCandidate,
+    DocumentSet,
     NoticeContext,
     PagedDocument,
     RequiredAttachment,
@@ -176,7 +177,7 @@ async def test_review_draft_flags_missing_proof_and_missing_requirements() -> No
 
 async def test_answer_question_cites_the_best_sentences() -> None:
     answer, _ = await HeuristicEngine().answer_question(
-        NOTICE, DOCUMENT, "Hur stor ansvarsförsäkring krävs?", []
+        NOTICE, DocumentSet.of([DOCUMENT]), "Hur stor ansvarsförsäkring krävs?", []
     )
     assert answer.found_in_document is True
     assert answer.suggest_formal_question is False
@@ -186,13 +187,32 @@ async def test_answer_question_cites_the_best_sentences() -> None:
     assert lead == ANSWER_LEAD
     assert len(lines) == len(answer.citations)
     assert lines[0].endswith("(sida 2)")
-    verified = verify_answer(answer, PAGES)
+    verified = verify_answer(answer, [DOCUMENT])
     assert all(citation.check == "verified" for citation in verified.citations)
+
+
+async def test_answer_question_reads_the_attachments_and_names_the_document() -> None:
+    attachment = PagedDocument(
+        document_id="att",
+        filename="6.6 Krav på Entreprenör.pdf",
+        pages=["Krav på entreprenören\nEntreprenören ska lämna en hållbarhetsredovisning varje år."],
+    )
+    main = PagedDocument(document_id="main", filename="underlag.pdf", pages=PAGES)
+
+    answer, _ = await HeuristicEngine().answer_question(
+        NOTICE, DocumentSet.of([main, attachment]), "Krävs en hållbarhetsredovisning?", []
+    )
+
+    assert answer.found_in_document is True
+    assert answer.citations[0].document == attachment.filename
+    assert answer.answer.splitlines()[1].endswith("(6.6 Krav på Entreprenör.pdf, sida 1)")
+    verified = verify_answer(answer, [main, attachment])
+    assert (verified.citations[0].check, verified.citations[0].document_id) == ("verified", "att")
 
 
 async def test_answer_question_suggests_formal_question_when_not_found() -> None:
     answer, _ = await HeuristicEngine().answer_question(
-        NOTICE, DOCUMENT, "Får vi använda underleverantörer?", []
+        NOTICE, DocumentSet.of([DOCUMENT]), "Får vi använda underleverantörer?", []
     )
     assert answer.found_in_document is False
     assert answer.suggest_formal_question is True

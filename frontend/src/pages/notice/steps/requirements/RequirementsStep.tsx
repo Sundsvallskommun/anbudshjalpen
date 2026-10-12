@@ -179,7 +179,7 @@ export function RequirementsStep({ notice, view, user }: { notice: NoticeDetail;
       <VStack gap={6}>
         <AiProvenance
           engine={view.engine}
-          reviewedAt={isPublished ? view.published_at : null}
+          reviewedAt={isPublished && view.reviewed ? view.published_at : null}
           reviewedLabel={reviewedLabel}
           verification={view.verification}
           howLabel="Hur togs listan fram?"

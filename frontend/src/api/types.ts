@@ -22,6 +22,10 @@ export interface Citation {
   quote: string;
   check: CitationCheck | null;
   found_page: number | null;
+  /** The document's name as the model saw it, when the material had several documents. */
+  document: string | null;
+  /** Set by verification: the document where the quote was found. */
+  document_id: Uuid | null;
 }
 
 // --- contracts/tasks.py ------------------------------------------------------------------------
@@ -166,12 +170,25 @@ export interface CompanyRef {
   name: string;
 }
 
+/** When a lab company is deleted (decision 0010). */
+export interface LabInfo {
+  expires_at: string;
+}
+
+/** A lab company the login page offers to continue as. */
+export interface LabCompanyRef {
+  id: Uuid;
+  name: string;
+}
+
 export interface UserView {
   id: Uuid;
   name: string;
   email: string;
   role: Role;
   company: CompanyRef | null;
+  /** Set for a lab company's participant. */
+  lab: LabInfo | null;
 }
 
 export interface Persona {
@@ -183,10 +200,24 @@ export interface Persona {
 export interface SessionView {
   user: UserView | null;
   personas: Persona[];
+  /** Lab companies to continue as (decision 0010); empty when the lab is off. */
+  lab_companies: LabCompanyRef[];
 }
 
 export interface LoginRequest {
   persona: Role;
+}
+
+export interface GateRequest {
+  code: string;
+}
+
+export interface LabCreateRequest {
+  name: string;
+}
+
+export interface LabLoginRequest {
+  company_id: Uuid;
 }
 
 export interface AppConfig {
@@ -196,6 +227,10 @@ export interface AppConfig {
   demo_notice: string;
   /** The municipality's page in e-Avrop, for notices without a page of their own. */
   eavrop_url: string;
+  /** The service wants its access code before anything else is shown (decision 0010). */
+  gate_required: boolean;
+  /** The login page offers "Prova med ditt eget företag" (decision 0010). */
+  lab_enabled: boolean;
 }
 
 // --- api/schemas.py: notices -------------------------------------------------------------------
@@ -237,6 +272,8 @@ export interface NoticeSummary {
   cpv_label: string | null;
   has_documents: boolean;
   checklist_status: ChecklistStatus;
+  /** The published checklist was approved by inköp; false when published without review (decision 0011). */
+  checklist_reviewed: boolean;
   is_fictitious: boolean;
   fit: Fit | null;
 }
@@ -295,6 +332,8 @@ export interface ChecklistView {
   created_at: IsoDateTime;
   approved_at: IsoDateTime | null;
   published_at: IsoDateTime | null;
+  /** Inköp approved it. False for a checklist published without review (decision 0011). */
+  reviewed: boolean;
   reviewer_note: string | null;
   verification: VerificationSummary;
   checklist: Checklist;
@@ -344,11 +383,20 @@ export interface QuestionRequest {
   history: QuestionTurnIn[];
 }
 
+/** What the engine was given for an answer (decision 0012), so the card can say so. */
+export interface ReadSummary {
+  documents_read: number;
+  documents_total: number;
+  pages_read: number;
+  pages_total: number;
+}
+
 export interface AnswerView {
   answer: Answer;
   engine: string;
-  /** The document that was read; the answer's page citations refer to it. */
+  /** The main document; a citation's own document_id says where its quote is. */
   document_id: Uuid;
+  read: ReadSummary;
   /** Frågestopp from the checklist, as the end of that day in Stockholm: a date, so show it as one. */
   question_deadline: IsoDateTime | null;
   /** Where to ask formally: the procurement in e-Avrop, else e-Avrop itself. */
@@ -401,6 +449,8 @@ export interface CompanyView {
   description: string;
   cpv_codes: string[];
   cpv_labels: Record<string, string>;
+  /** Every CPV division ("45000000" → "Anläggningsarbete"), so the chosen codes can be grouped by area. */
+  cpv_divisions: Record<string, string>;
   municipalities: string[];
   employees: number | null;
   annual_turnover_sek: number | null;
@@ -556,6 +606,21 @@ export interface JobRunView {
   error: string | null;
 }
 
+/** Settings inköp changes at run time (decision 0011). */
+export interface AppSettingsView {
+  /** Inköp reviews checklists before companies see them. */
+  review_required: boolean;
+}
+
+export interface AppSettingsUpdate {
+  review_required: boolean;
+}
+
+export interface AppSettingsSaved extends AppSettingsView {
+  /** Checklists published because the review was turned off. */
+  published_now: number;
+}
+
 export type JobName =
   | "ingest_ted"
   | "ingest_eavrop"
@@ -564,7 +629,8 @@ export type JobName =
   | "interpret_pending"
   | "match_all"
   | "send_reminders"
-  | "notify_matches";
+  | "notify_matches"
+  | "purge_lab";
 
 export interface ErrorView {
   detail: string;

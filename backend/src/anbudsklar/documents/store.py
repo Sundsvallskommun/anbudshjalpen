@@ -79,6 +79,7 @@ async def store_document(
     data: bytes,
     uploaded_by: uuid.UUID | None = None,
     is_fictitious: bool = False,
+    auto_interpret: bool = True,
 ) -> Document:
     """Store a document for a notice and index its pages; returns the existing row on re-upload.
 
@@ -105,6 +106,7 @@ async def store_document(
         storage_path=digest,
         is_fictitious=is_fictitious,
         uploaded_by=uploaded_by,
+        auto_interpret=auto_interpret,
     )
     document.pages = [
         DocumentPage(page_no=page_no, text=text, section=section)

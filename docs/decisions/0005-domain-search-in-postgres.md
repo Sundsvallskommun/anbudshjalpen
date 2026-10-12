@@ -1,6 +1,6 @@
 # 0005: Sökning i upphandlingsdatan görs i Postgres
 
-- **Status:** Accepterat
+- **Status:** Accepterat, delvis ersatt av [0012](0012-fragor-mot-alla-dokument.md) (frågor väljer sidor över en budget)
 - **Datum:** 2026-10-05
 - **Gäller:** sökning i annonser, sidor ur underlag, LOU och CPV-koder, i appen och i MCP-verktygen
 

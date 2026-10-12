@@ -17,9 +17,21 @@ from anbudsklar.contracts import Checklist, NoticeContext, PagedDocument
 from anbudsklar.ingest.common import IngestError
 from anbudsklar.models import ChecklistRecord, Document, JobRun, Notice
 from anbudsklar.services.background import interpret_in_background
-from anbudsklar.services.checklists import MAX_INTERPRET_ATTEMPTS, interpret_pending
+from anbudsklar.services.checklists import (
+    MAX_INTERPRET_ATTEMPTS,
+    interpret_pending,
+    list_interpretations,
+    reset_interpretation,
+)
 from anbudsklar.services.errors import ConflictError
-from anbudsklar.services.jobs import JOBS, JobContext, run_error_message, run_job, start_run
+from anbudsklar.services.jobs import (
+    JOBS,
+    JobContext,
+    last_fetching_start,
+    run_error_message,
+    run_job,
+    start_run,
+)
 from anbudsklar.services.notices import close_expired_notices
 from api.factories import RecordingMailer, add_document, add_notice, bound_session_factory
 
@@ -126,6 +138,19 @@ async def test_interpret_pending_skips_interpreted_documents_and_backs_off_after
     assert (await interpret_pending(db_session, FlakyEngine()))["pending"] == 0
 
 
+async def test_attachments_wait_until_a_buyer_asks(db_session: AsyncSession) -> None:
+    notice = await add_notice(db_session)
+    attachment = await add_document(db_session, notice, PAGES, filename="kravspecifikation.txt")
+    attachment.auto_interpret = False
+    await db_session.flush()
+
+    assert (await interpret_pending(db_session, FlakyEngine()))["pending"] == 0
+    assert await list_interpretations(db_session) == []
+
+    await reset_interpretation(db_session, attachment.id)
+    assert (await interpret_pending(db_session, FlakyEngine()))["interpreted"] == 1
+
+
 async def test_permanent_failures_give_up_at_once_and_never_block_new_documents(
     db_session: AsyncSession,
 ) -> None:
@@ -180,3 +205,19 @@ async def test_open_notices_past_their_deadline_are_closed(db_session: AsyncSess
         )
     }
     assert statuses == {"EXP-1": "closed", "EXP-2": "open", "EXP-3": "open", "EXP-4": "planned"}
+
+
+async def test_only_runs_that_fetched_count_as_the_last_fetch(db_session: AsyncSession) -> None:
+    earlier = datetime(2026, 10, 7, 4, 30, tzinfo=UTC)
+    blocked = datetime(2026, 10, 8, 4, 30, tzinfo=UTC)
+    db_session.add_all(
+        [
+            JobRun(job="ingest_eavrop", status="ok", started_at=earlier, stats={"fetched": 459}),
+            JobRun(job="ingest_eavrop", status="ok", started_at=blocked, stats={"fetched": 0, "blocked": 2}),
+            JobRun(job="ingest_eavrop", status="failed", started_at=blocked, stats={"fetched": 12}),
+        ]
+    )
+    await db_session.flush()
+
+    assert await last_fetching_start(db_session, "ingest_eavrop") == earlier
+    assert await last_fetching_start(db_session, "ingest_ted") is None

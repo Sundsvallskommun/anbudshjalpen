@@ -22,8 +22,8 @@ sedan `[SIDA 1]`, `[SIDA 2]` och så vidare (`PagedDocument.render()`). Alla mot
 citatkontrollen.
 
 **Kontraktet som modellen ser.** Instruktionen innehåller JSON-schemat från `model_output_schema()`. Fälten som bara
-vår kod får sätta (`check`, `found_page` och `draft_check`) är borttagna, så modellen kan aldrig markera sitt eget
-citat som kontrollerat.
+vår kod får sätta (`check`, `found_page`, `document_id` och `draft_check`) är borttagna, så modellen kan aldrig
+markera sitt eget citat som kontrollerat.
 
 **Validering och nytt försök.** Motorn tar ut det första JSON-objektet i svaret, även inuti ett kodblock, och
 validerar det mot kontraktet. Är svaret ogiltigt skickar motorn felen tillbaka på svenska och ber om ett rättat svar,
@@ -35,7 +35,8 @@ Checklistor och matchningar sparas med motorns namn.
 **Regler i alla instruktioner** (`_grundregler.md` och `_citatregler.md`):
 
 - Använd bara indata. Hitta aldrig på datum, belopp, krav, paragrafer eller länkar.
-- Ange sidan från markeringen `[SIDA n]` och citera ordagrant.
+- Ange sidan från markeringen `[SIDA n]` och citera ordagrant. Har underlaget flera dokument anges också dokumentets
+  namn från raden `DOKUMENT:` i `document`.
 - Skriv på enkel svenska och tilltala läsaren med "du".
 - Likabehandling: ge aldrig råd som bara ett företag får. Det som underlaget inte svarar på ska frågas formellt i
   e-Avrop före frågestoppet, så att svaret når alla anbudsgivare.
@@ -58,7 +59,8 @@ Checklistor och matchningar sparas med motorns namn.
 | Körs av | Direkt efter att inköparen laddat upp underlaget, jobbet `interpret_pending` var femte minut, eller `anbudsklar interpret` |
 
 Checklistan går från utkast till godkänd till publicerad, eller avvisas. Bara publicerade checklistor visas för företag
-och via MCP. En publicerad checklista som visar sig vara fel kan inköparen dra tillbaka med en motivering
+och via MCP. Har inköp slagit av granskningen på sidan Inställningar ([beslut 0011](decisions/0011-installningar-granskning-valfri.md))
+publiceras en tolkning direkt, utan godkännande, och märks "inte granskad av inköp". En publicerad checklista som visar sig vara fel kan inköparen dra tillbaka med en motivering
 (knappen "Dra tillbaka", `POST /api/admin/checklists/{id}/withdraw`). Den blir avvisad, företagen ser den förra publicerade
 checklistan om det finns någon, matchningarna mot annonsen bedöms om, och checklistan kan rättas och publiceras igen.
 När inköparen rättar en checklista kontrolleras citaten igen, med samma regel för datum och vikter. En avvisad
@@ -121,11 +123,11 @@ Granskningen pekar ut brister men skriver aldrig om utkastet.
 
 | | |
 |---|---|
-| Metod | `answer_question(notice, document, question, history)` |
+| Metod | `answer_question(notice, documents, question, history)` |
 | Indata | Annonsen, underlaget, frågan och de senaste tidigare frågorna och svaren. API:t tar emot högst tio, och appen skickar de nyaste som ryms i 12 000 tecken vidare till motorn |
-| Underlag | Dokumentet bakom den checklista som den som frågar ser, alltså den publicerade för företag och besökare. Utan checklista används annonsens första dokument |
+| Underlag | Alla dokument i upphandlingen, som ett `DocumentSet` ([beslut 0012](decisions/0012-fragor-mot-alla-dokument.md)). Huvuddokumentet är det bakom den checklista som den som frågar ser, alltså den publicerade för företag och besökare, annars annonsens första dokument; övriga följer. Ryms inte allt i budgeten (150 000 tecken) väljer `documents/bundle.py` sidor: huvuddokumentet helt, sedan bilagor som huvuddokumentet hänvisar till där det matchar frågan, sedan sökningens bästa sidor. Utelämnade sidor behåller sitt nummer och säger att de saknas |
 | Svar | `Answer`: svaret, om det står i underlaget, citat och om frågan bör ställas formellt (`suggest_formal_question`). API:t lägger till vilket dokument som lästes (`document_id`), frågestoppet ur checklistan (`question_deadline`, slutet av dagen 23:59:59 svensk tid) och var frågan ställs formellt (`formal_question_url`). Svaret börjar med slutsatsen i en mening, som webbappen visar i fetstil. Med `heuristic` är första raden "Det här står i underlaget:" och därefter en rad per citat |
-| Kontroll | Citaten kontrolleras |
+| Kontroll | Citaten kontrolleras i det dokument de anger (`document`), sedan i de andra. `document_id` sätts av vår kod. API:t säger hur mycket som lästes (`read`) |
 | Körs av | Vem som helst på annonsens sida, även utan inloggning |
 
 Frågan sparas för inköparens sammanställning utan att visa vem som frågade. Frågor som ställs efter sista anbudsdag
@@ -153,10 +155,11 @@ e-Avrop.
 
 | | |
 |---|---|
-| Metod | `suggest_cpv(description, candidates)` |
-| Indata | Företagets beskrivning och kandidater som vår sökning hittat i den officiella CPV-listan |
+| Metod | `suggest_cpv(description, candidates)`, två anrop per förslag |
+| Indata | Företagets beskrivning och kandidater ur den officiella CPV-listan. Första anropet får alla områden (huvudgrupper och grupper, cirka 320 rader) och väljer högst åtta. Andra anropet får koderna under de valda områdena (högst 400, breda först, men aldrig en hel huvudgrupp som "Transporter", eftersom en sådan kod i profilen skulle matcha varje annons under den) och de koder som vår ordsökning i benämningarna hittar |
 | Svar | `CpvSuggestions`: högst åtta koder med åtta siffror, benämning och motivering |
-| Kontroll | Modellen väljer bland kandidaterna, så koderna kommer från CPV-listan |
+| Kontroll | Modellen väljer bland kandidaterna, så koderna kommer från CPV-listan. Ett val utanför listan tas bort |
+| Varför två steg | Betydelsen avgör områdena. En sökning i benämningarna kommer aldrig från "renoverar badrum" till "Plattsättning", och företag beskriver sig med vardagsord. Ordsökningen är ett komplement, inte urvalet |
 | Körs av | Profilsidan, som visar förslagen som rutor att kryssa i, med motiveringen under varje kod |
 
 ### Regelhjälpen (`regelhjalpen`)
@@ -240,7 +243,10 @@ exempel "sex dagar före sista anbudsdag", blir därför okontrollerat. Ett datu
 månad stämmer.
 
 **I webbappen** har varje påstående en diskret länk till sin sida, "s. 5". Bara avvikelser får ord: ett citat på en
-annan sida visas som "s. 9 (AI angav 7)" och ett okontrollerat som "Hittades inte i underlaget". Kontrollen sammanfattas
+annan sida visas som "s. 9 (AI angav 7)" och ett okontrollerat som "Hittades inte i underlaget". Under ett svar på en
+fråga står källan på en egen rad, "Källa: s. 5", och har upphandlingen flera dokument namnges filen: "Källa: 6.6 Krav
+på Entreprenör.pdf, s. 8". Länkens adress bär då också dokumentet (`?dokument=…`), så att den öppnar rätt fil även i
+en ny flik. Kontrollen sammanfattas
 en gång per vy i ursprungsraden, till exempel "Alla 86 källhänvisningar hittades i underlaget" eller "84 av 86
 källhänvisningar hittades i underlaget · 2 hittades inte och behöver kontrolleras". Inköparen ser antalen under Inköp ›
 Att granska och innan checklistan publiceras. Länken öppnar källdialogen ([Design](design.md#källdialogen)), som

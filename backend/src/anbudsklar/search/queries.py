@@ -31,6 +31,7 @@ from anbudsklar.cpv import CPV_CODE, cpv_digits, cpv_prefix
 from anbudsklar.documents.citations import HIGHLIGHT, PageIndex, QuoteMatch, excerpt, match_quote
 from anbudsklar.models import CpvCode, Document, DocumentPage, LouSection, Notice
 from anbudsklar.search.types import BuyerCount, NoticeOrder, PageHit, PageText, QuoteCheck
+from anbudsklar.visibility import shown_notices
 
 SWEDISH = literal_column("'swedish'::regconfig")
 STOCKHOLM = ZoneInfo("Europe/Stockholm")
@@ -182,6 +183,37 @@ async def cpv_labels(session: AsyncSession, codes: Iterable[str]) -> dict[str, s
     return {code: labels[eight] for code, eight in digits.items() if eight in labels}
 
 
+# A code with this many significant digits at most is an area (division or group) a model
+# chooses among first: "45000000" (2) and "45400000" (3), not "45440000" (4).
+CPV_AREA_DIGITS = 3
+
+
+async def cpv_areas(session: AsyncSession) -> list[CpvCode]:
+    """The divisions and groups of the whole CPV list: about 320 rows, few enough to show a model."""
+
+    stmt = (
+        select(CpvCode)
+        .where(func.length(func.rtrim(CpvCode.code, "0")) <= CPV_AREA_DIGITS)
+        .order_by(CpvCode.code)
+    )
+    return list(await session.scalars(stmt))
+
+
+async def cpv_descendants(session: AsyncSession, codes: Iterable[str], *, limit: int) -> list[CpvCode]:
+    """The codes under any of `codes`, the codes themselves included, broad ones first."""
+
+    patterns = sorted({f"{cpv_prefix(code)}%" for code in codes})
+    if not patterns:
+        return []
+    stmt = (
+        select(CpvCode)
+        .where(CpvCode.code.like(any_(array(patterns, type_=Text))))
+        .order_by(CpvCode.level, CpvCode.code)
+        .limit(limit)
+    )
+    return list(await session.scalars(stmt))
+
+
 async def search_cpv(session: AsyncSession, query: str, limit: int = 20) -> list[CpvCode]:
     """CPV codes by code prefix (digits) or by label words (full text plus trigrams).
 
@@ -223,7 +255,7 @@ def _notice_filters(
     deadline_after: date | datetime | None,
     buyer: str | None = None,
 ) -> list[ColumnElement[bool]]:
-    conditions: list[ColumnElement[bool]] = []
+    conditions: list[ColumnElement[bool]] = [shown_notices()]
     if cpv_prefixes:
         conditions.append(_cpv_condition(cpv_prefixes))
     if status:

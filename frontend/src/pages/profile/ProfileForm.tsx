@@ -113,6 +113,7 @@ export function ProfileForm({ profile }: { profile: CompanyView }) {
           descriptionRef={description}
           codes={draft.cpv}
           onCodesChange={(cpv) => change({ cpv })}
+          divisions={profile.cpv_divisions}
           onDescriptionNeeded={askForDescription}
         />
         <CompanyFacts draft={draft} errors={errors} onChange={change} />

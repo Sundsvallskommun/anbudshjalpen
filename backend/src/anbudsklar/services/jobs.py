@@ -12,7 +12,7 @@ import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -31,6 +31,7 @@ from anbudsklar.services.background import SessionFactory
 from anbudsklar.services.checklists import interpret_pending
 from anbudsklar.services.dates import utcnow
 from anbudsklar.services.errors import ConflictError, ServiceError
+from anbudsklar.services.lab import purge_expired
 from anbudsklar.services.matching import match_all, notify_matches
 from anbudsklar.services.notices import close_expired_notices
 from anbudsklar.services.reminders import send_due_reminders
@@ -90,6 +91,13 @@ async def _ingest_ted(session: AsyncSession, ctx: JobContext) -> Mapping[str, in
 
 
 async def _ingest_eavrop(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:
+    since = await last_fetching_start(session, "ingest_eavrop")
+    return await ingest_eavrop(session, ctx.http, ctx.settings, changed_since=since)
+
+
+async def ingest_eavrop_full(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:
+    """Fetch every project again, for instance after a change to what the ingestion reads."""
+
     return await ingest_eavrop(session, ctx.http, ctx.settings)
 
 
@@ -121,6 +129,10 @@ async def _notify_matches(session: AsyncSession, ctx: JobContext) -> Mapping[str
     return await notify_matches(session, ctx.mailer, ctx.settings, utcnow())
 
 
+async def _purge_lab(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:
+    return {"deleted": await purge_expired(session, utcnow())}
+
+
 JOBS: dict[str, JobFunction] = {
     "ingest_ted": _ingest_ted,
     "ingest_eavrop": _ingest_eavrop,
@@ -131,7 +143,25 @@ JOBS: dict[str, JobFunction] = {
     "match_all": _match_all,
     "send_reminders": _send_reminders,
     "notify_matches": _notify_matches,
+    "purge_lab": _purge_lab,
 }
+
+
+async def last_fetching_start(session: AsyncSession, job: str) -> datetime | None:
+    """When the job's latest successful run that fetched something started.
+
+    For jobs that fetch only what changed since then. A run that fetched nothing does not
+    count: e-Avrop's earlier list scraper ran daily without fetching (robots.txt), and a run
+    without the API token fetches nothing either.
+    """
+
+    fetched = JobRun.stats["fetched"].as_integer()
+    return await session.scalar(
+        select(JobRun.started_at)
+        .where(JobRun.job == job, JobRun.status == OK, fetched > 0)
+        .order_by(JobRun.started_at.desc())
+        .limit(1)
+    )
 
 
 async def start_run(session: AsyncSession, job: str) -> JobRun:

@@ -28,13 +28,19 @@ export interface DocumentTarget {
 
 export type DialogTarget = ({ kind: "source" } & SourceTarget) | ({ kind: "document" } & DocumentTarget);
 
-export const SOURCE_PARAMS = { quote: "citat", page: "sida", claim: "pastaende", step: "flik" } as const;
+export const SOURCE_PARAMS = { quote: "citat", page: "sida", claim: "pastaende", document: "dokument", step: "flik" } as const;
 
-/** The address that opens a claim's source on its notice page. */
-export function sourceHref(noticeId: string, citation: Pick<Citation, "page" | "quote" | "check" | "found_page">, claim?: string): string {
+/** The address that opens a claim's source on its notice page; `documentId` names the file when it is not the primary one. */
+export function sourceHref(
+  noticeId: string,
+  citation: Pick<Citation, "page" | "quote" | "check" | "found_page">,
+  claim?: string,
+  documentId?: string,
+): string {
   const page = citation.check === "moved" && citation.found_page ? citation.found_page : citation.page;
   const params = new URLSearchParams({ [SOURCE_PARAMS.quote]: citation.quote, [SOURCE_PARAMS.page]: String(page) });
   if (claim) params.set(SOURCE_PARAMS.claim, claim);
+  if (documentId) params.set(SOURCE_PARAMS.document, documentId);
   return `/upphandlingar/${noticeId}?${params.toString()}`;
 }
 
@@ -75,8 +81,11 @@ export function targetFromParams(params: URLSearchParams, notice: NoticeDetail):
     const known = knownCitations(notice).find(
       (citation) => citation.quote === quote && (citation.page === page || citation.found_page === page),
     );
-    const citation: Citation = known ?? { page, quote, check: null, found_page: null };
-    return { kind: "source", noticeId: notice.id, citation, claim: params.get(SOURCE_PARAMS.claim) ?? "" };
+    const citation: Citation = known ?? { page, quote, check: null, found_page: null, document: null, document_id: null };
+    // Only a document of this notice: an address cannot make the dialog read some other notice's file.
+    const named = params.get(SOURCE_PARAMS.document);
+    const documentId = notice.documents.some((document) => document.id === named) ? (named ?? undefined) : undefined;
+    return { kind: "source", noticeId: notice.id, citation, claim: params.get(SOURCE_PARAMS.claim) ?? "", documentId };
   }
   if (params.get(SOURCE_PARAMS.step) === "underlag") return { kind: "document", noticeId: notice.id, page };
   return null;

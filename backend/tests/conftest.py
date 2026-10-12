@@ -50,6 +50,8 @@ def database_url(tmp_path_factory: pytest.TempPathFactory) -> Iterator[str]:
     asyncio.run(admin(f'CREATE DATABASE "{name}"'))
     os.environ["DATABASE_URL"] = url
     os.environ["DOCUMENTS_DIR"] = str(tmp_path_factory.mktemp("documents"))
+    # The test data is fictitious; a developer's .env that hides fixtures must not hide it here.
+    os.environ["SHOW_FICTITIOUS"] = "true"
     from anbudsklar.config import get_settings
 
     get_settings.cache_clear()

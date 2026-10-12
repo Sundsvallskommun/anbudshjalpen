@@ -26,6 +26,7 @@ from anbudsklar.contracts import (
     CpvCandidate,
     CpvSuggestion,
     CpvSuggestions,
+    DocumentSet,
     EvaluationCriterion,
     KeyDate,
     MatchAssessment,
@@ -1136,16 +1137,26 @@ class HeuristicEngine:
     async def answer_question(
         self,
         notice: NoticeContext,
-        document: PagedDocument,
+        documents: DocumentSet,
         question: str,
         history: list[QuestionTurn],
     ) -> tuple[Answer, EngineRun]:
-        sentences = document_sentences(document.pages)
-        # Question words the document never uses ("hur stor", "krävs") cannot match anything,
-        # so only the words the document shares count towards the score.
-        vocabulary = set().union(*(_stems(sentence.text) for sentence in sentences))
-        ranked = _best_matches(_stems(question) & vocabulary, sentences)
-        best = [sentence for score, sentence in ranked[:3] if score >= 0.5]
+        by_document = [(document, document_sentences(document.pages)) for document in documents.documents]
+        # Question words the documents never use ("hur stor", "krävs") cannot match anything,
+        # so only the words the documents share count towards the score.
+        vocabulary: set[str] = set()
+        for _, sentences in by_document:
+            vocabulary.update(*(_stems(sentence.text) for sentence in sentences))
+        query = _stems(question) & vocabulary
+        ranked = sorted(
+            (
+                (score, document, sentence)
+                for document, sentences in by_document
+                for score, sentence in _best_matches(query, sentences)
+            ),
+            key=lambda item: -item[0],  # stable: the main document wins ties
+        )
+        best = [(document, sentence) for score, document, sentence in ranked[:3] if score >= 0.5]
         if not best:
             answer = Answer(
                 answer=(
@@ -1156,12 +1167,22 @@ class HeuristicEngine:
                 suggest_formal_question=True,
             )
             return answer, self._run()
-        # The first line is the lead the web app shows in bold; one line per citation follows.
-        lines = "\n".join(f"– {_excerpt(sentence.text)} (sida {sentence.page})" for sentence in best)
+        # The first line is the lead the web app shows in bold; one line per citation follows,
+        # naming the document when there are several.
+        several = len(documents.documents) > 1
+        lines = "\n".join(
+            f"– {_excerpt(sentence.text)} ({document.filename}, sida {sentence.page})"
+            if several
+            else f"– {_excerpt(sentence.text)} (sida {sentence.page})"
+            for document, sentence in best
+        )
         answer = Answer(
             answer=f"{ANSWER_LEAD}\n{lines}",
             found_in_document=True,
-            citations=[_citation(sentence) for sentence in best],
+            citations=[
+                _citation(sentence).model_copy(update={"document": document.filename})
+                for document, sentence in best
+            ],
             suggest_formal_question=False,
         )
         return answer, self._run()

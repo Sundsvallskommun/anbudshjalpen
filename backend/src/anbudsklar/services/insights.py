@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from anbudsklar.api.schemas import InsightItem
 from anbudsklar.models import Notice, QuestionLog
 from anbudsklar.services.checklists import checklist_payload, published_checklists, tender_deadline
+from anbudsklar.visibility import shown_notices
 
 SAMPLE_QUESTIONS = 5
 
@@ -32,6 +33,7 @@ async def list_insights(session: AsyncSession, now: datetime) -> list[InsightIte
                 func.count(case((QuestionLog.suggested_formal_question.is_(True), 1))),
             )
             .join(QuestionLog, QuestionLog.notice_id == Notice.id)
+            .where(shown_notices())
             .group_by(Notice.id)
             .order_by(func.max(QuestionLog.created_at).desc())
         )

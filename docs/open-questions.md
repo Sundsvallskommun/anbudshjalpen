@@ -33,9 +33,9 @@ När en fråga är avgjord flyttas svaret till ett beslut i [decisions/](decisio
 | Ska vi avgränsa till kommunens och de kommunala bolagens upphandlingar, eller ta med TED? | Näringslivsenheten och inköp |
 | Kan inköp ta fram 3–5 avslutade upphandlingar inom pilotens verksamhet och markera vilka skallkrav som finns i dem? Får de ligga i ett öppet repo? | Inköp |
 | Vilken träffsäkerhet krävs för att en checklista ska få publiceras? | Inköp |
-| Ligger avtalskatalogen i e-Avrops avtalsdatabas? I så fall kan den hämtas via samma API | Inköp |
-| Får vi hämta från e-Avrop, och på vilka villkor? `robots.txt` förbjuder automatisk hämtning, och annonser under tröskelvärdena finns bara där | Inköp och Antirio |
-| Ska inköparen godkänna checklistorna innan de publiceras? Det kostar tid per upphandling och gör checklistan till kommunens sammanfattning | Inköp |
+| Ligger avtalskatalogen i e-Avrops avtalsdatabas? e-Avrop har ett Avtals-API som kan läsas med samma nyckel | Inköp |
+| Får underlagen från e-Avrops API visas och citeras publikt i Anbudsklar och via MCP till Eneo? Kan vi få en nyckel som bara läser publicerade uppgifter? Se [e-Avrops API](eavrop.md#det-som-saknas) | Inköp och Antirio |
+| Ska inköparen godkänna checklistorna innan de publiceras? Det kostar tid per upphandling och gör checklistan till kommunens sammanfattning. Båda sätten går att pröva: inställningen finns under Inköp › Inställningar ([beslut 0011](decisions/0011-installningar-granskning-valfri.md)) | Inköp |
 | Vilken verksamhet ska piloten gälla? | Näringslivsenheten och inköp |
 
 ## Juridik

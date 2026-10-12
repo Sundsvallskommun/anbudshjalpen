@@ -18,7 +18,7 @@ import { useSourceDeepLink } from "./SourceDialogProvider";
 import { SourceLink } from "./SourceLink";
 import { primaryDocumentId, sourceHref, targetFromParams } from "./sourceTarget";
 
-const verified: Citation = { page: 4, quote: "Leverantören ska ha en ansvarsförsäkring", check: "verified", found_page: null };
+const verified: Citation = { page: 4, quote: "Leverantören ska ha en ansvarsförsäkring", check: "verified", found_page: null, document: null, document_id: null };
 const claim = "Ni har ansvarsförsäkring";
 
 const routes: MockRoute[] = [
@@ -45,11 +45,21 @@ describe("SourceLink", () => {
     expect(link).toHaveAttribute("href", sourceHref(NOTICE_ID, verified, claim));
   });
 
+  it("names the document before the page when asked to, and carries it in the address", () => {
+    mockApi(routes);
+    renderWithProviders(
+      <SourceLink noticeId={NOTICE_ID} citation={verified} claim={claim} documentId="doc-2" documentName="6.6 Krav.pdf" />,
+    );
+    const link = screen.getByRole("link", { name: "Visa källan för ”Ni har ansvarsförsäkring”, 6.6 Krav.pdf, s. 4" });
+    expect(link).toHaveTextContent("6.6 Krav.pdf, s. 4");
+    expect(link).toHaveAttribute("href", expect.stringContaining("dokument=doc-2"));
+  });
+
   it("puts words only on deviations: another page, or not found", () => {
     mockApi(routes);
     renderWithProviders(
       <>
-        <SourceLink noticeId={NOTICE_ID} citation={{ ...verified, page: 5, check: "moved", found_page: 6 }} claim="A" />
+        <SourceLink noticeId={NOTICE_ID} citation={{ ...verified, page: 5, check: "moved", found_page: 6, document: null, document_id: null }} claim="A" />
         <SourceLink noticeId={NOTICE_ID} citation={{ ...verified, check: "unverified" }} claim="B" />
       </>,
     );
@@ -94,7 +104,7 @@ describe("SourceLink", () => {
 
   it("shows the cited words when the page does not have them", async () => {
     mockApi(routes);
-    const missing: Citation = { page: 4, quote: "Referensuppdrag i offentlig miljö", check: "unverified", found_page: null };
+    const missing: Citation = { page: 4, quote: "Referensuppdrag i offentlig miljö", check: "unverified", found_page: null, document: null, document_id: null };
     renderWithProviders(<SourceLink noticeId={NOTICE_ID} citation={missing} claim="Två referensuppdrag" />);
 
     await userEvent.click(screen.getByRole("link", { name: /^Visa källan för/ }));
@@ -140,6 +150,10 @@ describe("source addresses", () => {
     const target = targetFromParams(new URLSearchParams(`citat=${moved.quote}&sida=6`), noticeDetail);
     expect(target).toMatchObject({ kind: "source", citation: moved });
 
+    const named = targetFromParams(new URLSearchParams(`citat=${moved.quote}&sida=6&dokument=${noticeDetail.documents[0]!.id}`), noticeDetail);
+    expect(named).toMatchObject({ kind: "source", documentId: noticeDetail.documents[0]!.id });
+    const foreign = targetFromParams(new URLSearchParams(`citat=${moved.quote}&sida=6&dokument=not-ours`), noticeDetail);
+    expect(foreign).toMatchObject({ kind: "source", documentId: undefined });
     const unknown = targetFromParams(new URLSearchParams("citat=Något som inte finns&sida=3&pastaende=X"), noticeDetail);
     expect(unknown).toMatchObject({ kind: "source", claim: "X", citation: { page: 3, check: null } });
 

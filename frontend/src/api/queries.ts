@@ -7,6 +7,9 @@ import { api, withQuery } from "./client";
 import type {
   AnswerView,
   AppConfig,
+  AppSettingsSaved,
+  AppSettingsUpdate,
+  AppSettingsView,
   ChecklistAdminItem,
   ChecklistStatus,
   ChecklistUpdate,
@@ -17,10 +20,13 @@ import type {
   CpvSuggestionRequest,
   CpvSuggestionView,
   DocumentInfo,
+  GateRequest,
   InsightItem,
   InterpretationView,
   JobName,
   JobRunView,
+  LabCreateRequest,
+  LabLoginRequest,
   LoginRequest,
   MatchView,
   NoticeBuyers,
@@ -41,6 +47,7 @@ import type {
   RulesView,
   SessionView,
   UpcomingProcurement,
+  Uuid,
 } from "./types";
 
 export interface NoticeFilters {
@@ -77,6 +84,7 @@ export const keys = {
   insights: ["admin", "insights"] as const,
   interpretations: ["admin", "interpretations"] as const,
   jobs: ["admin", "jobs"] as const,
+  appSettings: ["admin", "settings"] as const,
 };
 
 // --- Session and configuration -----------------------------------------------------------------
@@ -101,6 +109,37 @@ export function useLogin() {
   return useMutation({
     mutationFn: (persona: Role) =>
       api.post<SessionView | undefined>("/api/session/login", { persona } satisfies LoginRequest),
+    onSuccess: (session) => resetForNewUser(client, session),
+  });
+}
+
+/** The access code that gates the service (decision 0010): once in, everything is fetched anew. */
+export function useEnterGate() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => api.post<unknown>("/api/gate", { code } satisfies GateRequest),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: keys.config });
+      await resetForNewUser(client, undefined);
+    },
+  });
+}
+
+/** Lab mode (decision 0010): a company of the participant's own, behind the gate. */
+export function useCreateLabCompany() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: LabCreateRequest) => api.post<SessionView | undefined>("/api/lab/companies", body),
+    onSuccess: (session) => resetForNewUser(client, session),
+  });
+}
+
+/** Signs the participant in as a lab company picked on the login page. */
+export function useLabLogin() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (companyId: Uuid) =>
+      api.post<SessionView | undefined>("/api/lab/sessions", { company_id: companyId } satisfies LabLoginRequest),
     onSuccess: (session) => resetForNewUser(client, session),
   });
 }
@@ -424,6 +463,23 @@ export function hasActiveRun(runs: readonly JobRunView[] | undefined, now: numbe
 }
 
 /** The latest run of every job that has run, polled while one is running. */
+/** The settings inköp can change (decision 0011). */
+export function useAppSettings() {
+  return useQuery({ queryKey: keys.appSettings, queryFn: () => api.get<AppSettingsView>("/api/admin/settings") });
+}
+
+export function useUpdateAppSettings() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: AppSettingsUpdate) => api.put<AppSettingsSaved>("/api/admin/settings", body),
+    onSuccess: async (saved) => {
+      client.setQueryData(keys.appSettings, { review_required: saved.review_required } satisfies AppSettingsView);
+      // Turning the review off publishes checklists, so every list that shows them is stale.
+      await client.invalidateQueries({ predicate: (query) => query.queryKey[0] !== "config" });
+    },
+  });
+}
+
 export function useJobs() {
   return useQuery({
     queryKey: keys.jobs,

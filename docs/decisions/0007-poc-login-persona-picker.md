@@ -1,6 +1,7 @@
 # 0007: Inloggningen i PoC:n är ett val av demoperson
 
-- **Status:** Accepterat
+- **Status:** Accepterat, delvis ersatt av [0010](0010-labblage-egna-foretag.md) (labbföretag) och
+  [0011](0011-installningar-granskning-valfri.md) (granskningen går att slå av)
 - **Datum:** 2026-10-05
 - **Gäller:** inloggning och roller i PoC:n, och vad som krävs i produktion
 

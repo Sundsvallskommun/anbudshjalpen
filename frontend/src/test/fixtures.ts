@@ -7,6 +7,7 @@ import type {
   AppConfig,
   ChecklistAdminItem,
   ChecklistView,
+  LabCompanyRef,
   MatchView,
   NoticeBuyers,
   NoticeDetail,
@@ -30,6 +31,8 @@ export const config: AppConfig = {
   ai_disclosure: "Anbudsklar använder AI. Kontrollera alltid svaren mot underlaget.",
   demo_notice: "Demo: underlag, företag och personer är fiktiva.",
   eavrop_url: "https://www.e-avrop.com/sundsvall",
+  gate_required: false,
+  lab_enabled: false,
 };
 
 export const companyUser: UserView = {
@@ -38,6 +41,17 @@ export const companyUser: UserView = {
   email: "anna@example.invalid",
   role: "foretagare",
   company: { id: "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d", name: "Målerifirman i Matfors AB" },
+  lab: null,
+};
+
+/** A workshop participant's own company (decision 0010). */
+export const labUser: UserView = {
+  id: "5e6f7a8b-9c0d-4e1f-a2b3-c4d5e6f7a8b9",
+  name: "Deltagare",
+  email: "lab-5e6f7a8b@anbudsklar.local",
+  role: "foretagare",
+  company: { id: "6f7a8b9c-0d1e-4f2a-b3c4-d5e6f7a8b9c0", name: "Fiktiv Snickeri AB" },
+  lab: { expires_at: "2026-11-11T12:00:00Z" },
 };
 
 export const buyerUser: UserView = {
@@ -46,6 +60,7 @@ export const buyerUser: UserView = {
   email: "lars@example.invalid",
   role: "inkopare",
   company: null,
+  lab: null,
 };
 
 /** The personas as the backend names them (services/personas.py): "Name, company" and the role in a sentence. */
@@ -62,8 +77,8 @@ const personas: Persona[] = [
   },
 ];
 
-export function session(user: UserView | null): SessionView {
-  return { user, personas };
+export function session(user: UserView | null, labCompanies: LabCompanyRef[] = []): SessionView {
+  return { user, personas, lab_companies: labCompanies };
 }
 
 export const noticeSummary: NoticeSummary = {
@@ -82,6 +97,7 @@ export const noticeSummary: NoticeSummary = {
   cpv_label: "Målning",
   has_documents: true,
   checklist_status: "published",
+  checklist_reviewed: true,
   is_fictitious: true,
   fit: "passar_delvis",
 };
@@ -112,6 +128,7 @@ export const checklistView: ChecklistView = {
   created_at: "2026-09-22T09:00:00+02:00",
   approved_at: "2026-09-23T10:00:00+02:00",
   published_at: "2026-09-23T10:05:00+02:00",
+  reviewed: true,
   reviewer_note: null,
   verification: { citations_total: 4, citations_verified: 2, citations_moved: 1, citations_unverified: 1 },
   checklist: {
@@ -124,7 +141,7 @@ export const checklistView: ChecklistView = {
         title: "Ansvarsförsäkring om minst 5 miljoner kronor",
         plain_language: "Företaget måste ha en ansvarsförsäkring och visa ett försäkringsbevis.",
         evidence: "Bifoga försäkringsbevis.",
-        citation: { page: 4, quote: "Leverantören ska ha en ansvarsförsäkring", check: "verified", found_page: null },
+        citation: { page: 4, quote: "Leverantören ska ha en ansvarsförsäkring", check: "verified", found_page: null, document: null, document_id: null },
       },
       {
         id: "K2",
@@ -132,14 +149,14 @@ export const checklistView: ChecklistView = {
         title: "Två referensuppdrag",
         plain_language: "Två liknande uppdrag i offentlig miljö de senaste tre åren.",
         evidence: null,
-        citation: { page: 5, quote: "två referensuppdrag", check: "moved", found_page: 6 },
+        citation: { page: 5, quote: "två referensuppdrag", check: "moved", found_page: 6, document: null, document_id: null },
       },
     ],
     attachments: [
       {
         name: "Prisbilaga",
         description: null,
-        citation: { page: 12, quote: "Bilaga 1 Prisbilaga", check: "unverified", found_page: null },
+        citation: { page: 12, quote: "Bilaga 1 Prisbilaga", check: "unverified", found_page: null, document: null, document_id: null },
       },
     ],
     evaluation: [
@@ -147,7 +164,7 @@ export const checklistView: ChecklistView = {
         name: "Pris",
         weight_percent: 70,
         how_assessed: "Lägst pris får högst poäng.",
-        citation: { page: 9, quote: "Pris 70 %", check: "verified", found_page: null },
+        citation: { page: 9, quote: "Pris 70 %", check: "verified", found_page: null, document: null, document_id: null },
       },
     ],
     dates: [
@@ -155,7 +172,7 @@ export const checklistView: ChecklistView = {
         kind: "fragestopp",
         date: "2026-10-16",
         description: "Frågor ställs i e-Avrop.",
-        citation: { page: 2, quote: "Sista dag för frågor", check: "verified", found_page: null },
+        citation: { page: 2, quote: "Sista dag för frågor", check: "verified", found_page: null, document: null, document_id: null },
       },
     ],
     terms: [
@@ -190,11 +207,12 @@ export const answerNotInDocument: AnswerView = {
   answer: {
     answer: "Underlaget säger inget om arbete på helger.",
     found_in_document: false,
-    citations: [{ page: 4, quote: "Leverantören ska ha en ansvarsförsäkring", check: "verified", found_page: null }],
+    citations: [{ page: 4, quote: "Leverantören ska ha en ansvarsförsäkring", check: "verified", found_page: null, document: null, document_id: null }],
     suggest_formal_question: true,
   },
   engine: "heuristic",
   document_id: DOCUMENT_ID,
+  read: { documents_read: 1, documents_total: 1, pages_read: 16, pages_total: 16 },
   // The checklist's frågestopp is a date; the backend sends it as the end of that day in Swedish time.
   question_deadline: "2026-10-16T23:59:59+02:00",
   formal_question_url: "https://example.invalid/e-avrop/underlag/1",
@@ -238,6 +256,7 @@ export const draftChecklistView: ChecklistView = {
   status: "draft",
   approved_at: null,
   published_at: null,
+  reviewed: false,
 };
 
 /** A draft the buyer rejected, with the reason; POST .../reopen turns it back into a draft that keeps the note. */
@@ -267,14 +286,14 @@ export const matchView: MatchView = {
           page: 4,
           quote: "Leverantören ska ha en ansvarsförsäkring",
           check: "verified",
-          found_page: null,
+          found_page: null, document: null, document_id: null,
         },
       },
       {
         kind: "oklart",
         text: "Underlaget ställer krav på referensuppdrag, men er profil säger inget om det.",
         requirement_id: "K2",
-        citation: { page: 5, quote: "två referensuppdrag", check: "moved", found_page: 6 },
+        citation: { page: 5, quote: "två referensuppdrag", check: "moved", found_page: 6, document: null, document_id: null },
       },
     ],
   },

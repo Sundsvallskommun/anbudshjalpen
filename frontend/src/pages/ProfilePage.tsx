@@ -1,19 +1,22 @@
 import { VStack } from "@astryxdesign/core/VStack";
-import { useProfile } from "../api/queries";
+import { useProfile, useSession } from "../api/queries";
 import { ErrorNotice, Loading } from "../components/states";
 import { Page } from "../shell/Page";
 import { RequireRole } from "../shell/RequireRole";
+import { LabBanner } from "./profile/LabBanner";
 import { ProfileForm } from "./profile/ProfileForm";
 import { ProfileSummary } from "./profile/ProfileSummary";
 
 function ProfileContent() {
   const profile = useProfile();
+  const lab = useSession().data?.user?.lab ?? null;
   if (profile.isPending) return <Loading label="Hämtar profilen …" />;
   if (profile.isError) {
     return <ErrorNotice title="Profilen kunde inte hämtas" error={profile.error} onRetry={() => profile.refetch()} />;
   }
   return (
     <VStack gap={6}>
+      {lab && <LabBanner lab={lab} />}
       <ProfileSummary profile={profile.data} />
       <ProfileForm profile={profile.data} />
     </VStack>

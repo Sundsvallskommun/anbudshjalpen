@@ -521,3 +521,32 @@ async def test_each_buyers_count_is_what_filtering_on_it_lists(
             assert buyers == []
         else:
             assert buyers, filters
+
+
+async def test_answers_read_every_document_and_cite_the_one_they_come_from(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    attachment = await add_document(
+        db_session,
+        demo.notice,
+        ["Krav på entreprenören\nEntreprenören ska lämna en hållbarhetsredovisning varje år."],
+        filename="6.6 Krav på Entreprenör.pdf",
+    )
+
+    response = await client.post(
+        f"/api/notices/{demo.notice.id}/questions", json={"question": "Krävs en hållbarhetsredovisning?"}
+    )
+
+    body = response.json()
+    assert response.status_code == 200, body
+    assert body["document_id"] == str(demo.document.id)  # the main document stays the answer's default
+    assert body["read"] == {
+        "documents_read": 2,
+        "documents_total": 2,
+        "pages_read": demo.document.page_count + 1,
+        "pages_total": demo.document.page_count + 1,
+    }
+    citation = body["answer"]["citations"][0]
+    assert citation["document"] == "6.6 Krav på Entreprenör.pdf"
+    assert citation["document_id"] == str(attachment.id)
+    assert citation["check"] == "verified"
