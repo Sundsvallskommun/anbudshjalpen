@@ -3,7 +3,7 @@ import { Grid } from "@astryxdesign/core/Grid";
 import { Heading } from "@astryxdesign/core/Heading";
 import { ProgressBar } from "@astryxdesign/core/ProgressBar";
 import { VStack } from "@astryxdesign/core/VStack";
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 import { StatTile } from "./StatTile";
 
 export interface ResultFilter {
@@ -28,6 +28,8 @@ export interface ResultSummaryProps {
   onSelectedChange?: (value: string | null) => void;
   /** A last line, such as "Bilagor i utkastet: 3 av 5" with a chip per attachment. */
   children?: ReactNode;
+  /** The title, focusable, for a result that arrives after a wait and should be where the reader lands. */
+  titleRef?: Ref<HTMLHeadingElement>;
 }
 
 /**
@@ -42,11 +44,14 @@ export function ResultSummary({
   selected = null,
   onSelectedChange,
   children,
+  titleRef,
 }: ResultSummaryProps) {
   return (
     <Card>
       <VStack gap={4}>
-        <Heading level={headingLevel}>{title}</Heading>
+        <Heading level={headingLevel} ref={titleRef} tabIndex={titleRef ? -1 : undefined}>
+          {title}
+        </Heading>
         {progress && (
           <ProgressBar
             label={progress.label}

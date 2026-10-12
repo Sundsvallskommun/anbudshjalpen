@@ -6,7 +6,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
 import { VStack } from "@astryxdesign/core/VStack";
-import { useId, useState } from "react";
+import { useId, useState, type Ref } from "react";
 import type { AttachmentCheck, Checklist, ReviewView } from "../../../../api/types";
 import { AiProvenance } from "../../../../components/ui/AiProvenance";
 import { ResultSummary } from "../../../../components/ui/ResultSummary";
@@ -73,11 +73,14 @@ export function ReviewResult({
   checklist,
   noticeId,
   documentId,
+  titleRef,
 }: {
   view: ReviewView;
   checklist: Checklist;
   noticeId: string;
   documentId?: string;
+  /** The verdict's heading, which takes the focus when a result arrives. */
+  titleRef?: Ref<HTMLHeadingElement>;
 }) {
   const groups = reviewGroups(view, checklist);
   const verdict = reviewVerdict(groups);
@@ -105,6 +108,7 @@ export function ReviewResult({
       <ResultSummary
         title={verdict.title}
         headingLevel={3}
+        titleRef={titleRef}
         progress={
           verdict.essential > 0
             ? {

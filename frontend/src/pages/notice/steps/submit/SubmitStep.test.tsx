@@ -44,7 +44,6 @@ describe("Step 4 Lämna in", () => {
       document.querySelector<HTMLInputElement>('input[type="file"]')!,
       new File(["%PDF-1.7 utkast"], "utkast.pdf", { type: "application/pdf" }),
     );
-    await userEvent.click(screen.getByRole("button", { name: "Granska utkastet" }));
     await screen.findByRole("heading", { level: 3, name: "1 sak behöver åtgärdas innan du lämnar anbudet" });
     await userEvent.click(screen.getByRole("tab", { name: "Lämna in" }));
 
