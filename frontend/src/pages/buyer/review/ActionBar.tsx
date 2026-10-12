@@ -26,7 +26,9 @@ function SaveStatus({ state, error, onRetry }: { state: SaveState; error: unknow
     <HStack gap={2} vAlign="center" wrap="wrap" role="status">
       {state === "saving" && (
         <>
-          <Spinner size="sm" label="Sparar" />
+          <HStack aria-hidden="true">
+            <Spinner size="sm" />
+          </HStack>
           <Text type="supporting">Sparar …</Text>
         </>
       )}
