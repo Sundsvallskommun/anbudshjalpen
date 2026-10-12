@@ -7,6 +7,7 @@ import { api, withQuery } from "./client";
 import type {
   AnswerView,
   AppConfig,
+  AiUsageView,
   AppSettingsSaved,
   AppSettingsUpdate,
   AppSettingsView,
@@ -84,6 +85,7 @@ export const keys = {
   insights: ["admin", "insights"] as const,
   interpretations: ["admin", "interpretations"] as const,
   jobs: ["admin", "jobs"] as const,
+  aiUsage: (days: number) => ["admin", "ai-usage", days] as const,
   appSettings: ["admin", "settings"] as const,
 };
 
@@ -481,6 +483,14 @@ export function hasActiveRun(runs: readonly JobRunView[] | undefined, now: numbe
 }
 
 /** The latest run of every job that has run, polled while one is running. */
+/** The AI engine's calls, tokens and estimated cost over the last `days` days (Drift). */
+export function useAiUsage(days: number) {
+  return useQuery({
+    queryKey: keys.aiUsage(days),
+    queryFn: () => api.get<AiUsageView>(withQuery("/api/admin/ai-usage", { days })),
+  });
+}
+
 /** The settings inköp can change (decision 0011). */
 export function useAppSettings() {
   return useQuery({ queryKey: keys.appSettings, queryFn: () => api.get<AppSettingsView>("/api/admin/settings") });

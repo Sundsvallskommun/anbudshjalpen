@@ -135,6 +135,7 @@ export function ReviewResult({
         engine={view.engine}
         howLabel="Hur gick granskningen till?"
         details={<Text as="p">{view.result.summary}</Text>}
+        usage={view.usage}
       />
     </VStack>
   );

@@ -29,8 +29,11 @@ markera sitt eget citat som kontrollerat.
 validerar det mot kontraktet. Är svaret ogiltigt skickar motorn felen tillbaka på svenska och ber om ett rättat svar,
 högst `AI_MAX_RETRIES` gånger (standard 2). Med Eneo sker det i samma session. Därefter ger motorn upp med ett fel.
 
-**Metadata.** Motorn redovisar vilken motor och modell som användes och hur många försök som krävdes (`EngineRun`).
-Checklistor och matchningar sparas med motorns namn.
+**Metadata.** Motorn redovisar vilken motor och modell som användes, hur många försök som krävdes och, när
+modelleverantören räknar dem, hur många tokens anropet förbrukade in och ut, summerat över försöken (`EngineRun`).
+Checklistor och matchningar sparas med motorns namn, och varje avslutat anrop sparas i tabellen `ai_calls` för
+statistiken under Drift ([AI-användning](operations.md#ai-användning)). Motorn `openai` lämnar räkningen vidare ur
+svarets `usage`; den heuristiska motorn har ingen, och Eneo-motorn läser inte Eneos räkning ännu.
 
 **Regler i alla instruktioner** (`_grundregler.md` och `_citatregler.md`):
 

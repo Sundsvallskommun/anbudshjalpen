@@ -18,6 +18,18 @@ const calendarDateFormat = new Intl.DateTimeFormat(LOCALE, {
   timeZone: "UTC",
 });
 const sekFormat = new Intl.NumberFormat(LOCALE, { style: "currency", currency: "SEK", maximumFractionDigits: 0 });
+const sekCostFormat = new Intl.NumberFormat(LOCALE, {
+  style: "currency",
+  currency: "SEK",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+const sekPriceFormat = new Intl.NumberFormat(LOCALE, {
+  style: "currency",
+  currency: "SEK",
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
 const numberFormat = new Intl.NumberFormat(LOCALE);
 
 /** "14 oktober 2026" for an ISO timestamp. */
@@ -92,6 +104,16 @@ export function relativeDeadline(iso: string, now: Date = new Date()): string {
 /** "1 200 000 kr". */
 export function formatSek(amount: number): string {
   return sekFormat.format(amount);
+}
+
+/** "0,12 kr", "14,50 kr": an estimated AI cost, which is öre for one answer and kronor for a month. */
+export function formatSekCost(amount: number): string {
+  return sekCostFormat.format(amount);
+}
+
+/** "30 kr", "0,15 kr": a price per million tokens, with decimals only when it has them. */
+export function formatSekPrice(amount: number): string {
+  return sekPriceFormat.format(amount);
 }
 
 /** "1 200". */

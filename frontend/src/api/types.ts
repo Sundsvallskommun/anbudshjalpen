@@ -445,9 +445,22 @@ export interface ReadSummary {
   pages_total: number;
 }
 
+/**
+ * What one answer cost: tokens as the model provider counted them, and money when a price is set. Null on a view
+ * when the engine reported no counts (the rule-based engine has no model; Eneo's counts are not read yet).
+ */
+export interface TokenUsageView {
+  input_tokens: number;
+  output_tokens: number;
+  /** Null until the operator sets both prices (AI_PRICE_INPUT_SEK_PER_MILLION and the output price). */
+  cost_sek: number | null;
+}
+
 export interface AnswerView {
   answer: Answer;
   engine: string;
+  /** Always sent by the backend; an answer kept in the browser from before the field existed has none. */
+  usage?: TokenUsageView | null;
   /** The main document; a citation's own document_id says where its quote is. */
   document_id: Uuid;
   read: ReadSummary;
@@ -461,6 +474,7 @@ export interface ReviewView {
   result: ReviewResult;
   requirement_titles: Record<string, string>;
   engine: string;
+  usage?: TokenUsageView | null;
   stored: false;
 }
 
@@ -542,6 +556,8 @@ export interface CpvSuggestionRequest {
 export interface CpvSuggestionView {
   suggestions: CpvSuggestions;
   engine: string;
+  /** The sum of the two calls behind the suggestions. */
+  usage?: TokenUsageView | null;
 }
 
 export interface CpvHit {
@@ -577,6 +593,8 @@ export interface RulesRequest {
 export interface RulesView {
   answer: RulesAnswer;
   engine: string;
+  /** Always sent by the backend; a conversation kept in the browser from before the field existed has none. */
+  usage?: TokenUsageView | null;
 }
 
 // --- api/schemas.py: buyer (inköpare) views ----------------------------------------------------
@@ -658,6 +676,47 @@ export interface JobRunView {
   finished_at: IsoDateTime | null;
   stats: Record<string, unknown>;
   error: string | null;
+}
+
+/** One AI task's calls in the period, in the tasks' own order (tolka_underlag first, regelhjalpen last). */
+export interface AiUsageTaskView {
+  task: string;
+  calls: number;
+  /** Calls whose tokens the engine reported; the token sums cover only these. */
+  calls_with_usage: number;
+  input_tokens: number;
+  output_tokens: number;
+  cost_sek: number | null;
+}
+
+/** One engine and model's calls in the period, the most used first. */
+export interface AiUsageModelView {
+  engine: string;
+  model: string | null;
+  calls: number;
+  calls_with_usage: number;
+  input_tokens: number;
+  output_tokens: number;
+  cost_sek: number | null;
+}
+
+/**
+ * The AI engine's usage over the last `days` days (Drift): calls, tokens and the estimated cost. The cost is null
+ * until the operator sets both prices, which the view echoes so the page can say so.
+ */
+export interface AiUsageView {
+  since: IsoDateTime;
+  until: IsoDateTime;
+  days: number;
+  calls: number;
+  calls_with_usage: number;
+  input_tokens: number;
+  output_tokens: number;
+  cost_sek: number | null;
+  price_input_sek_per_million: number | null;
+  price_output_sek_per_million: number | null;
+  by_task: AiUsageTaskView[];
+  by_model: AiUsageModelView[];
 }
 
 /** Settings inköp changes at run time (decision 0011). */

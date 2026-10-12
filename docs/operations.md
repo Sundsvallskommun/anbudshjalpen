@@ -57,6 +57,8 @@ Alla inställningar läses av `backend/src/anbudsklar/config.py` vid start. List
 | `AI_ENGINE` | `heuristic` | `eneo`, `openai` eller `heuristic` |
 | `AI_MAX_RETRIES` | `2` | Nya försök när ett svar inte följer kontraktet (0–5) |
 | `AI_TIMEOUT_SECONDS` | `180` | Tidsgräns för ett anrop till motorn |
+| `AI_PRICE_INPUT_SEK_PER_MILLION` | Inget | Vad språkmodellen kostar i kronor per miljon tokens in, för den uppskattade kostnaden under Drift › AI-användning. Utan båda priserna räknas tokens men ingen kostnad visas |
+| `AI_PRICE_OUTPUT_SEK_PER_MILLION` | Inget | Samma för tokens ut |
 | `ENEO_BACKEND_URL` | Inget | Eneo-instansens adress, till exempel `https://eneo-test.example.se`. Krävs med `AI_ENGINE=eneo`. Ett Eneo på värddatorn nås från Compose-stacken som `http://host.docker.internal:8123`, inte `localhost` |
 | `ENEO_API_KEY` | Inget | Hemlig. Servicenyckeln (`sk_`) för Anbudshjälpens space. Krävs med `AI_ENGINE=eneo` |
 | `ENEO_API_KEY_HEADER_NAME` | `X-API-Key` | Header för nyckeln, samma som Eneos `API_KEY_HEADER_NAME` |
@@ -157,6 +159,21 @@ ur statistiken och knappen "Kör nu: <jobb>" (`GET /api/admin/jobs` ger den sena
 körning pågår hämtas listan om var tredje sekund. Ett fel visas med appens egen text på svenska när det kommer från
 insamlingen, AI-motorn eller appens regler. Andra fel, till exempel från databasen, visas som "Tekniskt fel (<typ>).
 Detaljerna finns i loggen.", så att ingen SQL eller intern text hamnar i vyn.
+
+## AI-användning
+
+Överst på Drift står AI-motorns användning: antal anrop, tokens in och ut och en uppskattad kostnad för de senaste 7,
+30 eller 90 dagarna, som en rad med summorna, vilka modeller som svarat och en tabell per uppgift
+(`GET /api/admin/ai-usage?days=30`). Varje avslutat anrop till motorn sparas som en rad i tabellen `ai_calls` med
+uppgift, motor, modell, antal försök, tokenräkning och upphandling, men aldrig något av innehållet: inte frågan,
+underlaget, utkastet eller svaret. Ett anrop som misslyckas sparas inte. Tokenräkningen är modelleverantörens egen,
+som motorn `openai` lämnar vidare ur svarets `usage`, summerad över försöken eftersom varje nytt försök skickar hela
+samtalet igen. Den regelbaserade motorn har ingen språkmodell, och Eneo-motorn läser inte Eneos räkning ännu
+(kommentaren ovanför `AskResult` i `backend/src/anbudsklar/ai/eneo.py` säger var den finns), så deras anrop räknas
+utan tokens och sidan säger varför. Kostnaden är tokens in gånger `AI_PRICE_INPUT_SEK_PER_MILLION` plus tokens ut
+gånger `AI_PRICE_OUTPUT_SEK_PER_MILLION`, per miljon tokens och avrundad till öre, och visas bara när båda priserna
+är satta. Samma uppskattning står för ett enskilt svar i popovern "Hur togs det här fram?" i Fråga AI, Regelhjälpen
+och granskningen av utkast.
 
 ## Inställningar i tjänsten
 

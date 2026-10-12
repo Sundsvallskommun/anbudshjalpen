@@ -184,6 +184,13 @@ kopia av LOU, så utdraget kommer aldrig från modellen ([AI-uppgifterna](ai-tas
 Underlaget skickas som text i stället för som fil, eftersom en servicenyckel inte får ladda upp filer i Eneo. Då
 stämmer också sidnumren med vår citatkontroll.
 
+Tokenräkningen läses inte från Eneo ännu, så anrop till Eneo räknas utan tokens och kostnad under Drift ›
+AI-användning ([Drift](operations.md#ai-användning)). Eneo har siffrorna (kontrollerat mot `eneo-ai/eneo` 2026-10-09):
+`GET .../sessions/{session_id}/` ger sessionens meddelanden med `num_tokens_question` och `num_tokens_answer` per
+svar, en strömmad fråga slutar med händelsen `token_usage`, och `model` i svaret kan bära Eneos eget pris per token
+(`input_cost_per_token`, `output_cost_per_token`) när nyckeln får se priser. Kommentaren ovanför `AskResult` i
+`backend/src/anbudsklar/ai/eneo.py` säger hur de hakas på.
+
 | Svar från Eneo | Betyder | Vad appen gör |
 |---|---|---|
 | 400, kod 9007 | Eneos allmänna fel för en felaktig förfrågan, till exempel att modellen inte är aktiverad i spacet | "Eneo avvisade förfrågan. Kontrollera assistentens inställningar i Eneo …", och Eneos eget meddelande skrivs i loggen. Bara när meddelandet nämner tokens eller kontextfönstret säger appen att underlaget är för stort |

@@ -34,6 +34,7 @@ from anbudsklar.api.schemas import (
 from anbudsklar.api.uploads import UPLOAD_OPENAPI, read_upload
 from anbudsklar.documents.store import read_file
 from anbudsklar.services import notices, questions, reminders, review
+from anbudsklar.services.ai_usage import token_prices
 from anbudsklar.services.cpv import normalize_cpv_prefixes
 from anbudsklar.services.dates import utcnow
 
@@ -146,7 +147,13 @@ async def ask_question(
 ) -> AnswerView:
     async with slots.hold():
         answer = await questions.ask_question(
-            session, engine, notice_id, body, viewer, eavrop_url=settings.eavrop_base_url
+            session,
+            engine,
+            notice_id,
+            body,
+            viewer,
+            eavrop_url=settings.eavrop_base_url,
+            prices=token_prices(settings),
         )
     await session.commit()
     return answer
@@ -158,11 +165,17 @@ async def ask_question(
     openapi_extra=UPLOAD_OPENAPI,
 )
 async def review_draft(
-    notice_id: uuid.UUID, request: Request, session: SessionDep, engine: EngineDep, slots: AiSlotsDep
+    notice_id: uuid.UUID,
+    request: Request,
+    session: SessionDep,
+    engine: EngineDep,
+    slots: AiSlotsDep,
+    settings: SettingsDep,
 ) -> ReviewView:
     """The draft is read into memory, reviewed and dropped. It is never stored or logged.
 
     The AI slot is taken after the upload has arrived, so a slow upload never holds one.
+    The commit keeps only the record of the call for the statistics on Drift.
     """
 
     upload = await read_upload(
@@ -171,9 +184,16 @@ async def review_draft(
         too_large_message="Utkastet är för stort. Den största tillåtna storleken är 20 MB.",
     )
     async with slots.hold():
-        return await review.review_draft(
-            session, engine, notice_id, filename=upload.filename, data=upload.data
+        view = await review.review_draft(
+            session,
+            engine,
+            notice_id,
+            filename=upload.filename,
+            data=upload.data,
+            prices=token_prices(settings),
         )
+    await session.commit()
+    return view
 
 
 @router.post("/notices/{notice_id}/reminders", status_code=status.HTTP_201_CREATED)

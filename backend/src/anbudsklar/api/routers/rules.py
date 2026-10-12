@@ -1,6 +1,7 @@
-"""Regelhjälpen: general questions about procurement rules. Open to everyone, nothing is stored.
+"""Regelhjälpen: general questions about procurement rules. Open to everyone; no question is stored.
 
-A conversation continues only in the browser that started it (`ConversationStore`).
+A conversation continues only in the browser that started it (`ConversationStore`). What
+is committed is the record of the call for the statistics on Drift, never the question.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from anbudsklar.api.limits import rate_limited
 from anbudsklar.api.schemas import RulesRequest, RulesView
 from anbudsklar.api.security import RULES_COOKIE, conversation_owner, set_rules_cookie
 from anbudsklar.services import rules
+from anbudsklar.services.ai_usage import token_prices
 
 router = APIRouter(tags=["rules"])
 
@@ -32,7 +34,10 @@ async def ask_rules(
     if session_id is not None and not conversations.belongs_to(session_id, owner):
         session_id = None  # expired, or handed to another browser: start a new conversation
     async with slots.hold():
-        view = await rules.ask_rules(session, engine, body.question, session_id)
+        view = await rules.ask_rules(
+            session, engine, body.question, session_id, prices=token_prices(settings)
+        )
+    await session.commit()
     if view.answer.session_id:
         conversations.bind(view.answer.session_id, owner)
     set_rules_cookie(response, owner, settings)

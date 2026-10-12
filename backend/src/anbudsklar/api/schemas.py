@@ -294,9 +294,22 @@ class ReadSummary(ApiModel):
     pages_total: int
 
 
+class TokenUsageView(ApiModel):
+    """What one answer cost: tokens as the model provider counted them, and money when a price is set.
+
+    Shown in the provenance popover. None on a view when the engine reported no counts (the
+    heuristic engine has no model; the Eneo adapter does not read Eneo's counts yet).
+    """
+
+    input_tokens: int
+    output_tokens: int
+    cost_sek: float | None  # None until AI_PRICE_INPUT_SEK_PER_MILLION and the output price are set
+
+
 class AnswerView(ApiModel):
     answer: Answer
     engine: str
+    usage: TokenUsageView | None = None
     document_id: uuid.UUID  # the main document; a citation's own document_id says where its quote is
     read: ReadSummary
     # Frågestopp from the checklist, as the end of that day in Stockholm: the date is the
@@ -309,6 +322,7 @@ class ReviewView(ApiModel):
     result: ReviewResult
     requirement_titles: dict[str, str]  # requirement id -> title, for display
     engine: str
+    usage: TokenUsageView | None = None
     stored: Literal[False] = False  # the draft is never stored
 
 
@@ -387,6 +401,7 @@ class CpvSuggestionRequest(ApiModel):
 class CpvSuggestionView(ApiModel):
     suggestions: CpvSuggestions
     engine: str
+    usage: TokenUsageView | None = None  # the sum of the two calls behind the suggestions
 
 
 class CpvHit(ApiModel):
@@ -424,6 +439,7 @@ class RulesRequest(ApiModel):
 class RulesView(ApiModel):
     answer: RulesAnswer
     engine: str
+    usage: TokenUsageView | None = None
 
 
 # --- Buyer (inköpare) views ---------------------------------------------------------
@@ -510,6 +526,50 @@ class JobRunView(ApiModel):
     finished_at: datetime | None
     stats: dict[str, object]
     error: str | None
+
+
+class AiUsageTaskView(ApiModel):
+    """One AI task's calls in the period, in the tasks' own order (contracts.Task)."""
+
+    task: str
+    calls: int
+    calls_with_usage: int  # calls whose tokens the engine reported; the token sums cover only these
+    input_tokens: int
+    output_tokens: int
+    cost_sek: float | None
+
+
+class AiUsageModelView(ApiModel):
+    """One engine and model's calls in the period, the most used first."""
+
+    engine: str
+    model: str | None
+    calls: int
+    calls_with_usage: int
+    input_tokens: int
+    output_tokens: int
+    cost_sek: float | None
+
+
+class AiUsageView(ApiModel):
+    """The AI engine's usage over the last `days` days, for Drift: calls, tokens and the estimated cost.
+
+    The cost is `None` until the operator sets both prices (`AI_PRICE_INPUT_SEK_PER_MILLION`
+    and `AI_PRICE_OUTPUT_SEK_PER_MILLION`), which the view echoes so the page can say so.
+    """
+
+    since: datetime
+    until: datetime
+    days: int
+    calls: int
+    calls_with_usage: int
+    input_tokens: int
+    output_tokens: int
+    cost_sek: float | None
+    price_input_sek_per_million: float | None
+    price_output_sek_per_million: float | None
+    by_task: list[AiUsageTaskView]
+    by_model: list[AiUsageModelView]
 
 
 class AppSettingsView(ApiModel):

@@ -44,6 +44,24 @@ describe("AiProvenance", () => {
     expect(within(popover).queryByText(/språkmodell/)).not.toBeInTheDocument();
   });
 
+  it("says in the popover what the answer cost the language model, when the engine counted it", async () => {
+    mockApi([]);
+    renderWithProviders(<AiProvenance engine="openai" usage={{ input_tokens: 8950, output_tokens: 450, cost_sek: 0.12 }} />);
+    await userEvent.click(screen.getByRole("button", { name: "Hur togs det här fram?" }));
+    const popover = await screen.findByRole("dialog", { name: "Hur togs det här fram?" });
+    expect(
+      within(popover).getByText(/^Språkmodellen använde .* tokens för det här: .* in och 450 ut\. Uppskattad kostnad 0,12\skr\.$/u),
+    ).toBeInTheDocument();
+  });
+
+  it("says nothing about tokens when the engine did not count them", async () => {
+    mockApi([]);
+    renderWithProviders(<AiProvenance engine="heuristic" usage={null} />);
+    await userEvent.click(screen.getByRole("button", { name: "Hur togs det här fram?" }));
+    const popover = await screen.findByRole("dialog", { name: "Hur togs det här fram?" });
+    expect(within(popover).queryByText(/tokens/u)).not.toBeInTheDocument();
+  });
+
   it("explains an answer from the law in the law's terms, never the procurement documents'", async () => {
     mockApi([]);
     renderWithProviders(<AiProvenance engine="heuristic" basis="law" howLabel="Hur togs svaret fram?" />);

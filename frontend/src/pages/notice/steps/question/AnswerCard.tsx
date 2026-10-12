@@ -102,7 +102,7 @@ function ShortAdvice({ questionDeadline }: { questionDeadline: string | null }) 
  * advice with the date and the reminder when the document does not settle the question.
  */
 export function AnswerCard({ view, question, notice }: { view: AnswerView; question: string; notice: NoticeDetail }) {
-  const { answer, engine, question_deadline: questionDeadline } = view;
+  const { answer, engine, usage, question_deadline: questionDeadline } = view;
   // The backend says which document it read; without that, it read the first one.
   const documentId: string | undefined = view.document_id ?? answerDocumentId(notice);
   const parts = answerParts(answer);
@@ -122,7 +122,7 @@ export function AnswerCard({ view, question, notice }: { view: AnswerView; quest
             <Text type="supporting" weight="semibold" color="primary">
               Svar
             </Text>
-            <AiProvenance engine={engine} />
+            <AiProvenance engine={engine} usage={usage} />
           </HStack>
           {isAnsweredByBuyer ? (
             <Token label="Inköp har svarat" color="green" size="sm" icon={<Icon icon="success" size="sm" />} />

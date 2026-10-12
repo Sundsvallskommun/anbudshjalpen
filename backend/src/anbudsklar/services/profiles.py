@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from anbudsklar.ai.engine import AiEngine
+from anbudsklar.ai.engine import AiEngine, EngineRun
 from anbudsklar.api.schemas import CompanyUpdate, CompanyView, CpvHit, CpvSuggestionView
-from anbudsklar.contracts import CpvCandidate, CpvSuggestion, CpvSuggestions
+from anbudsklar.contracts import CpvCandidate, CpvSuggestion, CpvSuggestions, Task
 from anbudsklar.cpv import cpv_prefix
 from anbudsklar.models import Company
 from anbudsklar.search.queries import cpv_areas, cpv_descendants, cpv_labels, search_cpv
 from anbudsklar.services.access import Viewer
+from anbudsklar.services.ai_usage import TokenPrices, combined_usage, record_call, usage_view
 from anbudsklar.services.cpv import normalize_cpv_codes
 from anbudsklar.services.errors import InvalidInputError, NotFoundError
 from anbudsklar.services.text import keywords
@@ -89,17 +90,19 @@ async def cpv_hits(session: AsyncSession, query: str) -> list[CpvHit]:
     ]
 
 
-async def suggest_cpv(session: AsyncSession, engine: AiEngine, description: str) -> CpvSuggestionView:
+async def suggest_cpv(
+    session: AsyncSession, engine: AiEngine, description: str, *, prices: TokenPrices | None = None
+) -> CpvSuggestionView:
     """Let the engine choose among codes from the official list, never codes it invents.
 
     Two calls. First the engine picks the areas the company works in (CPV divisions and
     groups) from the whole list of them, so that meaning decides: a search over the labels
     alone never gets from "renoverar badrum" to "Plattsättning". Then it picks the exact
     codes under those areas. The codes the keyword search finds are offered as well, in
-    case the areas missed one.
+    case the areas missed one. The view's usage is the sum of the two calls.
     """
 
-    areas = await _areas(session, engine, description)
+    areas, runs = await _areas(session, engine, description)
     labels: dict[str, str] = {}
     for row in await cpv_descendants(session, [area.code for area in areas], limit=MAX_AREA_CODES):
         if len(cpv_prefix(row.code)) >= MIN_PROFILE_DIGITS:
@@ -111,26 +114,36 @@ async def suggest_cpv(session: AsyncSession, engine: AiEngine, description: str)
     if not candidates:
         return CpvSuggestionView(suggestions=CpvSuggestions(suggestions=[]), engine=engine.name)
     result, run = await engine.suggest_cpv(description, candidates)
+    await record_call(session, Task.SUGGEST_CPV, run)
+    runs.append(run)
     labels = {candidate.code: candidate.label for candidate in candidates}
     kept = [
         CpvSuggestion(code=item.code, label=labels[item.code], reason=item.reason)
         for item in result.suggestions
         if item.code in labels
     ]
-    return CpvSuggestionView(suggestions=CpvSuggestions(suggestions=kept), engine=run.engine)
+    usage = combined_usage(runs)
+    return CpvSuggestionView(
+        suggestions=CpvSuggestions(suggestions=kept),
+        engine=run.engine,
+        usage=usage_view(EngineRun(engine=run.engine, usage=usage), prices),
+    )
 
 
-async def _areas(session: AsyncSession, engine: AiEngine, description: str) -> list[CpvSuggestion]:
-    """The areas the engine picks from the whole list of divisions and groups."""
+async def _areas(
+    session: AsyncSession, engine: AiEngine, description: str
+) -> tuple[list[CpvSuggestion], list[EngineRun]]:
+    """The areas the engine picks from the whole list of divisions and groups, and the run behind them."""
 
     areas = await cpv_areas(session)
     if not areas:
-        return []
-    result, _ = await engine.suggest_cpv(
+        return [], []
+    result, run = await engine.suggest_cpv(
         description, [CpvCandidate(code=area.code, label=area.label_sv) for area in areas]
     )
+    await record_call(session, Task.SUGGEST_CPV, run)
     known = {area.code for area in areas}
-    return [item for item in result.suggestions if item.code in known][:MAX_AREAS]
+    return [item for item in result.suggestions if item.code in known][:MAX_AREAS], [run]
 
 
 async def _candidates(session: AsyncSession, description: str) -> list[CpvCandidate]:

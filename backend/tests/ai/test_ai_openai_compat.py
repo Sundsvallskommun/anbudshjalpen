@@ -14,7 +14,7 @@ import httpx2
 import pytest
 from openai import AsyncOpenAI
 
-from anbudsklar.ai.engine import EngineConfigError, EngineError, RuleContext
+from anbudsklar.ai.engine import EngineConfigError, EngineError, RuleContext, TokenUsage
 from anbudsklar.ai.openai_compat import OpenAICompatEngine, cited_sources
 from anbudsklar.ai.prompts import load_prompt
 from anbudsklar.config import Settings
@@ -54,19 +54,25 @@ def _engine(endpoint: FakeEndpoint) -> OpenAICompatEngine:
     return OpenAICompatEngine(settings, client=client)
 
 
-def _completion(content: str) -> httpx2.Response:
-    return httpx2.Response(
-        200,
-        json={
-            "id": "c1",
-            "object": "chat.completion",
-            "created": 0,
-            "model": "test-model",
-            "choices": [
-                {"index": 0, "message": {"role": "assistant", "content": content}, "finish_reason": "stop"}
-            ],
-        },
-    )
+def _completion(content: str, usage: tuple[int, int] | None = (1200, 40)) -> httpx2.Response:
+    """A completion with the provider's token count (prompt, completion), or without one."""
+
+    body: dict[str, Any] = {
+        "id": "c1",
+        "object": "chat.completion",
+        "created": 0,
+        "model": "test-model",
+        "choices": [
+            {"index": 0, "message": {"role": "assistant", "content": content}, "finish_reason": "stop"}
+        ],
+    }
+    if usage is not None:
+        body["usage"] = {
+            "prompt_tokens": usage[0],
+            "completion_tokens": usage[1],
+            "total_tokens": usage[0] + usage[1],
+        }
+    return httpx2.Response(200, json=body)
 
 
 async def test_asks_with_json_schema_and_the_prompt_file() -> None:
@@ -79,6 +85,7 @@ async def test_asks_with_json_schema_and_the_prompt_file() -> None:
     assert "[SIDA 1]" in body["messages"][1]["content"]
     assert answer.found_in_document is True
     assert (run.engine, run.model, run.attempts) == ("openai", "test-model", 1)
+    assert run.usage == TokenUsage(input_tokens=1200, output_tokens=40)
 
 
 async def test_steps_down_to_json_object_and_remembers_it() -> None:
@@ -95,13 +102,31 @@ async def test_steps_down_to_json_object_and_remembers_it() -> None:
 
 
 async def test_retries_invalid_json_in_the_same_conversation() -> None:
-    endpoint = FakeEndpoint(_completion("Svaret är ja."), _completion(f"```json\n{json.dumps(ANSWER)}\n```"))
+    endpoint = FakeEndpoint(
+        _completion("Svaret är ja.", usage=(1200, 10)),
+        _completion(f"```json\n{json.dumps(ANSWER)}\n```", usage=(1260, 40)),
+    )
     _, run = await _engine(endpoint).answer_question(NOTICE, DOCUMENTS, "Krävs F-skatt?", [])
     assert run.attempts == 2
+    # The retry resent the whole conversation, so the run cost both calls: that is what is billed.
+    assert run.usage == TokenUsage(input_tokens=2460, output_tokens=50)
     retry = endpoint.bodies[1]["messages"]
     assert [message["role"] for message in retry] == ["system", "user", "assistant", "user"]
     assert retry[2]["content"] == "Svaret är ja."
     assert retry[3]["content"].startswith("Ditt förra svar kunde inte användas")
+
+
+async def test_usage_is_unknown_when_the_endpoint_sends_no_count() -> None:
+    """A proxy or a small local server may leave `usage` out; the statistics then say so, never zero."""
+
+    endpoint = FakeEndpoint(_completion(json.dumps(ANSWER), usage=None))
+    _, run = await _engine(endpoint).answer_question(NOTICE, DOCUMENTS, "Krävs F-skatt?", [])
+    assert run.usage is None
+    mixed = FakeEndpoint(
+        _completion("Svaret är ja.", usage=(1200, 10)), _completion(json.dumps(ANSWER), usage=None)
+    )
+    _, run = await _engine(mixed).answer_question(NOTICE, DOCUMENTS, "Krävs F-skatt?", [])
+    assert run.usage is None  # a partial sum would understate the cost
 
 
 async def test_maps_authentication_errors_to_swedish() -> None:

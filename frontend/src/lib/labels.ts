@@ -179,9 +179,28 @@ export const JOBS: { job: JobName; label: string; description: string }[] = [
   { job: "match_all", label: "Bedöm matchningar", description: "Jämför företagens profiler med upphandlingarna." },
   { job: "send_reminders", label: "Skicka påminnelser", description: "Mejlar påminnelser som har förfallit." },
   { job: "notify_matches", label: "Meddela träffar", description: "Mejlar företag om nya upphandlingar som passar dem." },
+  {
+    job: "purge_lab",
+    label: "Radera labbföretag",
+    description: "Raderar labbföretag vars tid har gått ut, med deras användare, träffar och påminnelser.",
+  },
 ];
 
 export const JOB_LABEL: Record<string, string> = Object.fromEntries(JOBS.map(({ job, label }) => [job, label]));
+
+/** The AI tasks (contracts.Task) as Drift names them, in the contract's order. */
+const AI_TASKS: Record<string, string> = {
+  tolka_underlag: "Tolka underlag",
+  bedom_matchning: "Bedöma matchning",
+  granska_utkast: "Granska utkast",
+  besvara_fraga: "Besvara fråga",
+  foresla_cpv: "Föreslå CPV-koder",
+  regelhjalpen: "Regelhjälpen",
+};
+
+export function aiTaskLabel(task: string): string {
+  return AI_TASKS[task] ?? task;
+}
 
 const SOURCES: Record<string, string> = {
   ted: "TED",

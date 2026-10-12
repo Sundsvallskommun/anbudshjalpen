@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from anbudsklar.models import ChecklistRecord, JobRun, Reminder
+from anbudsklar.models import AiCall, ChecklistRecord, JobRun, Reminder
 from anbudsklar.services import jobs
 from anbudsklar.services.dates import end_of_local_day
 from anbudsklar.services.jobs import JobContext
@@ -505,3 +505,50 @@ async def test_the_buyer_persona_can_be_turned_off(
     assert refused.status_code == 403
     assert "avstängd" in refused.json()["detail"]
     assert (await client.post("/api/session/login", json={"persona": "foretagare"})).status_code == 200
+
+
+async def test_ai_usage_counts_the_calls_the_app_made(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    """A visitor's question is one call; the heuristic engine reports no tokens and no price is set."""
+
+    asked = await client.post(
+        f"/api/notices/{demo.notice.id}/questions", json={"question": "Vilken ansvarsförsäkring krävs?"}
+    )
+    assert asked.status_code == 200, asked.text
+    assert asked.json()["usage"] is None
+    db_session.add(
+        AiCall(
+            task="tolka_underlag",
+            engine="openai",
+            model="gpt-x",
+            input_tokens=120_000,
+            output_tokens=3_000,
+            attempts=1,
+            notice_id=demo.notice.id,
+            created_at=datetime.now(UTC) - timedelta(days=10),
+        )
+    )
+    await db_session.flush()
+
+    await login(client, "foretagare")
+    assert (await client.get("/api/admin/ai-usage")).status_code == 403
+    await login(client, "inkopare")
+    assert (await client.get("/api/admin/ai-usage", params={"days": 0})).status_code == 422
+
+    month = (await client.get("/api/admin/ai-usage")).json()
+    assert (month["days"], month["calls"], month["calls_with_usage"]) == (30, 2, 1)
+    assert (month["input_tokens"], month["output_tokens"], month["cost_sek"]) == (120_000, 3_000, None)
+    assert (month["price_input_sek_per_million"], month["price_output_sek_per_million"]) == (None, None)
+    assert [(item["task"], item["calls"], item["calls_with_usage"]) for item in month["by_task"]] == [
+        ("tolka_underlag", 1, 1),
+        ("besvara_fraga", 1, 0),
+    ]
+    assert [(item["engine"], item["model"]) for item in month["by_model"]] == [
+        ("heuristic", None),
+        ("openai", "gpt-x"),
+    ]
+
+    week = (await client.get("/api/admin/ai-usage", params={"days": 7})).json()
+    assert (week["calls"], week["input_tokens"]) == (1, 0)
+    assert [item["task"] for item in week["by_task"]] == ["besvara_fraga"]

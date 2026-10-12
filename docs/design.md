@@ -303,7 +303,9 @@ tillbaka till länken när dialogen stängs.
   sist, i en rad som är sticky på bredare skärmar: "Kontrollerat x av y", "Avvisa…", "Fler val" och primärknappen
   "Godkänn och publicera" med bekräftelse. En avvisad eller tillbakadragen checklista visar motiveringen och "Öppna som
   utkast igen".
-- **Drift** visar jobben grupperade som Hämta, Bearbeta och Skicka, se [Drift](operations.md#schemalagda-jobb).
+- **Drift** visar överst AI-användningen: anrop, tokens in och ut och uppskattad kostnad för 7, 30 eller 90 dagar,
+  som en rad med summorna och en tabell per uppgift ([AI-användning](operations.md#ai-användning)). Sedan jobben
+  grupperade som Hämta, Bearbeta och Skicka, se [Drift](operations.md#schemalagda-jobb).
 - **Inställningar** (`/inkop/installningar`) har en strömbrytare per inställning med en förklaring under, och sparar
   direkt med en toast som säger vad som hände ("Inställningen är sparad. 12 checklistor som väntade på granskning
   publicerades."). Se [beslut 0011](decisions/0011-installningar-granskning-valfri.md). När granskningen är av märks
@@ -322,7 +324,7 @@ Byggstenarna som omgörningen lade till ligger i `frontend/src/components/ui/`. 
 | Komponent | Till för |
 |---|---|
 | `AccentCard` | Ett kort med en accentkant på 4 px i startkanten, för det enda kortet i en vy som leder vidare: "Nästa steg" och Starts "Nästa frist". Tar samma props som Astryx `Card` |
-| `AiProvenance` | Ursprungsraden överst i varje automatiskt block, en gång. Granskat innehåll: "Granskad av inköp 5 okt 2026 · Alla 86 källhänvisningar hittades i underlaget". Annars "Automatiskt framtaget · inte granskat av inköp", eller bara "Automatiskt framtaget" med källkontrollen medan inköp inte granskar något (beslut 0019). Popovern "Hur togs det här fram?" namnger motorn: regelbaserat, AI via Eneo eller en AI-modell. `basis` säger vad innehållet bygger på: underlaget (standard), där popovern slutar med "Det är alltid förfrågningsunderlaget som gäller", eller lagen (`basis="law"`, Regelhjälpen), där den säger "Läs alltid hela paragrafen" och "Det är alltid lagtexten som gäller". På telefon heter länken "Mer" |
+| `AiProvenance` | Ursprungsraden överst i varje automatiskt block, en gång. Granskat innehåll: "Granskad av inköp 5 okt 2026 · Alla 86 källhänvisningar hittades i underlaget". Annars "Automatiskt framtaget · inte granskat av inköp", eller bara "Automatiskt framtaget" med källkontrollen medan inköp inte granskar något (beslut 0019). Popovern "Hur togs det här fram?" namnger motorn: regelbaserat, AI via Eneo eller en AI-modell. `basis` säger vad innehållet bygger på: underlaget (standard), där popovern slutar med "Det är alltid förfrågningsunderlaget som gäller", eller lagen (`basis="law"`, Regelhjälpen), där den säger "Läs alltid hela paragrafen" och "Det är alltid lagtexten som gäller". När motorn räknar tokens säger popovern också vad svaret kostade: "Språkmodellen använde 9 400 tokens för det här: 8 950 in och 450 ut. Uppskattad kostnad 0,12 kr." På telefon heter länken "Mer" |
 | `CollapsibleSection` | En grupp som kort, där rubriken är knappen. Antalet står i en Badge och ingår i knappens namn ("Skallkrav, 11 krav"), med en hjälprad och ett startläge. En länk till gruppen ("#skallkrav") eller till en rad i den öppnar gruppen och rullar sedan fram till målet och ger det fokus, även när man kommer från en annan sida. Innehållet ligger kvar när gruppen är stängd, så att ankarna fungerar |
 | `DeadlineBlock` | Fristblocket: "9 nov" stort i tabellsiffror, "kl. 23:59" och "om 35 dagar". Vid 7 dagar eller färre blir den relativa tiden en gul token med klocka, och ett passerat datum blir grått med "passerat". Varianterna `inline`, `stack` och `compact`. `note` sätter ett ord ovanför datumet där etiketten inte syns, till exempel "Anbudsansökan" |
 | `NextStepCard` | "Nästa steg" sist i varje steg: en mening och en eller två knappar, på ett `AccentCard` |
