@@ -147,12 +147,7 @@ class PublicProcurement:
 
 
 def parse_moment(value: Any) -> datetime | None:
-    """A moment from the API. Midnight means the end of the day before, as on TED.
-
-    e-Avrop shows a deadline stored as midnight at the start of 31 October as 30 October, and
-    TED gets the same value; `anbudsklar.ingest.ted.parse_deadline` stores it as 23:59:59 on
-    the last day, and so does this.
-    """
+    """A moment from the API, in Stockholm time when the API gives no offset."""
 
     if not isinstance(value, str) or not value:
         return None
@@ -162,8 +157,21 @@ def parse_moment(value: Any) -> datetime | None:
         return None
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=STOCKHOLM)
-    if moment.time() == time.min:
-        moment -= timedelta(seconds=1)
+    return moment
+
+
+def parse_deadline(value: Any) -> datetime | None:
+    """A deadline from the time table. Midnight means the end of that same day.
+
+    The time table holds dates as midnight at the start of the last day: `LastBid`
+    "2026-11-06T00:00:00+01:00" is shown as tender deadline 2026-11-06 on e-Avrop's notice
+    page (checked 2026-10-12). Read as a moment it would end the day before, so it is stored
+    as 23:59:59 on that day, as `anbudsklar.ingest.ted.parse_deadline` stores TED's dates.
+    """
+
+    moment = parse_moment(value)
+    if moment is not None and moment.time() == time.min:
+        moment = moment.replace(hour=23, minute=59, second=59)
     return moment
 
 
@@ -237,8 +245,8 @@ def public_procurement(detail: Mapping[str, Any], api_url: str) -> PublicProcure
         stage=stage,
         announced_at=announced_at,
         request_updated=parse_moment(request.get("UpdatedDate")),
-        deadline=parse_moment(time_table.get(deadline_key)),
-        question_deadline=parse_moment(time_table.get(question_key)),
+        deadline=parse_deadline(time_table.get(deadline_key)),
+        question_deadline=parse_deadline(time_table.get(question_key)),
         documents=_public_documents(request, api_url),
     )
 
@@ -597,6 +605,7 @@ async def ingest_eavrop(
     *,
     now: datetime | None = None,
     changed_since: datetime | None = None,
+    refetch: bool = False,
     request_interval: float = REQUEST_INTERVAL_SECONDS,
 ) -> dict[str, int]:
     """Upsert the announced procurements of the last 18 months and the open ones' documents.
@@ -607,6 +616,9 @@ async def ingest_eavrop(
     public, and fetching each one takes a few seconds, so this keeps a daily run short.
     Answering a question does not change it, so the open procurements' question logs are
     read on every run regardless (`_refresh_open_answers`).
+
+    `refetch` fetches every project again, stored ones included, so that a change to how
+    the ingestion reads a project reaches the notices already stored.
 
     Without `EAVROP_API_TOKEN` and `EAVROP_CLIENT_ID` the job does nothing: e-Avrop is then
     simply not a source, as in every environment without the municipality's token.
@@ -638,8 +650,9 @@ async def ingest_eavrop(
             continue
         list_updated = _text(item.get("UpdatedDate"))
         known = by_list_url.get(url)
-        if (known is not None and known.raw.get("list_updated") == list_updated) or _unchanged_since(
-            list_updated, changed_since
+        if not refetch and (
+            (known is not None and known.raw.get("list_updated") == list_updated)
+            or _unchanged_since(list_updated, changed_since)
         ):
             stats.record("unchanged")  # nothing changed in e-Avrop since the last run
             continue

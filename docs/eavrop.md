@@ -27,7 +27,8 @@ Jobbet `ingest_eavrop` körs varje dag 06:30:
 1. Listar projekt som skapats de senaste 18 månaderna (`GET /v1.1/clients/{kund-id}/procurements`).
 2. Hämtar ett projekt bara om det har ändrats (`UpdatedDate`) sedan förra lyckade körningen som hämtade något, med en
    dags marginal. Ett detaljanrop tar ett par sekunder, och de flesta projekt annonseras aldrig. Efter en ändring i
-   vad insamlaren läser hämtar `anbudsklar ingest eavrop --full` alla projekt igen, vilket tar ungefär en kvart.
+   vad insamlaren läser hämtar `anbudsklar ingest eavrop --full` alla projekt igen, även de som redan är sparade,
+   vilket tar ungefär en kvart. Oförändrade filer hämtas inte igen.
 3. Tar med projektet bara om det är publicerat, och sparar bara fälten i vitlistan (se nedan).
 4. Hämtar underlaget för öppna upphandlingar och lägger det på annonsen.
 5. Läser frågeloggen för varje öppen upphandling, även de som inte ändrats, och speglar inköps publicerade svar
@@ -65,8 +66,10 @@ Markeringen `IsClassified` används inte som skydd. Den saknades på utvärderin
 | Länk | `NoticeLink.aspx?id=<ProcurementId>` under `EAVROP_BASE_URL`, samma länk som TED ger |
 | Köpare | `ORGANIZATION_NAME`, eftersom API:t inte anger köpare |
 
-**Midnatt är slutet av dagen före.** API:t anger tider som midnatt i början av dagen efter sista dagen, precis som
-TED. Appen sparar 23:59:59 på sista dagen, så att datumet stämmer med e-Avrops webbplats.
+**Midnatt är slutet av samma dag.** Tidsplanen (`TimeTable`) anger datum som midnatt i början av sista dagen:
+`LastBid` "2026-11-06T00:00:00+01:00" visas som sista anbudsdag 2026-11-06 på e-Avrops annonssida (kontrollerat
+2026-10-12). Appen sparar 23:59:59 samma dag, så att datumet stämmer med e-Avrops webbplats och med TED. Fram till
+2026-10-12 sparades dagen före, så att annonserna visade en dag för tidig sista dag och stängdes en dag för tidigt.
 
 **TED och e-Avrop.** TED:s länk till underlaget innehåller e-Avrops `ProcurementId`. Finns upphandlingen redan som
 TED-annons får den underlaget, och ingen ny annons skapas. Kommer den från e-Avrop först skapar TED-insamlaren ingen

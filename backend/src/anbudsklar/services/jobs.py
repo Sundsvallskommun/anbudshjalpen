@@ -98,7 +98,7 @@ async def _ingest_eavrop(session: AsyncSession, ctx: JobContext) -> Mapping[str,
 async def ingest_eavrop_full(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:
     """Fetch every project again, for instance after a change to what the ingestion reads."""
 
-    return await ingest_eavrop(session, ctx.http, ctx.settings)
+    return await ingest_eavrop(session, ctx.http, ctx.settings, refetch=True)
 
 
 async def _ingest_lou(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:

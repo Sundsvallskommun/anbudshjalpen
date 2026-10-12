@@ -28,10 +28,11 @@ from anbudsklar.ingest.eavrop import (
     ingest_eavrop,
     main_document,
     map_procurement,
+    parse_deadline,
     parse_moment,
     public_procurement,
 )
-from anbudsklar.ingest.notices import STOCKHOLM, NoticeValues, eavrop_procurement_id
+from anbudsklar.ingest.notices import STOCKHOLM, NoticeValues, eavrop_procurement_id, notices_by_external_id
 from anbudsklar.ingest.ted import TedRecord, upsert_ted_notices
 from anbudsklar.models import Document, Notice, PublishedAnswer
 
@@ -219,11 +220,18 @@ def _mock_question_log(
 # --- Reading a project ---------------------------------------------------------------
 
 
-def test_midnight_is_the_end_of_the_day_before() -> None:
-    assert parse_moment("2026-10-31T00:00:00+01:00") == datetime(2026, 10, 30, 23, 59, 59, tzinfo=STOCKHOLM)
-    assert parse_moment("2026-10-30T12:00:00+01:00") == datetime(2026, 10, 30, 12, 0, tzinfo=STOCKHOLM)
+def test_a_deadline_at_midnight_is_the_end_of_that_day() -> None:
+    # e-Avrop's notice page shows LastBid "2026-11-06T00:00:00+01:00" as tender deadline 2026-11-06.
+    assert parse_deadline("2026-11-06T00:00:00+01:00") == datetime(2026, 11, 6, 23, 59, 59, tzinfo=STOCKHOLM)
+    assert parse_deadline("2026-10-30T12:00:00+01:00") == datetime(2026, 10, 30, 12, 0, tzinfo=STOCKHOLM)
+    assert parse_deadline(None) is None
+    assert parse_deadline("inte ett datum") is None
+
+
+def test_other_moments_are_read_as_they_are() -> None:
+    assert parse_moment("2026-10-31T00:00:00+01:00") == datetime(2026, 10, 31, 0, 0, tzinfo=STOCKHOLM)
+    assert parse_moment("2026-10-30T12:00:00") == datetime(2026, 10, 30, 12, 0, tzinfo=STOCKHOLM)
     assert parse_moment(None) is None
-    assert parse_moment("inte ett datum") is None
 
 
 def test_public_procurement_reads_only_the_allowlist() -> None:
@@ -232,8 +240,8 @@ def test_public_procurement_reads_only_the_allowlist() -> None:
     assert procurement is not None
     assert procurement.procurement_id == "900001"
     assert procurement.stage == "tender"
-    assert procurement.deadline == datetime(2026, 10, 27, 23, 59, 59, tzinfo=STOCKHOLM)
-    assert procurement.question_deadline == datetime(2026, 10, 19, 23, 59, 59, tzinfo=STOCKHOLM)
+    assert procurement.deadline == datetime(2026, 10, 28, 23, 59, 59, tzinfo=STOCKHOLM)
+    assert procurement.question_deadline == datetime(2026, 10, 20, 23, 59, 59, tzinfo=STOCKHOLM)
     assert [document.filename for document in procurement.documents] == [
         "Bilaga 1 Prisbilaga.xlsx",
         "Kravspecifikation fiktiv.txt",
@@ -277,7 +285,7 @@ def test_the_first_stage_of_a_two_step_procedure_is_public() -> None:
 
     assert procurement is not None
     assert procurement.stage == "application"
-    assert procurement.deadline == datetime(2026, 10, 21, 23, 59, 59, tzinfo=STOCKHOLM)
+    assert procurement.deadline == datetime(2026, 10, 22, 23, 59, 59, tzinfo=STOCKHOLM)
     assert [document.filename for document in procurement.documents] == ["Steg 1.pdf"]
 
 
@@ -405,6 +413,27 @@ async def test_a_rerun_skips_unchanged_projects_and_documents(
     # The open project is read once more for its question log (decision 0013); its documents are not.
     assert detail.call_count == 2
     assert all(route.call_count == 1 for route in documents.values())
+
+
+async def test_a_refetch_reads_stored_projects_again(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[_list_item(900100)]))
+    detail = respx_mock.get(f"{API}/v1/procurements/900100").mock(
+        return_value=httpx.Response(200, json=_project())
+    )
+    documents = _mock_documents(respx_mock)
+    await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+    notice = (await notices_by_external_id(db_session, "eavrop", ["900001"]))["900001"]
+    # As the earlier reading stored it, a day early.
+    notice.deadline_at = datetime(2026, 10, 27, 23, 59, 59, tzinfo=STOCKHOLM)
+
+    second = await ingest_eavrop(db_session, client, api_settings, now=NOW, refetch=True, request_interval=0)
+
+    assert second == {"fetched": 1, "inserted": 0, "updated": 1, "documents_skipped": 1}  # the xlsx
+    assert notice.deadline_at == datetime(2026, 10, 28, 23, 59, 59, tzinfo=STOCKHOLM)
+    assert detail.call_count == 2  # read once for the project and its question log together
+    assert all(route.call_count == 1 for route in documents.values())  # unchanged files are not fetched again
 
 
 async def test_projects_unchanged_since_the_last_run_are_not_fetched(
