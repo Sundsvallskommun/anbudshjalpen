@@ -1,7 +1,6 @@
 import { Outlet } from "react-router";
 import { useConfig, useSession } from "../api/queries";
-import { AskAiButton } from "../components/ask/AskAiButton";
-import { AskAiPanel } from "../components/ask/AskAiPanel";
+import { AskAiWidget } from "../components/ask/AskAiPanel";
 import { useRevealHash } from "../lib/useRevealHash";
 import { AboutDemoProvider } from "./AboutDemo";
 import { FrameHeader } from "./FrameHeader";
@@ -30,12 +29,7 @@ export function AppFrame() {
       >
         <Outlet />
       </ModuleShell>
-      {config.data && !config.data.gate_required && (
-        <>
-          <AskAiButton />
-          <AskAiPanel />
-        </>
-      )}
+      {config.data && !config.data.gate_required && <AskAiWidget />}
     </AboutDemoProvider>
   );
 }

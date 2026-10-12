@@ -193,8 +193,9 @@ ingen checklista: kortet heter då "Ingen granskad checklista". Saknas underlage
 ### Fråga AI
 
 AI-stödet är en panel som följer läsaren ([beslut 0014](decisions/0014-fraga-ai-panel.md)): knappen "Fråga AI" sist
-i vyn på varje sida bakom dörren, och panelen som en Astryx `Dialog` dockad i slutet av vyn på bredare skärmar och ett
-högt `BottomSheet` på telefon. Överst "Fråga AI" med ämnet som underrubrik, och på en upphandlings sida valet
+i vyn på varje sida bakom dörren, och panelen som en icke-modal Astryx `Popover` förankrad i knappen på bredare
+skärmar och ett högt `BottomSheet` utan skärm på telefon. Sidan går att läsa och använda medan panelen är öppen, och
+källdialogen öppnas ovanpå den. Överst "Fråga AI" med ämnet som underrubrik, och på en upphandlings sida valet
 Underlaget · Reglerna (`SegmentedControl`). Samtalet är en `ChatMessageList`: frågan i en bubbla ("Du") och svaret
 som ett kort med ursprungsrad, "Står i underlaget", en fet slutsats och citaten med sida, eller för reglerna
 paragraferna svaret bygger på, som på Regelhjälpen. När underlaget inte svarar har svaret den tonade rutan "Ger

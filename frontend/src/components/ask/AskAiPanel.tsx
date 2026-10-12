@@ -2,11 +2,11 @@ import { BottomSheet } from "@astryxdesign/core/BottomSheet";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
 import { ChatComposer, ChatMessage, ChatMessageBubble, ChatMessageList } from "@astryxdesign/core/Chat";
-import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog";
 import { Heading } from "@astryxdesign/core/Heading";
 import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
-import { Layout, LayoutContent, LayoutFooter } from "@astryxdesign/core/Layout";
+import { Layout, LayoutContent, LayoutFooter, LayoutHeader } from "@astryxdesign/core/Layout";
+import { Popover } from "@astryxdesign/core/Popover";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { Text } from "@astryxdesign/core/Text";
@@ -19,12 +19,16 @@ import { AnswerCard } from "../../pages/notice/steps/question/AnswerCard";
 import { EXAMPLE_QUESTIONS as RULES_EXAMPLES } from "../../pages/rules/rulesAnswer";
 import { RulesAnswerCard } from "../../pages/rules/RulesAnswerCard";
 import { ErrorNotice } from "../states";
-import { DownloadIcon } from "../ui/icons";
+import { ChatIcon, DownloadIcon } from "../ui/icons";
+import styles from "./AskAiPanel.module.css";
 import { isPending as isTurnPending, noticeScope, questionProblem, RULES_SCOPE, scopeKey, type AskScope, type Turn } from "./askAiState";
 import { useAskAi, type AskAiApi } from "./AskAiProvider";
 
 export const ASK_AI_TITLE = "Fråga AI";
 const RULES_SUBJECT = "Reglerna för offentlig upphandling";
+/** The panel's height on wider screens: a tall column, but never the whole window, so the page stays in view. */
+const PANEL_HEIGHT = "min(72dvh, 44rem)";
+const PANEL_WIDTH = 600;
 
 /** Questions most companies have about a procurement's documents, to ask with one press. */
 export const NOTICE_EXAMPLES: readonly string[] = [
@@ -205,56 +209,38 @@ function Writing({ ai }: { ai: AskAiApi }) {
   );
 }
 
-function SheetHeading({ title, isOpen }: { title: string; isOpen: boolean }) {
+/** The title and the subject under it. On a phone the sheet has no heading of its own, so the focus moves here (WCAG 3.2.4). */
+function PanelHeading({ ai, subtitle, takesFocus }: { ai: AskAiApi; subtitle: string; takesFocus: boolean }) {
   const ref = useRef<HTMLHeadingElement>(null);
-  // Focus moves to the title, as in the dialog (WCAG 3.2.4: the same control behaves the same everywhere).
   useEffect(() => {
-    if (isOpen) ref.current?.focus();
-  }, [isOpen]);
+    if (takesFocus && ai.isOpen) ref.current?.focus();
+  }, [takesFocus, ai.isOpen]);
   return (
-    <Heading level={2} ref={ref} tabIndex={-1}>
-      {title}
-    </Heading>
+    <HStack gap={3} hAlign="between" vAlign="start">
+      <VStack gap={0.5}>
+        <Heading level={2} ref={ref} tabIndex={takesFocus ? -1 : undefined}>
+          {ASK_AI_TITLE}
+        </Heading>
+        <Text type="supporting">{subtitle}</Text>
+      </VStack>
+      <Button label="Stäng" variant="ghost" size="sm" onClick={ai.close} />
+    </HStack>
   );
 }
 
-/**
- * The "Fråga AI" panel (decision 0014): the one place to ask about a notice's documents or the rules, opened from the
- * button that follows the reader or from "Ställ en fråga" and "Fråga om kravet". A dialog docked at the end of the
- * viewport on wider screens and a tall bottom sheet on a phone, with the same content: the subject, the conversation
- * as a message list, example questions and the composer. Rendered once by AppFrame; open it with useAskAi().
- */
-export function AskAiPanel() {
-  const ai = useAskAi();
-  const isPhone = useIsPhone();
-  const onOpenChange = (open: boolean) => {
-    if (!open) ai.close();
-  };
-  const subtitle = subjectOf(ai.scope, ai.notice);
-
-  if (isPhone) {
-    return (
-      <BottomSheet isOpen={ai.isOpen} onOpenChange={onOpenChange} label={ASK_AI_TITLE} height="tall" finalFocusRef={ai.openerRef}>
-        <VStack gap={4} padding={4}>
-          <VStack gap={1}>
-            <SheetHeading title={ASK_AI_TITLE} isOpen={ai.isOpen} />
-            <Text type="supporting">{subtitle}</Text>
-          </VStack>
-          <Subject ai={ai} />
-          <Thread ai={ai} />
-          <Suggestions ai={ai} />
-          <Writing ai={ai} />
-        </VStack>
-      </BottomSheet>
-    );
-  }
+/** The panel on wider screens: a fixed-height column whose conversation scrolls between the heading and the field. */
+function DockedPanel({ ai, subtitle }: { ai: AskAiApi; subtitle: string }) {
   return (
-    <Dialog isOpen={ai.isOpen} onOpenChange={onOpenChange} width={600} maxHeight="88dvh" position={{ end: 24, bottom: 24 }}>
-      {/* The header is always mounted: the dialog takes its accessible name from the title. */}
+    <VStack height={PANEL_HEIGHT} width="100%">
       <Layout
-        header={<DialogHeader title={ASK_AI_TITLE} subtitle={subtitle} onOpenChange={onOpenChange} />}
+        height="fill"
+        header={
+          <LayoutHeader padding={4}>
+            <PanelHeading ai={ai} subtitle={subtitle} takesFocus={false} />
+          </LayoutHeader>
+        }
         content={
-          <LayoutContent>
+          <LayoutContent padding={4}>
             <VStack gap={4}>
               <Subject ai={ai} />
               <Thread ai={ai} />
@@ -263,11 +249,66 @@ export function AskAiPanel() {
           </LayoutContent>
         }
         footer={
-          <LayoutFooter>
+          <LayoutFooter padding={4}>
             <Writing ai={ai} />
           </LayoutFooter>
         }
       />
-    </Dialog>
+    </VStack>
+  );
+}
+
+/**
+ * "Fråga AI" (decision 0014): the button that follows the reader at the end of the viewport, and the panel it opens.
+ * On wider screens the panel is a non-modal Astryx Popover anchored to the button, so the page stays readable and
+ * usable while it is open and the source dialog can open above it; on a phone a tall bottom sheet without a scrim.
+ * Both hold the same content: the subject, the conversation as a message list, example questions and the composer.
+ * Rendered once by AppFrame; open it from anywhere with useAskAi().
+ */
+export function AskAiWidget() {
+  const ai = useAskAi();
+  const isPhone = useIsPhone();
+  const subtitle = subjectOf(ai.scope, ai.notice);
+  const onOpenChange = (open: boolean) => {
+    if (open) ai.open();
+    else ai.close();
+  };
+
+  if (isPhone) {
+    return (
+      <>
+        <HStack className={styles.button} data-ask-ai-button="">
+          <Button label={ASK_AI_TITLE} variant="primary" icon={<Icon icon={ChatIcon} />} onClick={() => ai.toggle()} />
+        </HStack>
+        <BottomSheet isOpen={ai.isOpen} onOpenChange={onOpenChange} label={ASK_AI_TITLE} height="tall" hasScrim={false} finalFocusRef={ai.openerRef}>
+          <VStack gap={4} padding={4}>
+            <PanelHeading ai={ai} subtitle={subtitle} takesFocus />
+            <Subject ai={ai} />
+            <Thread ai={ai} />
+            <Suggestions ai={ai} />
+            <Writing ai={ai} />
+          </VStack>
+        </BottomSheet>
+      </>
+    );
+  }
+  return (
+    <HStack className={styles.button} data-ask-ai-button="">
+      <Popover
+        isOpen={ai.isOpen}
+        onOpenChange={onOpenChange}
+        isModal={false}
+        hasLightDismiss={false}
+        hasEscapeDismiss
+        placement="above"
+        alignment="end"
+        width={PANEL_WIDTH}
+        label={ASK_AI_TITLE}
+        closeButtonLabel="Stäng panelen"
+        content={<DockedPanel ai={ai} subtitle={subtitle} />}
+      >
+        <Button label={ASK_AI_TITLE} variant="primary" icon={<Icon icon={ChatIcon} />} />
+      </Popover>
+    </HStack>
   );
 }

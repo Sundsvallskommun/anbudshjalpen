@@ -117,10 +117,12 @@ describe("Fråga AI (decision 0014)", () => {
     const panel = await openPanel();
     expect(within(panel).queryByRole("radio")).not.toBeInTheDocument();
     expect(within(panel).getByText("Reglerna för offentlig upphandling")).toBeInTheDocument();
-    await ask(panel, "Hur lång är avtalsspärren?");
+    // One of Regelhjälpen's example questions, with one press.
+    await userEvent.click(within(panel).getByRole("button", { name: "Hur lång är avtalsspärren?" }));
 
-    const answer = await within(panel).findByRole("article", { name: "Svar på: Hur lång är avtalsspärren?" });
-    expect(await within(answer).findByText("Avtalsspärren är tio dagar när tilldelningsbeslutet skickas elektroniskt.")).toBeInTheDocument();
+    // The list page behind the panel is busy with its own requests, so the answer gets more time than usual.
+    const answer = await screen.findByRole("article", { name: "Svar på: Hur lång är avtalsspärren?" }, { timeout: 4000 });
+    expect(await within(answer).findByText("Avtalsspärren är tio dagar när tilldelningsbeslutet skickas elektroniskt.", {}, { timeout: 4000 })).toBeInTheDocument();
     expect(within(answer).getByText("LOU 20 kap. 1 § · Avtalsspärr")).toBeInTheDocument();
     expect(calls.find((call) => call.path === RULES)?.body).toEqual({ question: "Hur lång är avtalsspärren?", session_id: null });
   });

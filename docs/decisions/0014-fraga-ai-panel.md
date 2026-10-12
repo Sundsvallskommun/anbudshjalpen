@@ -20,9 +20,10 @@ meddelandelista, bubblor, skrivfält, dialog och bottenark.
 
 ## Beslut
 
-**AI-stödet är panelen "Fråga AI"**, byggd av Astryx komponenter: `Dialog` dockad i slutet av vyn på bredare skärmar
-och `BottomSheet` på telefon, med `ChatMessageList`, `ChatMessage` och `ChatComposer` för samtalet och en
-`SegmentedControl` för vad frågan gäller, underlaget eller reglerna. Svarskorten är desamma som förut, med citat,
+**AI-stödet är panelen "Fråga AI"**, byggd av Astryx komponenter: en icke-modal `Popover` förankrad i knappen på
+bredare skärmar och ett `BottomSheet` utan skärm på telefon, så att sidan går att använda medan panelen är öppen, med
+`ChatMessageList`, `ChatMessage` och `ChatComposer` för samtalet och en `SegmentedControl` för vad frågan gäller,
+underlaget eller reglerna. Svarskorten är desamma som förut, med citat,
 "Står i underlaget" och rutan om likabehandling. Knappen "Fråga AI" följer läsaren på varje sida bakom dörren; den är
 appens enda flytande kontroll och placeras av en liten stilmodul.
 
@@ -49,7 +50,7 @@ webbläsaren, och ett anrop till skulle ge samma dokument för mer kod.
 
 - Regelhjälpens sida finns kvar och använder samma anrop som panelens regelläge. Den kan tas bort när panelen har
   visat sig räcka.
-- Tillgänglighetsgatens tillstånd för steg 2 blev panelen. Källdialogen kan öppnas ovanpå panelen, som är en modal
-  dialog; att det fungerar i alla webbläsare är inte verifierat och ska prövas i gaten.
+- Tillgänglighetsgatens tillstånd för steg 2 blev panelen. Källdialogen öppnas ovanpå den icke-modala panelen;
+  provat i Chromium, och gaten prövar det i fler webbläsare.
 - Sessionslagringen är flikens egen: ett samtal följer inte med till en ny flik, och försvinner när fliken stängs.
 - Dokumentationen följer: [Design](../design.md) och [PoC](../poc.md). Målbilden skrivs inte om.

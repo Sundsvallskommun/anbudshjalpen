@@ -1,6 +1,7 @@
 /* "Fråga AI" follows the reader at the end of the viewport, over the page (decision 0014): the design system has no
-   floating control, so this module places its button. The page keeps a focused control clear of it when it scrolls
-   one into view (WCAG 2.4.11), as app.css does for the step bar. Not printed. Tokens only. */
+   floating control, so this module places its button; the panel is an Astryx Popover anchored to the button. The page
+   keeps a focused control clear of the button when it scrolls one into view (WCAG 2.4.11), as app.css does for the
+   step bar. Not printed. Tokens only. */
 .button {
   position: fixed;
   inset-block-end: var(--spacing-6);
