@@ -89,11 +89,24 @@ class Settings(BaseSettings):
     ted_api_url: str = "https://api.ted.europa.eu/v3/notices/search"
     ted_buyer_names: list[str] = Field(default_factory=lambda: ["Sundsvalls kommun"])
     eavrop_base_url: str = "https://www.e-avrop.com/sundsvall"
+    # e-Avrop's Projekt API (decision 0009). The token reads everything in the client's
+    # projects, secret parts included, so only the worker's allowlisted ingestion uses it.
+    eavrop_api_url: str = "https://www.e-avrop.com/api"
+    eavrop_api_token: SecretStr | None = None
+    eavrop_client_id: int | None = None
     riksdagen_lou_url: str = "https://data.riksdagen.se/dokument/sfs-2016-1145.text"
     http_user_agent: str = (
         "Anbudsklar-PoC/0.1 (Sundsvalls kommun; kontakt via naringslivsenheten)"  # ASCII only
     )
     scheduler_enabled: bool = True
+    # False hides the fictitious fixtures (notices, documents, agreements) from every read.
+    show_fictitious: bool = True
+    # The access code that gates the whole service (decision 0010); unset leaves it open.
+    access_code: SecretStr | None = None
+    # Lab mode (decision 0010): behind the code, visitors create their own company on the
+    # login page. Such companies are deleted after the retention period.
+    lab_enabled: bool = False
+    lab_retention_days: int = Field(default=30, ge=1, le=365)
 
     # --- E-mail (Mailpit in development)
     smtp_host: str = "localhost"

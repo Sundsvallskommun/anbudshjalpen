@@ -20,8 +20,8 @@ export const JOB_GROUPS: readonly JobGroup[] = [
   },
   {
     title: "Bearbeta",
-    description: "Stänger passerade annonser, tolkar underlag och bedömer vad som passar företagen.",
-    jobs: ["close_expired", "interpret_pending", "match_all"],
+    description: "Stänger passerade annonser, tolkar underlag, bedömer vad som passar företagen och raderar testföretag vars tid gått ut.",
+    jobs: ["close_expired", "interpret_pending", "match_all", "purge_lab"],
   },
   {
     title: "Skicka",
@@ -31,8 +31,8 @@ export const JOB_GROUPS: readonly JobGroup[] = [
 ];
 
 /**
- * A run's state: done, failed, still running, never run, or (e-Avrop) not activated, because its robots.txt forbids
- * automatic fetching until the municipality has permission (docs/data-sources.md).
+ * A run's state: done, failed, still running, never run, or (e-Avrop) not activated, because the municipality's API
+ * token and client id are not set (decision 0009, docs/eavrop.md).
  */
 export type RunState = "ok" | "failed" | "running" | "never" | "inactive";
 
@@ -41,7 +41,7 @@ export const RUN_STATE: Record<RunState, { label: string; dot: "success" | "erro
   failed: { label: "Misslyckades", dot: "error" },
   running: { label: "Pågår", dot: "accent" },
   never: { label: "Inte körd", dot: "neutral" },
-  inactive: { label: "Inte aktiverad – väntar på tillstånd", dot: "neutral" },
+  inactive: { label: "Inte aktiverad – nyckel saknas", dot: "neutral" },
 };
 
 /** A run still marked as running after this long belongs to a process that died (services/jobs.STALE_AFTER). */
@@ -58,7 +58,7 @@ export function runState(job: JobName, run: JobRunView | undefined, now: number 
   if (!run) return "never";
   if (run.status === "running") return now - Date.parse(run.started_at) < STALE_MS ? "running" : "failed";
   if (FAILED.has(run.status)) return "failed";
-  if (job === "ingest_eavrop" && count(run.stats, "blocked") > 0 && count(run.stats, "fetched") === 0) {
+  if (job === "ingest_eavrop" && count(run.stats, "not_configured") > 0) {
     return "inactive";
   }
   return "ok";
@@ -79,8 +79,11 @@ const STAT_WORDS: readonly [key: string, words: string][] = [
   ["sent", "skickade"],
   ["rescheduled", "flyttade"],
   ["loaded", "inlästa"],
+  ["not_public", "inte publika"],
+  ["linked", "kopplade till TED"],
+  ["documents_stored", "dokument hämtade"],
+  ["documents_skipped", "dokument hoppades över"],
   ["skipped", "hoppades över"],
-  ["blocked", "stoppade av robots.txt"],
   ["gave_up", "gav upp"],
   ["failed", "misslyckades"],
 ];

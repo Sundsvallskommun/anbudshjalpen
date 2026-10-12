@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field, fields
 from datetime import date, datetime, time
@@ -46,6 +47,20 @@ class NoticeValues:
 
     def columns(self) -> dict[str, Any]:
         return {item.name: getattr(self, item.name) for item in fields(self)} | {"is_fictitious": False}
+
+
+_EAVROP_NOTICE_LINK = re.compile(r"e-avrop\.com/.*[?&]id=(\d+)", re.IGNORECASE)
+
+
+def eavrop_procurement_id(url: str | None) -> str | None:
+    """e-Avrop's procurement id in a notice link (`NoticeLink.aspx?id=121907`), if it is one.
+
+    TED's document link for a notice that e-Avrop sent there is this link, so the id ties a
+    TED notice to the same procurement in e-Avrop's API (`ProcurementId`).
+    """
+
+    match = _EAVROP_NOTICE_LINK.search(url or "")
+    return match.group(1) if match else None
 
 
 def status_from_deadline(deadline: datetime | None, now: datetime) -> NoticeStatus:

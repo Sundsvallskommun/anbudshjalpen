@@ -13,7 +13,7 @@ describe("JOB_GROUPS", () => {
   it("groups every job once as Hämta, Bearbeta and Skicka", () => {
     expect(JOB_GROUPS.map((group) => group.title)).toEqual(["Hämta", "Bearbeta", "Skicka"]);
     const jobs = JOB_GROUPS.flatMap((group) => group.jobs);
-    expect(new Set(jobs).size).toBe(8);
+    expect(new Set(jobs).size).toBe(9);
   });
 });
 
@@ -29,10 +29,10 @@ describe("runState", () => {
     expect(runState("ingest_ted", run("ingest_ted", "running", "2026-10-05T08:00:00Z"), NOW.getTime())).toBe("failed");
   });
 
-  it("calls e-Avrop not activated while its robots.txt stops every fetch", () => {
-    const blocked = run("ingest_eavrop", "ok", "2026-10-05T04:30:00Z", { fetched: 0, inserted: 0, updated: 0, blocked: 2 });
-    expect(runState("ingest_eavrop", blocked)).toBe("inactive");
-    const fetched = run("ingest_eavrop", "ok", "2026-10-05T04:30:00Z", { fetched: 12, blocked: 1 });
+  it("calls e-Avrop not activated while its API key is not set", () => {
+    const unset = run("ingest_eavrop", "ok", "2026-10-05T04:30:00Z", { fetched: 0, inserted: 0, updated: 0, not_configured: 1 });
+    expect(runState("ingest_eavrop", unset)).toBe("inactive");
+    const fetched = run("ingest_eavrop", "ok", "2026-10-05T04:30:00Z", { fetched: 12, not_public: 8 });
     expect(runState("ingest_eavrop", fetched)).toBe("ok");
   });
 });

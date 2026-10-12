@@ -24,6 +24,7 @@ from anbudsklar.services.jobs import (
     JobFunction,
     agreements_csv_path,
     cpv_csv_path,
+    ingest_eavrop_full,
     open_job_context,
     run_job,
 )
@@ -37,8 +38,10 @@ app = typer.Typer(
 )
 ingest_app = typer.Typer(help="Hämta data från offentliga källor och filer.", no_args_is_help=True)
 eneo_app = typer.Typer(help="Koppla Anbudsklar till en Eneo-instans.", no_args_is_help=True)
+lab_app = typer.Typer(help="Labbläget: testföretag som deltagare skapar själva.", no_args_is_help=True)
 app.add_typer(ingest_app, name="ingest")
 app.add_typer(eneo_app, name="eneo")
+app.add_typer(lab_app, name="lab")
 
 
 def logging_config(level: str) -> dict[str, Any]:
@@ -107,10 +110,14 @@ def ingest_ted() -> None:
 
 
 @ingest_app.command("eavrop")
-def ingest_eavrop() -> None:
-    """Hämta annonserade och planerade upphandlingar från e-Avrop."""
+def ingest_eavrop(
+    full: Annotated[
+        bool, typer.Option(help="Hämta alla projekt, även de som inte ändrats sedan förra körningen")
+    ] = False,
+) -> None:
+    """Hämta kommunens publicerade upphandlingar och underlag från e-Avrops API."""
 
-    _run_job("ingest_eavrop")
+    _run_job("ingest_eavrop", ingest_eavrop_full if full else None)
 
 
 @ingest_app.command("lou")
@@ -163,6 +170,13 @@ def interpret(
         return {"interpreted": len(await interpret_notice(session, context.engine, notice))}
 
     _run_job("interpret_notice", interpret_one)
+
+
+@lab_app.command("purge")
+def lab_purge() -> None:
+    """Radera testföretag vars tid har gått ut (jobbet purge_lab)."""
+
+    _run_job("purge_lab")
 
 
 @app.command()

@@ -19,6 +19,7 @@ import logging
 import uuid
 from collections.abc import Sequence
 from datetime import date, datetime, timedelta
+from typing import NamedTuple
 
 from sqlalchemy import exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,9 +39,11 @@ from anbudsklar.documents.citations import verify_checklist
 from anbudsklar.documents.store import load_paged_document
 from anbudsklar.models import ChecklistRecord, Document, Notice
 from anbudsklar.services.access import Viewer
+from anbudsklar.services.app_settings import review_required
 from anbudsklar.services.contexts import notice_context
 from anbudsklar.services.dates import end_of_local_day, utcnow
 from anbudsklar.services.errors import ConflictError, InvalidInputError, NotFoundError
+from anbudsklar.visibility import shown_notices
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +78,7 @@ def to_checklist_view(record: ChecklistRecord) -> ChecklistView:
         created_at=record.created_at,
         approved_at=record.approved_at,
         published_at=record.published_at,
+        reviewed=record.approved_at is not None,
         reviewer_note=record.reviewer_note,
         verification=VerificationSummary.model_validate(record.verification or {}),
         checklist=checklist_payload(record),
@@ -145,23 +149,28 @@ async def visible_checklist(
     return await published_checklist(session, notice_id)
 
 
+class ChecklistState(NamedTuple):
+    status: ChecklistStatus
+    reviewed: bool  # inköp approved it (decision 0011)
+
+
 async def checklist_statuses(
     session: AsyncSession, notice_ids: Sequence[uuid.UUID], viewer: Viewer
-) -> dict[uuid.UUID, ChecklistStatus]:
+) -> dict[uuid.UUID, ChecklistState]:
     """What the viewer may know about each notice's checklist: buyers see every state."""
 
     if not notice_ids:
         return {}
-    query = select(ChecklistRecord.notice_id, ChecklistRecord.status).where(
+    query = select(ChecklistRecord.notice_id, ChecklistRecord.status, ChecklistRecord.approved_at).where(
         ChecklistRecord.notice_id.in_(notice_ids)
     )
     if not viewer.is_buyer:
         query = query.where(ChecklistRecord.status == PUBLISHED)
     rows = await session.execute(query.order_by(ChecklistRecord.created_at.desc()))
-    statuses: dict[uuid.UUID, ChecklistStatus] = {}
-    for notice_id, status in rows:
-        statuses.setdefault(notice_id, _status(status))
-    return statuses
+    states: dict[uuid.UUID, ChecklistState] = {}
+    for notice_id, status, approved_at in rows:
+        states.setdefault(notice_id, ChecklistState(_status(status), approved_at is not None))
+    return states
 
 
 # --- Interpreting -------------------------------------------------------------------
@@ -170,7 +179,11 @@ async def checklist_statuses(
 async def interpret_document(
     session: AsyncSession, engine: AiEngine, document_id: uuid.UUID
 ) -> ChecklistRecord:
-    """Run tolka_underlag on one document and store the verified result as a draft."""
+    """Run tolka_underlag on one document and store the verified result.
+
+    A draft for inköp to review, or, when the review is turned off (decision 0011), a
+    published checklist at once, with no `approved_at`, so the app says nobody reviewed it.
+    """
 
     document = await session.get(Document, document_id)
     if document is None:
@@ -187,10 +200,12 @@ async def interpret_document(
     document.interpret_attempts = 0
     document.interpret_error = None
     document.interpret_retry_at = None
+    publish_now = not await review_required(session)
     record = ChecklistRecord(
         notice_id=notice.id,
         document_id=document_id,
-        status=DRAFT,
+        status=PUBLISHED if publish_now else DRAFT,
+        published_at=utcnow() if publish_now else None,
         engine=run.engine,
         model=run.model,
         contract_version=CONTRACT_VERSION,
@@ -237,7 +252,7 @@ async def interpret_pending(
     document_ids = list(
         await session.scalars(
             select(Document.id)
-            .where(~has_checklist, Document.page_count > 0, due)
+            .where(~has_checklist, Document.page_count > 0, Document.auto_interpret, due)
             .order_by(Document.interpret_attempts, Document.created_at, Document.id)
             .limit(limit)
         )
@@ -294,7 +309,10 @@ async def record_interpret_failure(
 
 
 async def reset_interpretation(session: AsyncSession, document_id: uuid.UUID) -> Document:
-    """A buyer asks for a new interpretation: forget earlier failures."""
+    """A buyer asks for a new interpretation: forget earlier failures.
+
+    Asking also turns an attachment into one the worker interprets, if it fails now.
+    """
 
     document = await session.get(Document, document_id)
     if document is None:
@@ -304,18 +322,19 @@ async def reset_interpretation(session: AsyncSession, document_id: uuid.UUID) ->
     document.interpret_attempts = 0
     document.interpret_error = None
     document.interpret_retry_at = None
+    document.auto_interpret = True
     await session.flush()
     return document
 
 
 async def list_interpretations(session: AsyncSession) -> list[InterpretationView]:
-    """Documents still waiting for a checklist: new, retrying or given up."""
+    """Documents still waiting for a checklist: new, retrying or given up (not attachments)."""
 
     has_checklist = exists().where(ChecklistRecord.document_id == Document.id)
     rows = await session.execute(
         select(Document, Notice.title)
         .join(Notice, Notice.id == Document.notice_id)
-        .where(~has_checklist, Document.page_count > 0)
+        .where(~has_checklist, Document.page_count > 0, Document.auto_interpret, shown_notices())
         .order_by(Document.created_at.desc())
     )
     return [interpretation_view(document, title) for document, title in rows]
@@ -349,8 +368,10 @@ async def list_admin_checklists(
 ) -> list[ChecklistAdminItem]:
     """The review queue: the soonest tender deadline first, then the newest interpretation."""
 
-    query = select(ChecklistRecord, Notice.title, Notice.deadline_at, Notice.deadline_kind).join(
-        Notice, Notice.id == ChecklistRecord.notice_id
+    query = (
+        select(ChecklistRecord, Notice.title, Notice.deadline_at, Notice.deadline_kind)
+        .join(Notice, Notice.id == ChecklistRecord.notice_id)
+        .where(shown_notices())
     )
     if status is not None:
         query = query.where(ChecklistRecord.status == status)
@@ -442,6 +463,30 @@ async def publish_checklist(session: AsyncSession, checklist_id: uuid.UUID) -> C
     record.published_at = utcnow()
     await session.flush()
     return record
+
+
+async def publish_pending(session: AsyncSession) -> int:
+    """Publish each notice's latest draft or approved checklist: the review was turned off (decision 0011).
+
+    Rejected and withdrawn checklists stay as they are; inköp said no to those.
+    """
+
+    rows = await session.scalars(
+        select(ChecklistRecord)
+        .where(ChecklistRecord.status.in_([DRAFT, APPROVED]))
+        .order_by(ChecklistRecord.notice_id, ChecklistRecord.created_at.desc(), ChecklistRecord.id)
+    )
+    published = 0
+    seen: set[uuid.UUID] = set()
+    for record in rows:
+        if record.notice_id in seen:
+            continue
+        seen.add(record.notice_id)
+        record.status = PUBLISHED
+        record.published_at = utcnow()
+        published += 1
+    await session.flush()
+    return published
 
 
 async def reopen_checklist(session: AsyncSession, checklist_id: uuid.UUID) -> ChecklistRecord:

@@ -44,7 +44,7 @@ function RunStatus({ job, run }: { job: JobName; run: JobRunView | undefined }) 
         </Text>
       </HStack>
       {current === "inactive" && (
-        <Text type="supporting">e-Avrops robots.txt förbjuder automatisk hämtning. Hämtningen startar när kommunen har fått tillstånd.</Text>
+        <Text type="supporting">e-Avrop hämtas när kommunens nyckel till e-Avrops API är inlagd (EAVROP_API_TOKEN och EAVROP_CLIENT_ID).</Text>
       )}
       {run?.error && <Text color="primary">{`Fel: ${run.error}`}</Text>}
     </VStack>

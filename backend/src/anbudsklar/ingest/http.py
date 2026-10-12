@@ -71,13 +71,17 @@ async def send(
     settings: Settings,
     json: Any = None,
     data: Mapping[str, str] | None = None,
+    params: Mapping[str, str] | None = None,
+    headers: Mapping[str, str] | None = None,
     retry: RetryPolicy = DEFAULT_RETRY,
 ) -> httpx.Response:
     """Send one request with retries. Returns the last response, whatever its status."""
 
     async def attempt_once() -> httpx.Response:
-        headers = {"User-Agent": user_agent(settings)}
-        return await client.request(method, url, headers=headers, json=json, data=data, timeout=TIMEOUT)
+        merged = {"User-Agent": user_agent(settings), **(headers or {})}
+        return await client.request(
+            method, url, headers=merged, json=json, data=data, params=params, timeout=TIMEOUT
+        )
 
     for attempt in range(1, retry.attempts):
         try:

@@ -77,7 +77,7 @@ AI-motorn är en Eneo-testinstans som nås via API. Utan Eneo används motorn `o
 
 | Del | I PoC:n |
 |---|---|
-| Annonser | Riktiga från TED. e-Avrop hämtas inte förrän vi har tillstånd, se [Datakällor](data-sources.md) |
+| Annonser | Riktiga från TED, och från e-Avrops API när kommunens nyckel är inlagd, se [Datakällor](data-sources.md) |
 | Underlag | Tre påhittade underlag med facit, tills inköp kan lämna 3–5 avslutade upphandlingar |
 | LOU | Riktig, från Riksdagens öppna data |
 | Vägledningar och sundsvall.se | Riktiga, som kunskap i Eneo för Regelhjälpen |

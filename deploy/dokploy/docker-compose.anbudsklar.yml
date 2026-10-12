@@ -35,6 +35,8 @@ x-anbudsklar-env: &anbudsklar-env
   OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
   OPENAI_API_KEY: ${OPENAI_API_KEY:-}
   OPENAI_MODEL: ${OPENAI_MODEL:-}
+  EAVROP_API_TOKEN: ${EAVROP_API_TOKEN:-}
+  EAVROP_CLIENT_ID: ${EAVROP_CLIENT_ID:-}
   MCP_ENABLED: ${MCP_ENABLED:-true}
   MCP_API_KEYS: ${MCP_API_KEYS:-[]}
   MCP_MAX_OUTPUT_CHARS: ${MCP_MAX_OUTPUT_CHARS:-16000}
@@ -45,6 +47,10 @@ x-anbudsklar-env: &anbudsklar-env
   MAIL_FROM: ${MAIL_FROM:-Anbudsklar <noreply@anbudsklar.local>}
   ORGANIZATION_NAME: ${ORGANIZATION_NAME:-Sundsvalls kommun}
   SHOW_ORGANIZATION: ${SHOW_ORGANIZATION:-true}
+  SHOW_FICTITIOUS: ${SHOW_FICTITIOUS:-true}
+  ACCESS_CODE: ${ACCESS_CODE:-}
+  LAB_ENABLED: ${LAB_ENABLED:-false}
+  LAB_RETENTION_DAYS: ${LAB_RETENTION_DAYS:-30}
 
 services:
   anbudsklar-migrate:

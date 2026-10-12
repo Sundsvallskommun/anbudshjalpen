@@ -1,265 +1,448 @@
-"""e-Avrop: parsing of recorded list pages, robots.txt handling, paging and upserts."""
+"""e-Avrop's Projekt API: the allowlist, the public request, documents and the TED twin.
+
+All responses here are synthetic and fictitious. Real responses cannot be recorded: the API is
+the municipality's own and a project's response holds tenderers, prices and staff. The
+synthetic project below carries such parts on purpose, so the tests can show they never leave
+the response.
+"""
 
 from __future__ import annotations
 
-from datetime import date, datetime
-from urllib.parse import parse_qs
+import json
+from copy import deepcopy
+from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 import pytest
 import respx
+from pydantic import SecretStr
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.config import Settings
 from anbudsklar.ingest.common import IngestError
 from anbudsklar.ingest.eavrop import (
-    CpvEntry,
-    PagerTarget,
+    PublicDocument,
     ingest_eavrop,
-    load_robots,
-    map_advertised,
-    map_planned,
-    parse_advertised,
-    parse_cpv,
-    parse_period,
-    parse_planned,
+    main_document,
+    map_procurement,
+    parse_moment,
+    public_procurement,
 )
-from anbudsklar.ingest.notices import STOCKHOLM
-from anbudsklar.models import Notice
+from anbudsklar.ingest.notices import STOCKHOLM, NoticeValues, eavrop_procurement_id
+from anbudsklar.ingest.ted import TedRecord, upsert_ted_notices
+from anbudsklar.models import Document, Notice
 
-from .conftest import RECORDED_AT, read_sample
+API = "https://www.e-avrop.com/api"
+CLIENT_ID = 4242
+LIST_URL = f"{API}/v1.1/clients/{CLIENT_ID}/procurements"
+NOW = datetime(2026, 10, 8, 12, 0, tzinfo=UTC)
 
-BASE = "https://www.e-avrop.com/sundsvall"
-ROBOTS_URL = "https://www.e-avrop.com/robots.txt"
-ADVERTISED_URL = f"{BASE}/e-Upphandling/Default.aspx"
-PLANNED_URL = f"{BASE}/e-Upphandling/planedComing.aspx"
-ALLOW_ALL = "User-agent: *\nDisallow:\n"
-
-# Synthetic: the last page of the planned list (the real pages 2-4 were never fetched,
-# because robots.txt disallows it). Its pager shows page 2 as current and no page 3.
-LAST_PLANNED_PAGE = """<html><body><form id="form" method="post" action="./planedComing.aspx">
-<input type="hidden" name="__VIEWSTATE" value="synthetic-page-2"/>
-<table id="mainContent_tenderGridView">
-<tr class="headerNeutral"><th>Rubrik</th><th>cpv-kod</th><th>Planerad</th></tr>
-<tr class="rowline"><td><span class="link">Fiktiv planerad upphandling</span>
-<div class="dialogue" id="des_900001"><div class="dialogueBody"><table><tr><td>Syntetisk testrad.</td></tr>
-</table></div></div></td><td>90910000: Städning</td><td>Kvartal 2 2027</td></tr>
-<tr class="GridViewPager"><td colspan="3"><table><tr>
-<td><a href="javascript:__doPostBack('ctl00$mainContent$tenderGridView','Page$1')">1</a></td>
-<td><span>2</span></td></tr></table></td></tr>
-</table></form></body></html>"""
+# Words from the secret parts of the synthetic project. None of them may be stored.
+SECRET_WORDS = (
+    "Fiktiv Anbudsgivare AB",
+    "556000-0000",
+    "anbud@fiktiv.example",
+    "Handläggare Fiktivsson",
+    "Utvärderingsprotokoll",
+    "kreditupplysning",
+    "project-documents",
+)
 
 
-# --- Parsing -------------------------------------------------------------------------
+def _document(doc_id: int, filename: str, updated: str | None = None) -> dict[str, Any]:
+    document: dict[str, Any] = {
+        "Url": f"{API}/v1/announcement-documents/{doc_id}",
+        "Filename": filename,
+        "Description": "",
+    }
+    if updated:
+        document["UpdatedDate"] = updated
+    return document
 
 
-def test_advertised_list_rows() -> None:
-    rows = parse_advertised(read_sample("eavrop_advertised.html"), BASE)
+def _project(**changes: Any) -> dict[str, Any]:
+    """A fictitious, announced one-step procurement with secret parts, as the API returns it."""
 
-    assert len(rows) == 13
-    first = rows[0]
-    assert first.eavrop_id == 73875
-    assert first.title == "Laddningsbara betalkort"
-    assert first.url == "https://www.e-avrop.com/sundsvall/visa/upphandling.aspx?id=73875"
-    assert first.published == date(2026, 9, 17)
-    assert first.cpv == (
-        CpvEntry("30163000", "Betalkort"),
-        CpvEntry("66000000", "Finans- och försäkringstjänster"),
+    project: dict[str, Any] = {
+        "Type": "ProcurementProject",
+        "ProjectId": 900100,
+        "ProcurementId": 900001,
+        "Category": "Fiktiv kategori",
+        "AgreementType": "Contract",
+        "Members": [{"Name": "Handläggare Fiktivsson", "Email": "handlaggare@fiktiv.example"}],
+        "AgreementOwner": {"Name": "Handläggare Fiktivsson", "Email": "handlaggare@fiktiv.example"},
+        "QualityResponsible": {"Name": "Handläggare Fiktivsson", "Email": "handlaggare@fiktiv.example"},
+        "Title": "Fiktiv ommålning av förskola",
+        "DiaryNumber": "UH-2026-9999",
+        "Description": "Fiktiv upphandling för test. Målning av fasad.",
+        "Value": {"Value": 1234567, "Currency": "SEK"},
+        "CpvCodes": [{"Code": "45442110", "Description": "Målning av byggnader"}],
+        "ProcurementType": "NationalOneStep",
+        "HasLots": False,
+        "TimeTable": {
+            "LastQuestion": "2026-10-20T00:00:00+02:00",
+            "LastBid": "2026-10-28T00:00:00+01:00",
+        },
+        "Events": [{"Event": "Created", "Date": "2026-09-01T09:00:00+02:00"}, {"Event": "Announced"}],
+        "Documents": [
+            {
+                "Url": f"{API}/v1/project-documents/1",
+                "Filename": "Utvärderingsprotokoll UH-2026-9999.xlsx",
+                "IsClassified": False,
+            },
+            {
+                "Url": f"{API}/v1/project-documents/2",
+                "Filename": "kreditupplysning-fiktiv-anbudsgivare-ab.pdf",
+                "IsClassified": False,
+            },
+        ],
+        "Suppliers": [
+            {
+                "Company": "Fiktiv Anbudsgivare AB",
+                "OrganizationNumber": "556000-0000",
+                "Email": "anbud@fiktiv.example",
+                "Bid": {"Price": 999000},
+            }
+        ],
+        "Reports": [{"Url": f"{API}/v1/project-documents/3", "Filename": "Utvärderingsprotokoll.pdf"}],
+        "LogFiles": [{"Url": f"{API}/v1/project-documents/4", "Filename": "logg.txt"}],
+        "RequestForTender": {
+            "AnnouncementDate": "2026-10-01T10:00:00+02:00",
+            "UpdatedDate": "2026-10-01T10:00:00+02:00",
+            "Documents": [
+                _document(11, "Bilaga 1 Prisbilaga.xlsx"),
+                _document(12, "Kravspecifikation fiktiv.txt"),
+                _document(13, "Administrativa föreskrifter fiktiv.txt"),
+            ],
+        },
+        "RequestForApplications": {},
+    }
+    project.update(changes)
+    return project
+
+
+def _list_item(project_id: int, updated: str = "2026-10-01T10:00:00+02:00") -> dict[str, str]:
+    return {
+        "Url": f"{API}/v1/procurements/{project_id}",
+        "CreatedDate": "2026-09-01T09:00:00+02:00",
+        "UpdatedDate": updated,
+    }
+
+
+@pytest.fixture
+def api_settings(settings: Settings) -> Settings:
+    return settings.model_copy(
+        update={
+            "eavrop_api_url": API,
+            "eavrop_api_token": SecretStr("test-token"),
+            "eavrop_client_id": CLIENT_ID,
+            "eavrop_base_url": "https://www.e-avrop.com/sundsvall",
+        }
     )
-    assert first.deadline == date(2026, 10, 14)
-    assert first.deadline_text is None
 
 
-def test_continuous_intake_has_no_deadline_and_invalid_cpv_is_dropped() -> None:
-    rows = parse_advertised(read_sample("eavrop_advertised.html"), BASE)
-    continuous = next(row for row in rows if row.title == "Fritt val Hemtjänst")
-
-    assert continuous.deadline is None
-    assert continuous.deadline_text == "anbud kan lämnas löpande"
-    assert [entry.code for entry in continuous.cpv] == ["85310000"]
-
-
-def test_planned_list_rows_pager_and_postback_fields() -> None:
-    page = parse_planned(read_sample("eavrop_planned.html"))
-
-    assert len(page.rows) == 15
-    first = page.rows[0]
-    assert first.planned_id == "138275"
-    assert first.title == "Städtjänster"
-    assert first.description == "Denna upphandling omfattar Städtjänster"
-    assert [entry.code for entry in first.cpv] == ["90919000", "90910000"]
-    assert first.period == "Kvartal 1 2026"
-    assert page.next_page == PagerTarget("ctl00$mainContent$tenderGridView", "Page$2")
-    assert page.form_fields["__VIEWSTATE"]
-    assert page.form_fields["ctl00$navigationContent$NoticeLists$RadioButtonListScope"] == "coming"
-    assert not any("password" in name or "username" in name for name in page.form_fields)
+def _mock_documents(respx_mock: respx.MockRouter) -> dict[int, respx.Route]:
+    routes = {}
+    for doc_id, text in (
+        (12, "Kravspecifikation. Leverantören ska måla fasaden."),
+        (13, "Anbud ska lämnas på svenska."),
+    ):
+        routes[doc_id] = respx_mock.get(f"{API}/v1/announcement-documents/{doc_id}").mock(
+            return_value=httpx.Response(
+                200, content=text.encode(), headers={"Content-Type": "application/octet-stream"}
+            )
+        )
+    return routes
 
 
-def test_last_planned_page_has_no_next_page() -> None:
-    page = parse_planned(LAST_PLANNED_PAGE)
-
-    assert [row.planned_id for row in page.rows] == ["900001"]
-    assert page.next_page is None
+# --- Reading a project ---------------------------------------------------------------
 
 
-def test_cpv_cell_with_check_digits_and_entities() -> None:
-    assert parse_cpv("45442100-5: Målning45000000: Anläggningsarbete") == (
-        CpvEntry("45442100", "Målning"),
-        CpvEntry("45000000", "Anläggningsarbete"),
+def test_midnight_is_the_end_of_the_day_before() -> None:
+    assert parse_moment("2026-10-31T00:00:00+01:00") == datetime(2026, 10, 30, 23, 59, 59, tzinfo=STOCKHOLM)
+    assert parse_moment("2026-10-30T12:00:00+01:00") == datetime(2026, 10, 30, 12, 0, tzinfo=STOCKHOLM)
+    assert parse_moment(None) is None
+    assert parse_moment("inte ett datum") is None
+
+
+def test_public_procurement_reads_only_the_allowlist() -> None:
+    procurement = public_procurement(_project(), API)
+
+    assert procurement is not None
+    assert procurement.procurement_id == "900001"
+    assert procurement.stage == "tender"
+    assert procurement.deadline == datetime(2026, 10, 27, 23, 59, 59, tzinfo=STOCKHOLM)
+    assert procurement.question_deadline == datetime(2026, 10, 19, 23, 59, 59, tzinfo=STOCKHOLM)
+    assert [document.filename for document in procurement.documents] == [
+        "Bilaga 1 Prisbilaga.xlsx",
+        "Kravspecifikation fiktiv.txt",
+        "Administrativa föreskrifter fiktiv.txt",
+    ]
+    stored = json.dumps(map_procurement(procurement, Settings(), now=NOW).columns(), default=str)
+    for word in SECRET_WORDS:
+        assert word not in stored
+    assert "1234567" not in stored  # the project's value may be an internal estimate
+
+
+def test_an_unannounced_project_is_not_public() -> None:
+    assert public_procurement(_project(Events=[{"Event": "Created"}]), API) is None
+
+
+def test_an_invitation_to_chosen_suppliers_is_not_public() -> None:
+    invited = {"InvitationDate": "2026-10-01T10:00:00+02:00", "Documents": [_document(11, "Steg 2.pdf")]}
+
+    assert public_procurement(_project(RequestForTender=invited), API) is None
+
+
+def test_the_first_stage_of_a_two_step_procedure_is_public() -> None:
+    project = _project(
+        ProcurementType="NationalTwoStep",
+        TimeTable={
+            "LastQuestionApplication": "2026-10-15T00:00:00+02:00",
+            "LastApplication": "2026-10-22T00:00:00+02:00",
+            "LastBid": "2026-12-01T00:00:00+01:00",
+        },
+        RequestForTender={
+            "InvitationDate": "2026-11-01T10:00:00+01:00",
+            "Documents": [_document(20, "Steg 2.pdf")],
+        },
+        RequestForApplications={
+            "AnnouncementDate": "2026-10-01T10:00:00+02:00",
+            "Documents": [_document(21, "Steg 1.pdf")],
+        },
     )
 
+    procurement = public_procurement(project, API)
 
-def test_planned_period() -> None:
-    assert parse_period("Kvartal 3 2026") == (2026, 3)
-    assert parse_period("Hösten 2026") is None
-
-
-def test_robot_check_stops_parsing() -> None:
-    page = '<div id="mainContent_reCAPTCHA_RobotControl"></div>'
-
-    with pytest.raises(IngestError, match="robotkontroll"):
-        parse_advertised(page, BASE)
+    assert procurement is not None
+    assert procurement.stage == "application"
+    assert procurement.deadline == datetime(2026, 10, 21, 23, 59, 59, tzinfo=STOCKHOLM)
+    assert [document.filename for document in procurement.documents] == ["Steg 1.pdf"]
 
 
-def test_changed_page_format_is_reported() -> None:
-    with pytest.raises(IngestError, match="saknade upphandlingstabellen"):
-        parse_planned("<html><body><p>Underhåll pågår</p></body></html>")
-
-
-# --- Mapping -------------------------------------------------------------------------
-
-
-def test_advertised_row_maps_to_an_open_contract_notice() -> None:
-    row = parse_advertised(read_sample("eavrop_advertised.html"), BASE)[0]
-
-    values = map_advertised(row, now=RECORDED_AT)
-
-    assert values.source == "eavrop"
-    assert values.external_id == "73875"
-    assert values.reference_number == "73875"  # e-Avrop's id for the procurement
-    assert (values.notice_type, values.status) == ("contract", "open")
-    assert values.cpv_codes == ["30163000", "66000000"]
-    assert values.published_at == datetime(2026, 9, 17, tzinfo=STOCKHOLM)
-    assert values.deadline_at == datetime(2026, 10, 14, 23, 59, 59, tzinfo=STOCKHOLM)
-    assert values.documents_url == values.url
-    assert values.raw["list"] == "advertised"
-    assert values.raw["deadline"] == "2026-10-14"
-    assert values.raw["html"].startswith("<tr")
-
-
-def test_planned_row_maps_to_a_planned_notice() -> None:
-    row = parse_planned(read_sample("eavrop_planned.html")).rows[2]
-
-    values = map_planned(row, list_url=PLANNED_URL)
-
-    assert values.external_id == "planned-133129"
-    assert values.reference_number is None  # a planned procurement has no id of its own yet
-    assert values.title == "Skogsförvaltning"
-    assert (values.notice_type, values.status) == ("planned", "planned")
-    assert values.deadline_at is None
-    assert values.raw["planned_year"] == 2026 and values.raw["planned_quarter"] == 3
-
-
-# --- robots.txt and fetching ---------------------------------------------------------
-
-
-async def test_robots_txt_is_respected(
-    respx_mock: respx.MockRouter, client: httpx.AsyncClient, settings: Settings, db_session: AsyncSession
-) -> None:
-    robots = respx_mock.get(ROBOTS_URL).mock(
-        return_value=httpx.Response(200, text=read_sample("eavrop_robots.txt"))
+def test_a_document_outside_the_announcement_address_is_skipped() -> None:
+    request = deepcopy(_project()["RequestForTender"])
+    request["Documents"].append({"Url": f"{API}/v1/project-documents/1", "Filename": "Intern.pdf"})
+    request["Documents"].append(
+        {"Url": "https://example.com/v1/announcement-documents/5", "Filename": "Annan.pdf"}
     )
-    lists = respx_mock.route(host="www.e-avrop.com", path__startswith="/sundsvall/")
 
-    stats = await ingest_eavrop(db_session, client, settings, now=RECORDED_AT, request_interval=0)
+    procurement = public_procurement(_project(RequestForTender=request), API)
 
-    assert stats == {"fetched": 0, "inserted": 0, "updated": 0, "blocked": 2}
-    assert robots.call_count == 1
-    assert lists.call_count == 0
+    assert procurement is not None
+    assert "Intern.pdf" not in [document.filename for document in procurement.documents]
+    assert "Annan.pdf" not in [document.filename for document in procurement.documents]
 
 
 @pytest.mark.parametrize(
-    ("status", "allowed"),
-    [(404, True), (410, True), (400, False), (401, False), (403, False), (429, False), (503, False)],
+    ("filenames", "expected"),
+    [
+        (
+            ["Bilaga.pdf", "6.1 Administrativa föreskrifter.docx", "6.1 Administrativa föreskrifter.pdf"],
+            "6.1 Administrativa föreskrifter.pdf",
+        ),
+        (["Kravspecifikation.pdf", "Upphandlinsförfrågan 2026.docx"], "Upphandlinsförfrågan 2026.docx"),
+        (["Avtalsvillkor.pdf", "Krav på Leverantör.pdf", "Kravspecifikation.pdf"], "Krav på Leverantör.pdf"),
+        (["Prisbilaga.xlsx", "Inbjudan till utbildning.pdf"], "Inbjudan till utbildning.pdf"),
+        (["Prisbilaga.xlsx", "Uppdraget.pdf"], "Uppdraget.pdf"),  # the only readable file
+        (["Avtalsvillkor.pdf", "Utvärderingsmodell.pdf"], None),
+    ],
 )
-@pytest.mark.usefixtures("no_backoff")
-async def test_missing_robots_txt_allows_and_unreachable_disallows(
-    respx_mock: respx.MockRouter, client: httpx.AsyncClient, settings: Settings, status: int, allowed: bool
-) -> None:
-    respx_mock.get(ROBOTS_URL).mock(return_value=httpx.Response(status))
+def test_main_document(filenames: list[str], expected: str | None) -> None:
+    documents = [
+        PublicDocument(name, f"{API}/v1/announcement-documents/{index}", None)
+        for index, name in enumerate(filenames)
+    ]
 
-    robots = await load_robots(client, settings, "https://www.e-avrop.com")
-
-    assert robots.can_fetch("Anbudsklar-PoC", ADVERTISED_URL) is allowed
+    assert main_document(documents) == expected
 
 
-async def test_robots_txt_behind_redirects_is_followed(
-    respx_mock: respx.MockRouter, client: httpx.AsyncClient, settings: Settings
-) -> None:
-    respx_mock.get("http://e-avrop.com/robots.txt").mock(
-        return_value=httpx.Response(301, headers={"Location": "https://e-avrop.com/robots.txt"})
-    )
-    respx_mock.get("https://e-avrop.com/robots.txt").mock(
-        return_value=httpx.Response(302, headers={"Location": "/static/robots.txt"})
-    )
-    final = respx_mock.get("https://e-avrop.com/static/robots.txt").mock(
-        return_value=httpx.Response(200, text=read_sample("eavrop_robots.txt"))
-    )
-
-    robots = await load_robots(client, settings, "http://e-avrop.com")
-
-    assert final.call_count == 1
+def test_eavrop_procurement_id_from_a_notice_link() -> None:
     assert (
-        robots.can_fetch("Anbudsklar-PoC", "http://e-avrop.com/sundsvall/e-Upphandling/Default.aspx") is False
+        eavrop_procurement_id("https://www.e-avrop.com/sundsvall/e-Upphandling/NoticeLink.aspx?id=121907")
+        == "121907"
     )
+    assert eavrop_procurement_id("https://ted.europa.eu/sv/notice/-/detail/1-2026") is None
+    assert eavrop_procurement_id(None) is None
 
 
-async def test_robots_txt_with_too_many_redirects_disallows(
-    respx_mock: respx.MockRouter, client: httpx.AsyncClient, settings: Settings
+# --- Ingestion -----------------------------------------------------------------------
+
+
+async def test_ingest_stores_the_notice_and_only_the_public_documents(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
 ) -> None:
-    loop = respx_mock.get(ROBOTS_URL).mock(return_value=httpx.Response(302, headers={"Location": ROBOTS_URL}))
+    unannounced = _project(ProjectId=900200, ProcurementId=900002, Events=[{"Event": "Created"}])
+    listing = respx_mock.get(LIST_URL).mock(
+        return_value=httpx.Response(200, json=[_list_item(900100), _list_item(900200)])
+    )
+    respx_mock.get(f"{API}/v1/procurements/900100").mock(return_value=httpx.Response(200, json=_project()))
+    respx_mock.get(f"{API}/v1/procurements/900200").mock(return_value=httpx.Response(200, json=unannounced))
+    documents = _mock_documents(respx_mock)
+    secret = respx_mock.get(url__regex=rf"{API}/v1/project-documents/.*").mock(
+        return_value=httpx.Response(200)
+    )
 
-    robots = await load_robots(client, settings, "https://www.e-avrop.com")
+    stats = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
 
-    assert loop.call_count == 6  # the first request and five redirects
-    assert robots.can_fetch("Anbudsklar-PoC", ADVERTISED_URL) is False
+    assert stats == {
+        "fetched": 2,
+        "inserted": 1,
+        "updated": 0,
+        "not_public": 1,
+        "documents_stored": 2,
+        "documents_skipped": 1,
+    }
+    assert listing.calls.last.request.headers["Authorization"] == "Bearer test-token"
+    assert listing.calls.last.request.url.params["from"].startswith("2025-04-")
+    assert all(route.called for route in documents.values())
+    assert not secret.called
+    notice = await db_session.scalar(select(Notice).where(Notice.source == "eavrop"))
+    assert notice is not None
+    assert (notice.external_id, notice.status, notice.reference_number) == ("900001", "open", "UH-2026-9999")
+    assert notice.procedure == "Upphandling under tröskelvärdena (19 kap. LOU)"
+    assert notice.url == "https://www.e-avrop.com/sundsvall/e-Upphandling/NoticeLink.aspx?id=900001"
+    assert notice.estimated_value_sek is None
+    stored_text = json.dumps({"raw": notice.raw, "description": notice.description}, ensure_ascii=False)
+    for word in SECRET_WORDS:
+        assert word not in stored_text
+    stored = list(
+        await db_session.scalars(
+            select(Document).where(Document.notice_id == notice.id).order_by(Document.created_at)
+        )
+    )
+    assert [(document.filename, document.auto_interpret) for document in stored] == [
+        ("Administrativa föreskrifter fiktiv.txt", True),
+        ("Kravspecifikation fiktiv.txt", False),
+    ]
 
 
-async def test_robots_txt_redirect_to_another_scheme_disallows(
-    respx_mock: respx.MockRouter, client: httpx.AsyncClient, settings: Settings
+async def test_a_rerun_skips_unchanged_projects_and_documents(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
 ) -> None:
-    respx_mock.get(ROBOTS_URL).mock(
-        return_value=httpx.Response(302, headers={"Location": "ftp://www.e-avrop.com/robots.txt"})
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[_list_item(900100)]))
+    detail = respx_mock.get(f"{API}/v1/procurements/900100").mock(
+        return_value=httpx.Response(200, json=_project())
     )
+    documents = _mock_documents(respx_mock)
 
-    robots = await load_robots(client, settings, "https://www.e-avrop.com")
+    await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+    second = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
 
-    assert robots.can_fetch("Anbudsklar-PoC", ADVERTISED_URL) is False
+    assert second == {"fetched": 1, "inserted": 0, "updated": 0, "unchanged": 1}
+    assert detail.call_count == 1
+    assert all(route.call_count == 1 for route in documents.values())
 
 
-async def test_ingest_fetches_both_lists_pages_through_planned_and_upserts(
-    respx_mock: respx.MockRouter, client: httpx.AsyncClient, settings: Settings, db_session: AsyncSession
+async def test_projects_unchanged_since_the_last_run_are_not_fetched(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
 ) -> None:
-    respx_mock.get(ROBOTS_URL).mock(return_value=httpx.Response(200, text=ALLOW_ALL))
-    respx_mock.get(ADVERTISED_URL).mock(
-        return_value=httpx.Response(200, text=read_sample("eavrop_advertised.html"))
+    respx_mock.get(LIST_URL).mock(
+        return_value=httpx.Response(200, json=[_list_item(900200, "2026-09-01T09:00:00+02:00")])
     )
-    respx_mock.get(PLANNED_URL).mock(
-        return_value=httpx.Response(200, text=read_sample("eavrop_planned.html"))
+    detail = respx_mock.get(f"{API}/v1/procurements/900200").mock(return_value=httpx.Response(200, json={}))
+
+    stats = await ingest_eavrop(
+        db_session, client, api_settings, now=NOW, changed_since=NOW, request_interval=0
     )
-    next_page = respx_mock.post(PLANNED_URL).mock(return_value=httpx.Response(200, text=LAST_PLANNED_PAGE))
 
-    first = await ingest_eavrop(db_session, client, settings, now=RECORDED_AT, request_interval=0)
-    second = await ingest_eavrop(db_session, client, settings, now=RECORDED_AT, request_interval=0)
+    assert stats["unchanged"] == 1
+    assert not detail.called
 
-    assert first == {"fetched": 29, "inserted": 29, "updated": 0}
-    assert second == {"fetched": 29, "inserted": 0, "updated": 0, "unchanged": 29}
-    posted = parse_qs(next_page.calls[0].request.content.decode())
-    assert posted["__EVENTTARGET"] == ["ctl00$mainContent$tenderGridView"]
-    assert posted["__EVENTARGUMENT"] == ["Page$2"]
-    assert posted["__VIEWSTATE"][0].startswith("gsgc27Q6")
-    count = select(func.count()).select_from(Notice).where(Notice.source == "eavrop")
-    assert await db_session.scalar(count) == 29
-    planned = await db_session.scalar(select(Notice).where(Notice.external_id == "planned-900001"))
-    assert planned is not None and planned.status == "planned"
+
+async def test_documents_go_to_the_ted_notice_of_the_same_procurement(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    twin = Notice(
+        source="ted",
+        external_id="900001-2026",
+        title="Fiktiv ommålning (TED)",
+        status="open",
+        documents_url="https://www.e-avrop.com/sundsvall/e-Upphandling/NoticeLink.aspx?id=900001",
+        raw={},
+    )
+    db_session.add(twin)
+    await db_session.flush()
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[_list_item(900100)]))
+    respx_mock.get(f"{API}/v1/procurements/900100").mock(return_value=httpx.Response(200, json=_project()))
+    _mock_documents(respx_mock)
+
+    stats = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+    assert stats["linked"] == 1
+    assert (
+        await db_session.scalar(select(func.count()).select_from(Notice).where(Notice.source == "eavrop"))
+        == 0
+    )
+    assert (
+        await db_session.scalar(
+            select(func.count()).select_from(Document).where(Document.notice_id == twin.id)
+        )
+        == 2
+    )
+
+
+async def test_ted_does_not_add_a_procurement_already_stored_from_eavrop(db_session: AsyncSession) -> None:
+    db_session.add(
+        Notice(source="eavrop", external_id="900001", title="Fiktiv ommålning", status="open", raw={})
+    )
+    await db_session.flush()
+    values = NoticeValues(
+        source="ted",
+        external_id="900001-2026",
+        title="Fiktiv ommålning (TED)",
+        notice_type="contract",
+        status="open",
+        raw={},
+        documents_url="https://www.e-avrop.com/sundsvall/e-Upphandling/NoticeLink.aspx?id=900001",
+    )
+
+    stats = await upsert_ted_notices(
+        db_session, [TedRecord(values=values, notice_identifier=None, version=1)]
+    )
+
+    assert stats.skipped == 1
+    assert (
+        await db_session.scalar(select(func.count()).select_from(Notice).where(Notice.source == "ted")) == 0
+    )
+
+
+async def test_without_token_the_job_does_nothing(
+    client: httpx.AsyncClient, settings: Settings, db_session: AsyncSession
+) -> None:
+    unconfigured = settings.model_copy(update={"eavrop_api_token": None, "eavrop_client_id": None})
+
+    assert await ingest_eavrop(db_session, client, unconfigured, now=NOW) == {
+        "fetched": 0,
+        "inserted": 0,
+        "updated": 0,
+        "not_configured": 1,
+    }
+
+
+async def test_a_refused_token_fails_the_run(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(401))
+
+    with pytest.raises(IngestError, match="EAVROP_API_TOKEN"):
+        await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+
+async def test_a_list_item_outside_the_api_is_not_fetched(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    respx_mock.get(LIST_URL).mock(
+        return_value=httpx.Response(
+            200,
+            json=[
+                {"Url": "https://example.com/v1/procurements/1", "UpdatedDate": "2026-10-01T10:00:00+02:00"}
+            ],
+        )
+    )
+
+    stats = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+    assert stats["skipped"] == 1

@@ -34,6 +34,7 @@ from anbudsklar.ingest.notices import (
     NoticeKind,
     NoticeStatus,
     NoticeValues,
+    eavrop_procurement_id,
     save_notice,
     status_from_deadline,
     unique,
@@ -456,16 +457,24 @@ def _version(notice: Mapping[str, Any]) -> int:
 async def upsert_ted_notices(session: AsyncSession, records: Sequence[TedRecord]) -> IngestStats:
     stats = IngestStats(fetched=len(records))
     by_external_id, by_identifier = await _existing(session, records)
+    from_eavrop = await _eavrop_procurement_ids(session)
     for record in records:
         existing = by_external_id.get(record.values.external_id)
         if existing is None and record.notice_identifier:
             existing = by_identifier.get(record.notice_identifier)
+        if existing is None and eavrop_procurement_id(record.values.documents_url) in from_eavrop:
+            stats.skipped += 1  # the same procurement is already stored from e-Avrop (decision 0009)
+            continue
         if existing is not None and _version(existing.raw) > record.version:
             stats.record("unchanged")  # we already hold a newer version of this notice
             continue
         stats.record(save_notice(session, existing, record.values))
     await session.flush()
     return stats
+
+
+async def _eavrop_procurement_ids(session: AsyncSession) -> set[str]:
+    return set(await session.scalars(select(Notice.external_id).where(Notice.source == "eavrop")))
 
 
 async def _existing(

@@ -70,9 +70,16 @@ Alla inställningar läses av `backend/src/anbudsklar/config.py` vid start. List
 | `MCP_MAX_OUTPUT_CHARS` | `16000` | Högsta längd på ett verktygssvar. Eneo kortar av vid 32 768 tecken |
 | `TED_API_URL` | `https://api.ted.europa.eu/v3/notices/search` | TED:s sök-API |
 | `TED_BUYER_NAMES` | `["Sundsvalls kommun"]` | Köparnamn som söks i TED, utöver bolagen som finns i koden |
-| `EAVROP_BASE_URL` | `https://www.e-avrop.com/sundsvall` | e-Avrops sidor för Sundsvall |
+| `EAVROP_BASE_URL` | `https://www.e-avrop.com/sundsvall` | e-Avrops sidor för Sundsvall, för länkar till annonserna |
+| `EAVROP_API_URL` | `https://www.e-avrop.com/api` | e-Avrops API |
+| `EAVROP_API_TOKEN` | Inget | Hemlig. Kommunens nyckel till e-Avrops Projekt-API. Den läser även sekretessbelagda delar av kommunens upphandlingar, se [e-Avrops API](eavrop.md). Utan nyckel hämtas inget från e-Avrop |
+| `EAVROP_CLIENT_ID` | Inget | Kommunens kund-id i e-Avrop. Krävs tillsammans med `EAVROP_API_TOKEN` |
 | `RIKSDAGEN_LOU_URL` | `https://data.riksdagen.se/dokument/sfs-2016-1145.text` | LOU som text från Riksdagen |
 | `HTTP_USER_AGENT` | `Anbudsklar-PoC/0.1 (Sundsvalls kommun; kontakt via naringslivsenheten)` | Hur insamlaren presenterar sig |
+| `ACCESS_CODE` | Inget | Hemlig. Skyddar hela testmiljön ([beslut 0010](decisions/0010-labblage-egna-foretag.md)): webbappen visar bara "Ange accesskoden" och varje API-väg svarar 401 tills koden är inskriven, utom `/health` och `/mcp`. Byt koden efter träffen, så gäller inga gamla kakor |
+| `LAB_ENABLED` | `false` | Med `true`, och `ACCESS_CODE` satt, får inloggningssidan "Prova med ditt eget företag" |
+| `LAB_RETENTION_DAYS` | `30` | Hur länge ett labbföretag finns kvar innan jobbet `purge_lab` raderar det |
+| `SHOW_FICTITIOUS` | `true` | Med `false` döljs de påhittade annonserna, underlagen och avtalen överallt: i listor, sökning, matchning, inköps vyer och MCP. Inget raderas. Demopersonerna och deras företag finns kvar ([beslut 0007](decisions/0007-poc-login-persona-picker.md)) |
 | `SCHEDULER_ENABLED` | `true` | Läses bara av worker. Med `false` avslutas worker direkt. Appen kör aldrig schemalagda jobb |
 | `SMTP_HOST` | `localhost` | SMTP-server. Mailpit i PoC:n |
 | `SMTP_PORT` | `1025` | SMTP-port |
@@ -124,12 +131,13 @@ Worker kör jobben med APScheduler, i svensk tid. Varje körning sparas i tabell
 | Jobb | När | Gör |
 |---|---|---|
 | `ingest_ted` | Varje dag 06:15 | Hämtar annonser från TED |
-| `ingest_eavrop` | Varje dag 06:30 | Hämtar från e-Avrop, men bara om `robots.txt` tillåter det. Se [Datakällor](data-sources.md) |
+| `ingest_eavrop` | Varje dag 06:30 | Hämtar kommunens publicerade upphandlingar från e-Avrops API och underlaget till de öppna. Bara projekt som ändrats sedan förra lyckade körningen hämtas. Utan `EAVROP_API_TOKEN` gör jobbet ingenting. Se [e-Avrops API](eavrop.md) |
 | `ingest_lou` | Måndagar 05:00 | Hämtar LOU från Riksdagen |
 | `close_expired` | Var 15:e minut | Sparar `closed` på öppna annonser vars sista dag har passerat (sista anbudsdag, eller sista dag för anbudsansökan i ett selektivt förfarande), oavsett källa |
 | `interpret_pending` | Var femte minut | Tolkar nya underlag till checklistor, högst fem per körning. Ett misslyckat försök görs om efter 15 minuter, 30 minuter, 1 timme och 2 timmar, och efter fem försök ger jobbet upp. Det ger upp direkt när samma underlag inte kan lyckas: ett underlag utan läsbar text, en modell som fortsätter att bryta mot kontraktet, ett underlag som är för stort för modellen och en förfrågan som modelleverantören eller Eneo avvisar eller inte kan läsa |
 | `match_all` | Var 30:e minut | Bedömer annonser mot företagens profiler. En bedömning görs om när annonsen, profilen eller den publicerade checklistan har ändrats, eller när bedömningsversionen (`ASSESSMENT_VERSION` i `services/matching.py`) har bytts. När ett företag sparar sin profil bedömer appen just det företagets träffar direkt, se [AI-uppgifterna](ai-tasks.md#bedöma-matchning-bedom_matchning) |
 | `send_reminders` | Varje minut | Skickar påminnelser som är på tur, med länk till upphandlingen och till sidan Påminnelser |
+| `purge_lab` | Varje dag 04:30 | Raderar labbföretag vars tid har gått ut, med deras användare, träffar och påminnelser ([beslut 0010](decisions/0010-labblage-egna-foretag.md)). `anbudsklar lab purge` gör samma sak direkt |
 | `notify_matches` | Var tionde minut | Mejlar nya träffar som verkar passa eller passar delvis, en gång per användare och annons, med länk till upphandlingen och till Start |
 
 När worker startar läser den in CPV-listan och LOU om tabellerna är tomma.
@@ -144,11 +152,21 @@ AI-motor.
 
 Sidan Drift (`/inkop/drift`, i inköps kontomeny) visar jobben grupperade som Hämta, Bearbeta och Skicka, med
 misslyckade jobb först i varje grupp. Varje jobb visar sin status (Klar, Misslyckades, Pågår eller Inte körd; e-Avrop
-visas som "Inte aktiverad – väntar på tillstånd" när `robots.txt` stoppar hämtningen), när det senast kördes, en rad
+visas som "Inte aktiverad – nyckel saknas" när `EAVROP_API_TOKEN` och `EAVROP_CLIENT_ID` saknas), när det senast kördes, en rad
 ur statistiken och knappen "Kör nu: <jobb>" (`GET /api/admin/jobs` ger den senaste körningen per jobb). Medan en
 körning pågår hämtas listan om var tredje sekund. Ett fel visas med appens egen text på svenska när det kommer från
 insamlingen, AI-motorn eller appens regler. Andra fel, till exempel från databasen, visas som "Tekniskt fel (<typ>).
 Detaljerna finns i loggen.", så att ingen SQL eller intern text hamnar i vyn.
+
+## Inställningar i tjänsten
+
+Inställningar som verksamheten äger ligger i databasen (tabellen `app_settings`) och ändras på sidan Inställningar i
+inköps kontomeny (`/inkop/installningar`, `GET` och `PUT /api/admin/settings`), se
+[beslut 0011](decisions/0011-installningar-granskning-valfri.md). En rad som saknas betyder standardvärdet.
+
+| Inställning | Standard | Betyder |
+|---|---|---|
+| Inköp granskar checklistor innan de publiceras (`review_required`) | På | Av: en tolkning publiceras direkt, märkt "inte granskad av inköp", och de checklistor som väntar på granskning publiceras när inställningen slås av. Avvisade och tillbakadragna rörs inte |
 
 ## Loggar
 
@@ -216,7 +234,8 @@ skäl.
 
 ## Kända luckor
 
-- e-Avrop hämtas inte, eftersom `robots.txt` förbjuder det. Annonser under tröskelvärdena saknas därför.
+- e-Avrop hämtas bara med kommunens nyckel. Utan den saknas annonser under tröskelvärdena och riktiga underlag. Det
+  e-Avrops API inte ger, till exempel frågor och svar, står i [e-Avrops API](eavrop.md#det-som-saknas).
 - Inloggningen är ett val av demoperson ([beslut 0007](decisions/0007-poc-login-persona-picker.md)). Sessionerna
   ligger i processens minne, gäller i åtta timmar och är högst 10 000; därutöver loggas den äldsta ut först. En
   omstart loggar ut alla, och appen måste köras som en enda process. Gränserna för antal anrop och vilken webbläsare
