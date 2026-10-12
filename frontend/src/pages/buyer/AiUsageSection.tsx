@@ -10,7 +10,7 @@ import { useState } from "react";
 import { useAiUsage, useConfig } from "../../api/queries";
 import type { AiUsageTaskView } from "../../api/types";
 import { ErrorNotice, Loading } from "../../components/states";
-import { formatNumber, formatSekCost } from "../../lib/format";
+import { formatNumber, formatSekCost, plural } from "../../lib/format";
 import { aiTaskLabel } from "../../lib/labels";
 import { useIsPhone } from "../../lib/usePhone";
 import { DEFAULT_DAYS, engineNote, modelsLine, PERIODS, priceNote, summaryLine } from "./aiUsage";
@@ -73,20 +73,32 @@ const COLUMNS: TableColumn<TaskRow>[] = [
   },
 ];
 
-/** On a phone the two token columns become one, so the task's name keeps room to wrap. */
+/**
+ * On a phone the calls stand under the task's name and the two token columns become one, so the name keeps room
+ * to wrap by words: at 390 px four fixed columns left it a sliver that broke "Bedöma matchning" mid-word.
+ */
 const PHONE_COLUMNS: TableColumn<TaskRow>[] = [
-  COLUMNS[0]!,
-  { ...COLUMNS[1]!, width: pixel(72) },
+  {
+    key: "task",
+    header: "Uppgift",
+    width: proportional(1, { minWidth: 0 }),
+    renderCell: ({ item }) => (
+      <VStack gap={0}>
+        <Text>{aiTaskLabel(item.task)}</Text>
+        <Text type="supporting">{plural(item.calls, "anrop", "anrop")}</Text>
+      </VStack>
+    ),
+  },
   {
     key: "tokens",
     header: "Tokens",
-    width: pixel(96),
+    width: pixel(88),
     align: "end",
     renderCell: ({ item }) => (
       <Figure text={tokens(item.input_tokens + item.output_tokens, item.calls_with_usage)} missing={UNCOUNTED} />
     ),
   },
-  { ...COLUMNS[4]!, width: pixel(96) },
+  { ...COLUMNS[4]!, width: pixel(84) },
 ];
 
 function Usage({ days }: { days: number }) {
