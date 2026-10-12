@@ -24,6 +24,14 @@ function documentWords(document: DocumentInfo): { shown: string; name: string } 
   return { shown: `Underlaget · ${pages}`, name: `Underlaget, ${pages}` };
 }
 
+/** "3 sidor utan läsbar text": pages the AI never saw (scans, images), so the reader checks those in the file. */
+export function emptyPagesText(document: DocumentInfo): string | null {
+  if (document.empty_pages <= 0) return null;
+  return document.page_count > 0 && document.empty_pages === document.page_count
+    ? "ingen läsbar text, troligen inskannad"
+    : `${plural(document.empty_pages, "sida", "sidor")} utan läsbar text`;
+}
+
 /** "Ladda ned" with its icon, named by what it saves ("Ladda ned underlaget"); a plain anchor, past the router. */
 function DownloadLink({ document, name }: { document: DocumentInfo; name: string }) {
   return (
@@ -81,7 +89,11 @@ export function DocumentItem({ notice, document }: { notice: NoticeDetail; docum
         <VStack gap={0.5}>
           <Text weight="medium">{document.filename}</Text>
           <Text type="supporting">
-            {[document.page_count > 0 ? plural(document.page_count, "sida", "sidor") : null, document.is_fictitious ? "Fiktiv" : null]
+            {[
+              document.page_count > 0 ? plural(document.page_count, "sida", "sidor") : null,
+              emptyPagesText(document),
+              document.is_fictitious ? "Fiktiv" : null,
+            ]
               .filter(Boolean)
               .join(" · ")}
           </Text>
@@ -110,6 +122,36 @@ export function DocumentList({ notice }: { notice: NoticeDetail }) {
       {notice.documents.map((document) => (
         <DocumentItem key={document.id} notice={notice} document={document} />
       ))}
+    </VStack>
+  );
+}
+
+/**
+ * The files the source lists that Anbudshjälpen could not read in (decision 0020), with the reason, so the documents
+ * here are never taken for the whole set: a price list in Excel the AI never saw is still part of the procurement.
+ */
+export function UnreadFiles({ notice }: { notice: NoticeDetail }) {
+  if (notice.unread_files.length === 0) return null;
+  const outside = externalLink(notice.documents_url);
+  return (
+    <VStack gap={2} hAlign="start">
+      <Text weight="semibold">Finns hos köparen men inte här</Text>
+      <Text type="supporting">
+        Anbudshjälpen kunde inte läsa in de här filerna, så varken checklistan, Fråga AI eller sökningen känner till
+        dem. Läs dem i originalet.
+      </Text>
+      <VStack as="ul" role="list" aria-label="Filer som inte lästs in" gap={1}>
+        {notice.unread_files.map((file) => (
+          <HStack as="li" key={file.filename} gap={2} vAlign="start">
+            <Text>{`${file.filename} · ${file.reason}`}</Text>
+          </HStack>
+        ))}
+      </VStack>
+      {outside && (
+        <Link href={outside.href} isExternalLink isStandalone>
+          {outsideDocumentsText(outside.site)}
+        </Link>
+      )}
     </VStack>
   );
 }

@@ -2,7 +2,7 @@
 
 Page numbers are the backbone of citations: engines see the text with "[SIDA n]"
 markers and our verifier checks quotes against the same list. PDFs therefore keep
-their physical pages. Formats without pages (DOCX, plain text) are cut into
+their physical pages. Formats without pages (DOCX, XLSX, plain text) are cut into
 pseudo-pages of about `PSEUDO_PAGE_CHARS` characters at paragraph boundaries, so a
 citation still points to a stable, readable chunk.
 
@@ -10,16 +10,25 @@ The cleaning keeps line breaks (lists, headings and tables stay readable for peo
 and models) but repairs what PDF extraction typically breaks: ligatures, odd spaces,
 soft hyphens and words hyphenated across a line break.
 
+Word files are read from their XML rather than through python-docx's text properties,
+which only see ordinary runs: a municipal template keeps the diary number, dates and
+whole clauses in content controls, forms put their fields in text boxes, and footnotes
+hold the fine print. A requirement in any of them must not vanish without a trace.
+
 Uploads come from anyone who picks a persona, and the app runs as one process, so
-extraction must never use memory out of proportion to the upload. A DOCX is a zip
-archive whose XML python-docx expands and parses in full: a small file can unpack to
-gigabytes. The archive is therefore checked before parsing (`_check_docx_archive`), and
-every format stops at `MAX_PAGES` pages or `MAX_CHARS` characters, which is also more
-than an engine can take in one call.
+extraction must never use memory out of proportion to the upload. DOCX and XLSX are
+zip archives whose XML the parsers expand in full: a small file can unpack to
+gigabytes. The archive is therefore checked before parsing (`_check_office_archive`),
+and every format stops at `MAX_PAGES` pages or `MAX_CHARS` characters, which is also
+more than an engine can take in one call.
+
+`EXTRACTION_VERSION` is stored with every document. Raise it when the text a stored
+file would give changes, so that the worker reads the files again (`reextract_outdated`).
 """
 
 from __future__ import annotations
 
+import datetime as dt
 import io
 import logging
 import re
@@ -27,18 +36,21 @@ import unicodedata
 import zipfile
 from collections.abc import Iterable, Iterator
 from pathlib import PurePosixPath
-from typing import Literal
+from typing import Any, Literal, NamedTuple
 
 import docx
+import openpyxl
+from docx.opc.constants import RELATIONSHIP_TYPE
 from docx.oxml.document import CT_Document
 from docx.oxml.ns import qn
-from docx.oxml.table import CT_Tbl
-from docx.oxml.text.paragraph import CT_P
-from docx.table import Table
-from docx.text.paragraph import Paragraph
+from docx.oxml.parser import parse_xml
 from pypdf import PdfReader
 
 logger = logging.getLogger(__name__)
+
+EXTRACTION_VERSION = 3
+"""Version 3: e-Avrop's page footer is stripped and the export is recognised as a layout.
+Version 2: Word content controls, text boxes, footnotes and nested tables; Excel sheets."""
 
 PSEUDO_PAGE_CHARS = 3_500
 
@@ -48,33 +60,40 @@ MAX_CHARS = 1_500_000
 """Most characters of cleaned text read from one document."""
 
 DOCX_MAX_MEMBERS = 2_000
-"""Most files inside a DOCX archive; Word writes a few dozen plus one per image."""
+"""Most files inside a DOCX or XLSX archive; Office writes a few dozen plus one per image."""
 DOCX_MAX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
-"""Most bytes all files in a DOCX archive may unpack to (python-docx keeps every part)."""
+"""Most bytes all files in an Office archive may unpack to (python-docx keeps every part)."""
 DOCX_MAX_XML_BYTES = 32 * 1024 * 1024
-"""Most bytes of XML in a DOCX archive; far more than `MAX_CHARS` of text needs."""
+"""Most bytes of XML in an Office archive; far more than `MAX_CHARS` of text needs."""
 DOCX_MAX_XML_ELEMENTS = 1_000_000
-"""Most XML elements in a DOCX archive. lxml and python-docx spend 100-250 bytes per
+"""Most XML elements in an Office archive. lxml and python-docx spend 100-250 bytes per
 element, so element-dense XML (empty paragraphs) is the costliest kind to parse."""
 DOCX_MAX_BODY_ITEMS = 100_000
 """Most top-level paragraphs and tables read from a DOCX. 300 pages hold a few tens of
 thousands at most; more is padding, such as hundreds of thousands of empty paragraphs."""
 DOCX_MAX_COMPRESSION_RATIO = 100
-"""Highest unpacked/packed ratio for a large archive member. Word XML packs about 5-20x."""
+"""Highest unpacked/packed ratio for a large archive member. Office XML packs about 5-20x."""
 DOCX_RATIO_MIN_BYTES = 1024 * 1024
 """Members smaller than this skip the ratio check: they cannot do harm on their own."""
+XLSX_MAX_ROWS = 200_000
+"""Most rows read from a workbook, empty ones included: a sheet can declare a range far
+beyond its cells, and openpyxl then yields the empty rows in between."""
 _ZIP_CHUNK_BYTES = 256 * 1024
 
 PDF_MIMETYPE = "application/pdf"
 DOCX_MIMETYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+XLSX_MIMETYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+XLSM_MIMETYPE = "application/vnd.ms-excel.sheet.macroEnabled.12"
 TEXT_MIMETYPE = "text/plain"
 MARKDOWN_MIMETYPE = "text/markdown"
 
-DocumentKind = Literal["pdf", "docx", "text"]
+DocumentKind = Literal["pdf", "docx", "xlsx", "text"]
 
 _KIND_BY_MIMETYPE: dict[str, DocumentKind] = {
     PDF_MIMETYPE: "pdf",
     DOCX_MIMETYPE: "docx",
+    XLSX_MIMETYPE: "xlsx",
+    XLSM_MIMETYPE: "xlsx",
     TEXT_MIMETYPE: "text",
     MARKDOWN_MIMETYPE: "text",
     "text/x-markdown": "text",
@@ -82,6 +101,8 @@ _KIND_BY_MIMETYPE: dict[str, DocumentKind] = {
 _KIND_BY_SUFFIX: dict[str, DocumentKind] = {
     ".pdf": "pdf",
     ".docx": "docx",
+    ".xlsx": "xlsx",
+    ".xlsm": "xlsx",
     ".txt": "text",
     ".md": "text",
     ".markdown": "text",
@@ -89,8 +110,36 @@ _KIND_BY_SUFFIX: dict[str, DocumentKind] = {
 _MIMETYPE_BY_KIND: dict[DocumentKind, str] = {
     "pdf": PDF_MIMETYPE,
     "docx": DOCX_MIMETYPE,
+    "xlsx": XLSX_MIMETYPE,
     "text": TEXT_MIMETYPE,
 }
+SUPPORTED_SUFFIXES = frozenset(_KIND_BY_SUFFIX)
+"""File endings the extraction reads; ingestion fetches only these."""
+
+# WordprocessingML tags, resolved once (lxml compares tag strings).
+_W_P = qn("w:p")
+_W_TBL = qn("w:tbl")
+_W_TR = qn("w:tr")
+_W_TC = qn("w:tc")
+_W_T = qn("w:t")
+_W_TAB = qn("w:tab")
+_W_BR = qn("w:br")
+_W_CR = qn("w:cr")
+_W_SDT = qn("w:sdt")
+_W_SDT_CONTENT = qn("w:sdtContent")
+_W_DEL = qn("w:del")
+_W_NO_BREAK_HYPHEN = qn("w:noBreakHyphen")
+_W_FOOTNOTE = qn("w:footnote")
+_W_TYPE = qn("w:type")
+_W_ID = qn("w:id")
+# Markup compatibility: a drawing or text box comes as an AlternateContent with a Choice and
+# a Fallback that hold the same text twice; only the Choice is read.
+_MC_FALLBACK = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Fallback"
+_BLOCK_TAGS = frozenset({_W_P, _W_TBL})
+_CONTAINER_TAGS = frozenset({_W_SDT, _W_SDT_CONTENT})
+_SKIPPED_SUBTREES = frozenset({_MC_FALLBACK, _W_DEL, qn("w:moveFrom")})
+# lxml ships no type stubs, so the XML elements the Word reader walks are untyped.
+XmlElement = Any
 
 _LIGATURES = str.maketrans(
     {
@@ -152,9 +201,10 @@ def _too_much_text() -> DocumentTooLarge:
     )
 
 
-def _docx_too_large() -> DocumentTooLarge:
+def _office_too_large(kind: DocumentKind) -> DocumentTooLarge:
+    name = "Excel-filen" if kind == "xlsx" else "Word-filen"
     return DocumentTooLarge(
-        "Word-filen blir för stor när den packas upp och kan inte läsas. "
+        f"{name} blir för stor när den packas upp och kan inte läsas. "
         "Spara den som PDF eller dela upp den och försök igen."
     )
 
@@ -172,7 +222,7 @@ def _kind(mimetype: str, filename: str, data: bytes) -> DocumentKind:
     if data.startswith(b"%PDF-"):
         return "pdf"
     raise UnsupportedDocument(
-        "Filformatet stöds inte. Ladda upp underlaget som PDF, Word (.docx) eller textfil."
+        "Filformatet stöds inte. Ladda upp underlaget som PDF, Word (.docx), Excel (.xlsx) eller textfil."
     )
 
 
@@ -287,6 +337,13 @@ def _pdf_pages(data: bytes) -> Iterator[str]:
 
 
 _DOCX_UNREADABLE = "Word-filen kunde inte läsas. Den kan vara skadad."
+_XLSX_UNREADABLE = "Excel-filen kunde inte läsas. Den kan vara skadad."
+_UNREADABLE_BY_KIND: dict[DocumentKind, str] = {"docx": _DOCX_UNREADABLE, "xlsx": _XLSX_UNREADABLE}
+
+
+def _unreadable(kind: DocumentKind) -> UnreadableDocument:
+    return UnreadableDocument(_UNREADABLE_BY_KIND.get(kind, _DOCX_UNREADABLE))
+
 
 # Starts of parts libxml2 would decode as UCS-4 or EBCDIC. OPC allows only UTF-8 and UTF-16.
 _FOREIGN_XML_HEADS = (
@@ -311,33 +368,33 @@ _BYTE_TRANSPARENT_ENCODINGS = re.compile(
 )
 
 
-def _is_xml_part(head: bytes) -> bool:
+def _is_xml_part(head: bytes, kind: DocumentKind) -> bool:
     """Whether libxml2 could parse an archive member that starts with `head` as XML.
 
     Binary parts (images, fonts) cannot be parsed, so they are left to the size checks.
     An XML part must use an encoding in which every "<" is one 0x3C byte, otherwise the
-    element count in `_check_docx_archive` could be dodged (in UTF-7 "<" is "+ADw-").
+    element count in `_check_office_archive` could be dodged (in UTF-7 "<" is "+ADw-").
     """
 
     if head.startswith(_FOREIGN_XML_HEADS):
-        raise UnreadableDocument(_DOCX_UNREADABLE)
+        raise _unreadable(kind)
     for signature, codec in _UTF16_HEADS.items():
         if head.startswith(signature):
             declared = _XML_DECLARED_ENCODING.search(head[:400].decode(codec, "ignore"))
             if declared is not None and not declared[1].lower().startswith("utf-16"):
-                raise UnreadableDocument(_DOCX_UNREADABLE)
+                raise _unreadable(kind)
             return True
     body = head.removeprefix(b"\xef\xbb\xbf").lstrip(b" \t\r\n")
     if body[:1] not in (b"<", b""):
         return False
     declared = _XML_DECLARED_ENCODING.match(body[:400].decode("latin-1"))
     if declared is not None and not _BYTE_TRANSPARENT_ENCODINGS.fullmatch(declared[1]):
-        raise UnreadableDocument(_DOCX_UNREADABLE)
+        raise _unreadable(kind)
     return True
 
 
-def _check_docx_archive(data: bytes) -> None:
-    """Reject a DOCX that would unpack to far more than python-docx should hold in memory.
+def _check_office_archive(data: bytes, kind: DocumentKind) -> None:
+    """Reject a DOCX or XLSX that would unpack to far more than a parser should hold in memory.
 
     The declared sizes are checked first (cheap). They are trustworthy as upper bounds:
     `zipfile` never returns more than a member's declared size and fails the CRC check
@@ -350,15 +407,15 @@ def _check_docx_archive(data: bytes) -> None:
         archive = zipfile.ZipFile(io.BytesIO(data))
         members = archive.infolist()
     except Exception as exc:  # BadZipFile, or a damaged central directory
-        raise UnreadableDocument(_DOCX_UNREADABLE) from exc
+        raise _unreadable(kind) from exc
     if len(members) > DOCX_MAX_MEMBERS:
-        raise _docx_too_large()
+        raise _office_too_large(kind)
     if sum(member.file_size for member in members) > DOCX_MAX_UNCOMPRESSED_BYTES:
-        raise _docx_too_large()
+        raise _office_too_large(kind)
     for member in members:
         ratio = member.file_size / max(member.compress_size, 1)
         if member.file_size >= DOCX_RATIO_MIN_BYTES and ratio > DOCX_MAX_COMPRESSION_RATIO:
-            raise _docx_too_large()
+            raise _office_too_large(kind)
     xml_bytes = 0
     xml_elements = 0
     try:
@@ -367,7 +424,7 @@ def _check_docx_archive(data: bytes) -> None:
                 continue
             with archive.open(member) as stream:
                 chunk = stream.read(_ZIP_CHUNK_BYTES)
-                if not _is_xml_part(chunk):
+                if not _is_xml_part(chunk, kind):
                     continue
                 previous = b""
                 while chunk:
@@ -376,23 +433,122 @@ def _check_docx_archive(data: bytes) -> None:
                     # In UTF-16 end tags count too, which errs on the safe side.
                     xml_elements += chunk.count(b"<") - (previous[-1:] + chunk).count(b"</")
                     if xml_bytes > DOCX_MAX_XML_BYTES or xml_elements > DOCX_MAX_XML_ELEMENTS:
-                        raise _docx_too_large()
+                        raise _office_too_large(kind)
                     previous, chunk = chunk, stream.read(_ZIP_CHUNK_BYTES)
     except DocumentError:
         raise
     except Exception as exc:  # bad CRC, encrypted member, unsupported compression
-        raise UnreadableDocument(_DOCX_UNREADABLE) from exc
+        raise _unreadable(kind) from exc
+
+
+# --- Word -----------------------------------------------------------------------------
+
+
+def _children(parent: XmlElement, tags: frozenset[str]) -> Iterator[XmlElement]:
+    """Children of `parent` with one of `tags`, in order, looking inside content controls.
+
+    A content control (`w:sdt`) wraps what it holds in `w:sdtContent`: blocks in the body,
+    rows in a table, cells in a row. A template or a form keeps whole sections in them.
+    """
+
+    for child in parent.iterchildren():
+        if child.tag in tags:
+            yield child
+        elif child.tag in _CONTAINER_TAGS:
+            yield from _children(child, tags)
+
+
+def _inline_text(element: XmlElement) -> str:
+    """The text under a paragraph or run-level element, with tabs and line breaks kept.
+
+    The walk covers content controls, hyperlinks, fields and the text boxes of a drawing,
+    which python-docx's `Paragraph.text` leaves out. It skips what is not the document's
+    text: the deleted side of a tracked change and the fallback copy of a drawing. A text
+    box's own paragraphs and tables become lines of their own.
+    """
+
+    parts: list[str] = []
+    for child in element.iterchildren():
+        tag = child.tag
+        if tag in _SKIPPED_SUBTREES:
+            continue
+        if tag == _W_T:
+            parts.append(child.text or "")
+        elif tag == _W_TAB:
+            parts.append("\t")
+        elif tag in (_W_BR, _W_CR):
+            parts.append("\n")
+        elif tag == _W_NO_BREAK_HYPHEN:
+            parts.append("-")
+        elif tag == _W_P:
+            parts.append(f"\n{_inline_text(child)}\n")
+        elif tag == _W_TBL:
+            parts.append("\n" + "\n".join(_table_rows(child)) + "\n")
+        elif isinstance(tag, str):  # comments and processing instructions have no text
+            parts.append(_inline_text(child))
+    return "".join(parts)
+
+
+def _block_text(block: XmlElement) -> str:
+    """A paragraph as one block, a table as one line per row."""
+
+    if block.tag == _W_TBL:
+        return "\n".join(_table_rows(block))
+    return _inline_text(block).strip()
+
+
+def _table_rows(table: XmlElement) -> list[str]:
+    """One line per row, cells separated by " | "; a nested table's rows join their cell."""
+
+    rows: list[str] = []
+    for row in _children(table, frozenset({_W_TR})):
+        cells: list[str] = []
+        for cell in _children(row, frozenset({_W_TC})):
+            blocks = (_block_text(block) for block in _children(cell, _BLOCK_TAGS))
+            text = " ".join(" ".join(block.split()) for block in blocks if block.strip())
+            if text and (not cells or cells[-1] != text):  # merged cells repeat their text
+                cells.append(text)
+        if cells:
+            rows.append(" | ".join(cells))
+    return rows
+
+
+def _footnotes(document: Any) -> list[str]:
+    """The document's footnotes, numbered as Word numbers them, for the end of the text.
+
+    Fine print such as "Kravet gäller inte vid …" often stands there. python-docx has no
+    footnote API, so the part is read as XML; the separator notes Word always writes are
+    left out, and a part that cannot be read costs the footnotes, never the document.
+    """
+
+    try:
+        part = document.part.part_related_by(RELATIONSHIP_TYPE.FOOTNOTES)
+        root = getattr(part, "element", None)
+        if root is None:
+            root = parse_xml(part.blob)  # our own archive check ran first
+    except Exception:  # no footnotes part, or one Word would not have written
+        return []
+    notes: list[str] = []
+    for note in root.iterchildren(_W_FOOTNOTE):
+        if note.get(_W_TYPE):  # separator, continuationSeparator
+            continue
+        blocks = (_block_text(block) for block in _children(note, _BLOCK_TAGS))
+        text = " ".join(" ".join(block.split()) for block in blocks if block.strip())
+        if text:
+            number = note.get(_W_ID)
+            notes.append(f"[{number}] {text}" if number else text)
+    return notes
 
 
 def _docx_blocks(data: bytes) -> list[str]:
-    """Text of the top-level paragraphs and table rows in the document body, in order.
+    """Text of the body's paragraphs and table rows in order, then the footnotes.
 
     The body is walked lazily instead of with `Document.iter_inner_content()`, which first
     builds a list of every paragraph: with many empty paragraphs that list alone costs
     more memory than the document tree.
     """
 
-    _check_docx_archive(data)
+    _check_office_archive(data, "docx")
     try:
         document = docx.Document(io.BytesIO(data))
     except Exception as exc:  # python-docx raises zip, XML and key errors for bad files
@@ -403,35 +559,81 @@ def _docx_blocks(data: bytes) -> list[str]:
         return []
     blocks: list[str] = []
     chars = 0
-    for count, element in enumerate(body.iterchildren(qn("w:p"), qn("w:tbl")), start=1):
+    for count, element in enumerate(_children(body, _BLOCK_TAGS), start=1):
         if count > DOCX_MAX_BODY_ITEMS:
             raise _too_many_pages()
-        if isinstance(element, CT_P):
-            texts = [Paragraph(element, document).text.strip()]
-        elif isinstance(element, CT_Tbl):
-            texts = _table_rows(Table(element, document))
-        else:
-            continue
-        for text in texts:
-            if text:
-                blocks.append(text)
+        for text in _block_text(element).split("\n"):
+            if text.strip():
+                blocks.append(text.strip())
                 chars += len(text)
         if chars > 2 * MAX_CHARS:  # cleaning shortens text a little; the exact check comes later
             raise _too_much_text()
+    notes = _footnotes(document)
+    if notes:
+        blocks.append("Fotnoter")
+        blocks.extend(notes)
     return blocks
 
 
-def _table_rows(table: Table) -> list[str]:
-    rows: list[str] = []
-    for row in table.rows:
-        cells: list[str] = []
-        for cell in row.cells:
-            text = " ".join(cell.text.split())
-            if text and (not cells or cells[-1] != text):  # merged cells repeat their text
-                cells.append(text)
-        if cells:
-            rows.append(" | ".join(cells))
-    return rows
+# --- Excel ----------------------------------------------------------------------------
+
+
+def _cell_value(value: object) -> str:
+    """A cell as Swedish readers write it: whole numbers without ".0", decimals with a comma."""
+
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "Ja" if value else "Nej"
+    if isinstance(value, float):
+        return str(int(value)) if value.is_integer() else str(value).replace(".", ",")
+    if isinstance(value, dt.datetime):
+        if value.time() == dt.time.min:
+            return value.date().isoformat()
+        return value.isoformat(sep=" ", timespec="minutes")
+    if isinstance(value, dt.date):
+        return value.isoformat()
+    return str(value)
+
+
+def _xlsx_sheets(data: bytes) -> list[list[str]]:
+    """Each sheet with rows as "cell | cell" lines, the sheet's name first; empty sheets left out.
+
+    Price lists and requirement matrices come as workbooks. Cached values are read, so a
+    formula without a saved result is empty, which the citation check then cannot verify;
+    that is the safe direction. Every sheet starts a new pseudo-page.
+    """
+
+    _check_office_archive(data, "xlsx")
+    try:
+        workbook = openpyxl.load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+    except Exception as exc:  # not a workbook, or one openpyxl cannot read
+        raise _unreadable("xlsx") from exc
+    sheets: list[list[str]] = []
+    rows_seen = chars = 0
+    try:
+        for sheet in workbook.worksheets:
+            blocks = [f"Blad: {sheet.title}"]
+            for row in sheet.iter_rows(values_only=True):
+                rows_seen += 1
+                if rows_seen > XLSX_MAX_ROWS:
+                    raise _too_many_pages()
+                cells = [" ".join(text.split()) for value in row if (text := _cell_value(value)).strip()]
+                if cells:
+                    line = " | ".join(cells)
+                    blocks.append(line)
+                    chars += len(line)
+                    if chars > 2 * MAX_CHARS:
+                        raise _too_much_text()
+            if len(blocks) > 1:
+                sheets.append(blocks)
+    except DocumentError:
+        raise
+    except Exception as exc:  # damaged sheet XML
+        raise _unreadable("xlsx") from exc
+    finally:
+        workbook.close()
+    return sheets
 
 
 def _decode_text(data: bytes) -> str:
@@ -453,13 +655,37 @@ def _text_pages(data: bytes) -> list[str]:
     return paginate((p for p in paragraphs if p), separator="\n\n")
 
 
-def extract_pages(data: bytes, mimetype: str, filename: str) -> list[str]:
-    """Extract cleaned text per page (PDF) or pseudo-page (DOCX, text, markdown).
+class Extraction(NamedTuple):
+    """What a file gave: its pages, and the layout they were recognised as (see `eavrop_export`)."""
 
-    Raises `UnsupportedDocument` for other formats, `UnreadableDocument` when a file is
-    damaged, encrypted or has no text layer (scanned documents are not supported), and
-    `DocumentTooLarge` past `MAX_PAGES` pages, `MAX_CHARS` characters or a DOCX archive
-    limit.
+    pages: list[str]
+    layout: str | None
+
+
+def extract_document(data: bytes, mimetype: str, filename: str) -> Extraction:
+    """`extract_pages` plus the layout: an e-Avrop export loses its page footer and is marked."""
+
+    from anbudsklar.documents.eavrop_export import detect_layout, strip_footers
+
+    pages = _extract_pages(data, mimetype, filename)
+    layout = detect_layout(pages)
+    return Extraction(strip_footers(pages) if layout else pages, layout)
+
+
+def extract_pages(data: bytes, mimetype: str, filename: str) -> list[str]:
+    """The pages of `extract_document`, for callers that do not keep the layout."""
+
+    return extract_document(data, mimetype, filename).pages
+
+
+def _extract_pages(data: bytes, mimetype: str, filename: str) -> list[str]:
+    """Extract cleaned text per page (PDF) or pseudo-page (DOCX, XLSX, text, markdown).
+
+    A page without text stays as an empty string so that the numbering holds; callers
+    count them (`empty_pages`), and the engines are told. Raises `UnsupportedDocument` for
+    other formats, `UnreadableDocument` when a file is damaged, encrypted or has no text
+    layer at all (scanned documents are not supported), and `DocumentTooLarge` past
+    `MAX_PAGES` pages, `MAX_CHARS` characters or an Office archive limit.
     """
 
     kind = _kind(mimetype, filename, data)
@@ -468,6 +694,8 @@ def extract_pages(data: bytes, mimetype: str, filename: str) -> list[str]:
         raw_pages = _pdf_pages(data)
     elif kind == "docx":
         raw_pages = paginate(_docx_blocks(data), separator="\n")
+    elif kind == "xlsx":
+        raw_pages = [page for sheet in _xlsx_sheets(data) for page in paginate(sheet, separator="\n")]
     else:
         raw_pages = _text_pages(data)
     pages: list[str] = []

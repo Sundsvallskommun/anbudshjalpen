@@ -8,13 +8,15 @@ the response.
 
 from __future__ import annotations
 
+import io
 import json
 import re
 from copy import deepcopy
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
+import openpyxl
 import pytest
 import respx
 from pydantic import SecretStr
@@ -34,7 +36,7 @@ from anbudsklar.ingest.eavrop import (
 )
 from anbudsklar.ingest.notices import STOCKHOLM, NoticeValues, eavrop_procurement_id, notices_by_external_id
 from anbudsklar.ingest.ted import TedRecord, upsert_ted_notices
-from anbudsklar.models import Document, Notice, PublishedAnswer
+from anbudsklar.models import Document, DocumentPage, Notice, PublishedAnswer
 
 API = "https://www.e-avrop.com/api"
 CLIENT_ID = 4242
@@ -150,6 +152,7 @@ def _project(**changes: Any) -> dict[str, Any]:
                 _document(11, "Bilaga 1 Prisbilaga.xlsx"),
                 _document(12, "Kravspecifikation fiktiv.txt"),
                 _document(13, "Administrativa föreskrifter fiktiv.txt"),
+                _document(14, "Foto entré.jpg"),
             ],
         },
         "RequestForApplications": {},
@@ -185,15 +188,31 @@ def api_settings(settings: Settings) -> Settings:
     )
 
 
+def _workbook(rows: list[list[object]]) -> bytes:
+    """A small fictitious price list, as a buyer attaches it."""
+
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    assert sheet is not None
+    sheet.title = "Priser"
+    for row in rows:
+        sheet.append(row)
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+
 def _mock_documents(respx_mock: respx.MockRouter, *, question_log: bool = True) -> dict[int, respx.Route]:
     routes = {}
-    for doc_id, text in (
-        (12, "Kravspecifikation. Leverantören ska måla fasaden."),
-        (13, "Anbud ska lämnas på svenska."),
-    ):
+    files: tuple[tuple[int, bytes], ...] = (
+        (11, _workbook([["Post", "Pris per timme"], ["Målning", 450]])),
+        (12, "Kravspecifikation. Leverantören ska måla fasaden.".encode()),
+        (13, "Anbud ska lämnas på svenska.".encode()),
+    )
+    for doc_id, content in files:
         routes[doc_id] = respx_mock.get(f"{API}/v1/announcement-documents/{doc_id}").mock(
             return_value=httpx.Response(
-                200, content=text.encode(), headers={"Content-Type": "application/octet-stream"}
+                200, content=content, headers={"Content-Type": "application/octet-stream"}
             )
         )
     if question_log:
@@ -248,6 +267,7 @@ def test_public_procurement_reads_only_the_allowlist() -> None:
         "Bilaga 1 Prisbilaga.xlsx",
         "Kravspecifikation fiktiv.txt",
         "Administrativa föreskrifter fiktiv.txt",
+        "Foto entré.jpg",
     ]
     stored = json.dumps(map_procurement(procurement, Settings(), now=NOW).columns(), default=str)
     for word in SECRET_WORDS:
@@ -315,8 +335,9 @@ def test_a_document_outside_the_announcement_address_is_skipped() -> None:
         (["Kravspecifikation.pdf", "Upphandlinsförfrågan 2026.docx"], "Upphandlinsförfrågan 2026.docx"),
         (["Avtalsvillkor.pdf", "Krav på Leverantör.pdf", "Kravspecifikation.pdf"], "Krav på Leverantör.pdf"),
         (["Prisbilaga.xlsx", "Inbjudan till utbildning.pdf"], "Inbjudan till utbildning.pdf"),
-        (["Prisbilaga.xlsx", "Uppdraget.pdf"], "Uppdraget.pdf"),  # the only readable file
-        (["Avtalsvillkor.pdf", "Utvärderingsmodell.pdf"], None),
+        (["Ritningar.zip", "Uppdraget.pdf"], "Uppdraget.pdf"),  # the only readable file
+        (["Avtalsvillkor.docx", "Utvärderingsmodell.pdf"], "Utvärderingsmodell.pdf"),  # no word: first PDF
+        (["Ritningar.zip", "Film.mp4"], None),
     ],
 )
 def test_main_document(filenames: list[str], expected: str | None) -> None:
@@ -362,8 +383,8 @@ async def test_ingest_stores_the_notice_and_only_the_public_documents(
         "inserted": 1,
         "updated": 0,
         "not_public": 1,
-        "documents_stored": 2,
-        "documents_skipped": 1,
+        "documents_stored": 3,
+        "documents_skipped": 1,  # the photo
         "answers_inserted": 1,
     }
     assert listing.calls.last.request.headers["Authorization"] == "Bearer test-token"
@@ -382,13 +403,21 @@ async def test_ingest_stores_the_notice_and_only_the_public_documents(
         assert word not in stored_text
     stored = list(
         await db_session.scalars(
-            select(Document).where(Document.notice_id == notice.id).order_by(Document.created_at)
+            select(Document)
+            .where(Document.notice_id == notice.id)
+            .order_by(Document.created_at, Document.filename)
         )
     )
     assert [(document.filename, document.auto_interpret) for document in stored] == [
         ("Administrativa föreskrifter fiktiv.txt", True),
+        ("Bilaga 1 Prisbilaga.xlsx", False),
         ("Kravspecifikation fiktiv.txt", False),
     ]
+    workbook = next(document for document in stored if document.filename.endswith(".xlsx"))
+    pages = await db_session.scalars(select(DocumentPage.text).where(DocumentPage.document_id == workbook.id))
+    assert list(pages) == ["Blad: Priser\nPost | Pris per timme\nMålning | 450"]
+    # The reader is told what is in e-Avrop but not here, and why.
+    assert notice.unread_files == [{"filename": "Foto entré.jpg", "reason": "Filformatet .jpg stöds inte"}]
     # Only the answered question is public; the unanswered one is not stored.
     [answer] = (await db_session.scalars(select(PublishedAnswer))).all()
     assert (answer.notice_id, answer.question, answer.answer) == (
@@ -432,7 +461,7 @@ async def test_a_refetch_reads_stored_projects_again(
 
     second = await ingest_eavrop(db_session, client, api_settings, now=NOW, refetch=True, request_interval=0)
 
-    assert second == {"fetched": 1, "inserted": 0, "updated": 1, "documents_skipped": 1}  # the xlsx
+    assert second == {"fetched": 1, "inserted": 0, "updated": 1, "documents_skipped": 1}  # the photo
     assert notice.deadline_at == datetime(2026, 10, 28, 23, 59, 59, tzinfo=STOCKHOLM)
     assert detail.call_count == 2  # read once for the project and its question log together
     assert all(route.call_count == 1 for route in documents.values())  # unchanged files are not fetched again
@@ -482,8 +511,9 @@ async def test_documents_go_to_the_ted_notice_of_the_same_procurement(
         await db_session.scalar(
             select(func.count()).select_from(Document).where(Document.notice_id == twin.id)
         )
-        == 2
+        == 3
     )
+    assert twin.unread_files == [{"filename": "Foto entré.jpg", "reason": "Filformatet .jpg stöds inte"}]
     assert (await db_session.scalar(select(PublishedAnswer.notice_id))) == twin.id
 
 
@@ -714,3 +744,123 @@ async def test_a_refused_project_in_the_answers_pass_does_not_fail_the_run(
     stats = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
 
     assert stats["answers_failed"] == 1
+
+
+async def test_the_sources_question_deadline_is_stored_as_the_end_of_that_day(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[_list_item(900100)]))
+    respx_mock.get(f"{API}/v1/procurements/900100").mock(return_value=httpx.Response(200, json=_project()))
+    _mock_documents(respx_mock)
+
+    await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+    notice = (await notices_by_external_id(db_session, "eavrop", ["900001"]))["900001"]
+    assert notice.question_deadline_at == datetime(2026, 10, 20, 23, 59, 59, tzinfo=STOCKHOLM)
+
+
+async def test_a_republished_file_supersedes_the_stored_one(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    """Only the current version reaches the engines; the old row stays for older checklists' sources."""
+
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[_list_item(900100)]))
+    detail = respx_mock.get(f"{API}/v1/procurements/900100").mock(
+        return_value=httpx.Response(200, json=_project())
+    )
+    routes = _mock_documents(respx_mock)
+    await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+    # The buyer corrects the main document; the request's update time moves past our copy
+    # (which the database stamped with the real clock).
+    later = _project()
+    later["RequestForTender"]["UpdatedDate"] = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
+    detail.mock(return_value=httpx.Response(200, json=later))
+    routes[13].mock(
+        return_value=httpx.Response(
+            200,
+            content="Anbud ska lämnas på svenska eller engelska.".encode(),
+            headers={"Content-Type": "text/plain"},
+        )
+    )
+    second = await ingest_eavrop(db_session, client, api_settings, now=NOW, refetch=True, request_interval=0)
+
+    assert second["documents_stored"] == 3  # every file is fetched again; two are unchanged content
+    notice = (await notices_by_external_id(db_session, "eavrop", ["900001"]))["900001"]
+    versions = list(
+        await db_session.scalars(
+            select(Document)
+            .where(
+                Document.notice_id == notice.id, Document.filename == "Administrativa föreskrifter fiktiv.txt"
+            )
+            .order_by(Document.created_at)
+        )
+    )
+    assert len(versions) == 2
+    # Both rows were stamped in this test's transaction, so the chain, not the order, tells them apart.
+    new = next(version for version in versions if version.superseded_by is None)
+    old = next(version for version in versions if version is not new)
+    assert old.superseded_by == new.id
+    assert new.auto_interpret  # the corrected main document gets a new checklist
+    assert (
+        await db_session.scalar(
+            select(func.count()).select_from(Document).where(Document.notice_id == notice.id)
+        )
+        == 4
+    )
+
+
+def _archive(members: dict[str, bytes]) -> bytes:
+    import zipfile
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, content in members.items():
+            archive.writestr(name, content)
+    return buffer.getvalue()
+
+
+async def test_an_archives_readable_files_become_documents_and_the_rest_is_said(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    project = _project()
+    project["RequestForTender"]["Documents"] = [
+        _document(13, "Administrativa föreskrifter fiktiv.txt"),
+        _document(21, "11.4 Ritningar.zip"),
+        _document(22, "Trasigt.zip"),
+    ]
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[_list_item(900100)]))
+    respx_mock.get(f"{API}/v1/procurements/900100").mock(return_value=httpx.Response(200, json=project))
+    _mock_documents(respx_mock)
+    archive = _archive(
+        {
+            "ritningar/A-40-1-001.dwg": b"not readable",
+            "ritningar/A-40-1-001.pdf": b"",  # an empty PDF cannot be read: counted, not stored
+            "ritningar/Ritningsförteckning.txt": "Förteckning över ritningar.".encode(),
+            "__MACOSX/._Ritningsförteckning.txt": b"junk",
+        }
+    )
+    respx_mock.get(f"{API}/v1/announcement-documents/21").mock(
+        return_value=httpx.Response(200, content=archive, headers={"Content-Type": "application/zip"})
+    )
+    respx_mock.get(f"{API}/v1/announcement-documents/22").mock(
+        return_value=httpx.Response(200, content=b"PK\x03\x04 not a zip")
+    )
+
+    stats = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+    notice = (await notices_by_external_id(db_session, "eavrop", ["900001"]))["900001"]
+    stored = {
+        document.filename: document
+        for document in await db_session.scalars(select(Document).where(Document.notice_id == notice.id))
+    }
+    member = stored["11.4 Ritningar.zip › ritningar › Ritningsförteckning.txt"]
+    assert member.auto_interpret is False and member.page_count == 1
+    assert stats["documents_stored"] == 2 and stats["documents_skipped"] == 3
+    assert notice.unread_files == [
+        {
+            "filename": "11.4 Ritningar.zip",
+            "reason": "1 filer i arkivet kunde inte läsas (.dwg); 1 filer i arkivet gick inte att läsa",
+        },
+        {"filename": "Trasigt.zip", "reason": "Arkivet kunde inte packas upp. Det kan vara skadat"},
+    ]

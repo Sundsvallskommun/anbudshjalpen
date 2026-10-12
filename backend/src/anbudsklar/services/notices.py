@@ -25,10 +25,11 @@ from anbudsklar.api.schemas import (
     NoticeSummary,
     PageView,
     PublishedAnswerView,
+    UnreadFile,
 )
-from anbudsklar.contracts import MatchAssessment
+from anbudsklar.contracts import Checklist, MatchAssessment
 from anbudsklar.documents.extract import DocumentError
-from anbudsklar.documents.store import store_document
+from anbudsklar.documents.store import is_current, store_document
 from anbudsklar.models import Document, DocumentPage, MatchRecord, Notice, PublishedAnswer
 from anbudsklar.search.queries import (
     count_notices_by_buyer,
@@ -77,11 +78,28 @@ async def get_document(session: AsyncSession, document_id: uuid.UUID) -> Documen
 
 
 async def first_document(session: AsyncSession, notice_id: uuid.UUID) -> Document | None:
-    """The main procurement document: the first one attached to the notice."""
+    """The main procurement document: the first current one attached to the notice."""
 
     return await session.scalar(
-        select(Document).where(Document.notice_id == notice_id).order_by(Document.created_at).limit(1)
+        select(Document)
+        .where(Document.notice_id == notice_id, is_current())
+        .order_by(Document.created_at)
+        .limit(1)
     )
+
+
+def question_deadline(notice: Notice, checklist: Checklist | None) -> datetime | None:
+    """Frågestopp as a moment: the source's own date first, else the published checklist's.
+
+    e-Avrop states the last day for questions in its time table; a checklist's date is what
+    a model read in the document, verified or not. Lists, Fråga AI and reminders all use
+    this, so they never disagree about it.
+    """
+
+    if notice.question_deadline_at is not None:
+        return notice.question_deadline_at
+    day = key_date(checklist, "fragestopp") if checklist else None
+    return end_of_local_day(day) if day else None
 
 
 def default_sort(status: NoticeStatus | None, text: str | None) -> NoticeSort:
@@ -166,7 +184,7 @@ async def notice_summaries(
     statuses = await checklist_statuses(session, ids, viewer)
     fits = await _fits(session, ids, viewer)
     labels = await cpv_labels(session, {code for notice in notices if (code := main_cpv_code(notice))})
-    question_deadlines = await _question_deadlines(session, ids)
+    question_deadlines = await _question_deadlines(session, notices)
     now = utcnow()
     return [
         _summary(
@@ -183,18 +201,18 @@ async def notice_summaries(
     ]
 
 
-async def _question_deadlines(session: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.UUID, datetime]:
-    """Frågestopp per notice from its published checklist, the one inköp has reviewed.
+async def _question_deadlines(session: AsyncSession, notices: Sequence[Notice]) -> dict[uuid.UUID, datetime]:
+    """Frågestopp per notice: the source's date, else the published checklist's (`question_deadline`)."""
 
-    Reminders follow the same date (`services.reminders`), so a list, a card and a reminder
-    never disagree about it.
-    """
-
+    published = await published_checklists(
+        session, [notice.id for notice in notices if notice.question_deadline_at is None]
+    )
     deadlines: dict[uuid.UUID, datetime] = {}
-    for notice_id, record in (await published_checklists(session, ids)).items():
-        day = key_date(checklist_payload(record), "fragestopp")
-        if day is not None:
-            deadlines[notice_id] = end_of_local_day(day)
+    for notice in notices:
+        record = published.get(notice.id)
+        moment = question_deadline(notice, checklist_payload(record) if record else None)
+        if moment is not None:
+            deadlines[notice.id] = moment
     return deadlines
 
 
@@ -248,7 +266,9 @@ async def notice_detail(session: AsyncSession, notice_id: uuid.UUID, viewer: Vie
     notice = await get_notice(session, notice_id)
     [summary] = await notice_summaries(session, [notice], viewer)
     documents = await session.scalars(
-        select(Document).where(Document.notice_id == notice.id).order_by(Document.created_at)
+        select(Document)
+        .where(Document.notice_id == notice.id, is_current())
+        .order_by(Document.created_at, Document.filename, Document.id)
     )
     checklist = await visible_checklist(session, notice.id, viewer)
     progress = await checklist_progress(session, notice.id) if checklist is None else None
@@ -264,6 +284,11 @@ async def notice_detail(session: AsyncSession, notice_id: uuid.UUID, viewer: Vie
         estimated_value_sek=notice.estimated_value_sek,
         cpv_labels=await cpv_labels(session, notice.cpv_codes or []),
         documents=[document_info(document) for document in documents],
+        unread_files=[
+            UnreadFile(filename=str(item.get("filename", "")), reason=str(item.get("reason", "")))
+            for item in notice.unread_files or []
+            if item.get("filename")
+        ],
         checklist=to_checklist_view(checklist) if checklist else None,
         checklist_progress=progress,
         match=match_view(match, summary) if match else None,
@@ -324,12 +349,18 @@ async def create_notice(session: AsyncSession, data: NoticeCreate) -> Notice:
 async def attach_document(
     session: AsyncSession, notice_id: uuid.UUID, *, filename: str, data: bytes, uploaded_by: uuid.UUID
 ) -> Document:
-    """Store a procurement document. The same file uploaded twice returns the stored document."""
+    """Store a procurement document. The same file uploaded twice returns the stored document.
+
+    The first document of a notice is its main document and gets a checklist of its own.
+    A later upload is an attachment (decision 0020): it is not interpreted on its own, and
+    `interpret_changed` interprets the notice again with it within a few minutes.
+    """
 
     if len(data) > MAX_DOCUMENT_BYTES:
         raise FileTooLargeError("Dokumentet är för stort. Den största tillåtna storleken är 50 MB.")
     mimetype = mimetype_for(filename)
     notice = await get_notice(session, notice_id)
+    first = await first_document(session, notice.id) is None
     try:
         return await store_document(
             session,
@@ -339,6 +370,7 @@ async def attach_document(
             data=data,
             uploaded_by=uploaded_by,
             is_fictitious=notice.is_fictitious,
+            auto_interpret=first,
         )
     except DocumentError as exc:
         raise as_service_error(exc) from exc
@@ -361,6 +393,7 @@ def document_info(document: Document) -> DocumentInfo:
         id=document.id,
         filename=document.filename,
         page_count=document.page_count,
+        empty_pages=document.empty_pages,
         is_fictitious=document.is_fictitious,
     )
 
@@ -414,7 +447,9 @@ def _summary(
 async def _notices_with_documents(session: AsyncSession, ids: list[uuid.UUID]) -> set[uuid.UUID]:
     if not ids:
         return set()
-    rows = await session.scalars(select(Document.notice_id).where(Document.notice_id.in_(ids)).distinct())
+    rows = await session.scalars(
+        select(Document.notice_id).where(Document.notice_id.in_(ids), is_current()).distinct()
+    )
     return set(rows)
 
 

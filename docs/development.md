@@ -97,6 +97,7 @@ Kommandot `anbudsklar` körs från `backend/` med `uv run anbudsklar …`, eller
 | `seed` | Läser in påhittade annonser, underlag, företag, demopersoner och avtal, och CPV-koderna om de saknas. Går att köra flera gånger. Har en fixtur-PDF byggts om ersätts underlaget som seed lade in tidigare, och checklistor som tolkats från den gamla filen tas bort med det. Underlag som inköpare laddat upp ligger kvar. Utskriften visar antalet i `replaced_documents` |
 | `ingest ted`, `ingest eavrop`, `ingest lou`, `ingest cpv`, `ingest agreements` | Hämtar eller läser in en källa. `ingest cpv` och `ingest agreements` tar `--path` till en annan CSV-fil |
 | `interpret --notice <id>` eller `interpret --pending` | Tolkar alla underlag i en annons på nytt (nya utkast), eller kör jobbet `interpret_pending` en gång |
+| `reextract` | Läser om sparade underlag med det senaste textuttaget (jobbet `reextract_outdated`) |
 | `match` | Bedömer annonser mot företagens profiler |
 | `eval` | Kör kvalitetstestet (`--engine`, `--fixtures`, `--out`), se [Kvalitetstest](quality-test.md) |
 | `eneo provision` | Sätter upp spacet, assistenterna, MCP-servern och környckeln i Eneo, se [Eneo-integration](eneo-integration.md#sätta-upp-anbudsklar-eneo-provision) |

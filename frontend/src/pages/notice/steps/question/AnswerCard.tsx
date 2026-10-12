@@ -77,15 +77,18 @@ function AnswerQuotes({ citations, notice }: { citations: readonly AnswerCitatio
   );
 }
 
-/** What the engine read (decision 0012): all of it, or how much of the procurement's documents. */
-export function readLine(read: ReadSummary): string {
+/**
+ * What the engine read (decisions 0012 and 0020): all of it, or how much of the procurement's documents. `subject` is
+ * what rests on it: "Svaret" (default) or "Listan".
+ */
+export function readLine(read: ReadSummary, subject = "Svaret"): string {
   const whole = read.pages_read === read.pages_total;
   if (read.documents_total <= 1) {
-    return whole ? "Svaret bygger på hela underlaget." : `Svaret bygger på ${read.pages_read} av ${read.pages_total} sidor i underlaget.`;
+    return whole ? `${subject} bygger på hela underlaget.` : `${subject} bygger på ${read.pages_read} av ${read.pages_total} sidor i underlaget.`;
   }
   return whole
-    ? `Svaret bygger på alla ${read.documents_total} dokument i underlaget.`
-    : `Svaret bygger på ${read.pages_read} av ${read.pages_total} sidor i underlagets ${read.documents_total} dokument.`;
+    ? `${subject} bygger på alla ${read.documents_total} dokument i underlaget.`
+    : `${subject} bygger på ${read.pages_read} av ${read.pages_total} sidor i underlagets ${read.documents_total} dokument.`;
 }
 
 /** "Oklart? Ställ frågan i e-Avrop senast 30 okt.", for an answer the document settles. */

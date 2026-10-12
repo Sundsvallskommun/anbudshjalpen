@@ -172,6 +172,13 @@ def interpret(
     _run_job("interpret_notice", interpret_one)
 
 
+@app.command()
+def reextract() -> None:
+    """Läs om sparade underlag vars text ett äldre textuttag gjorde (jobbet reextract_outdated)."""
+
+    _run_job("reextract_outdated")
+
+
 @lab_app.command("purge")
 def lab_purge() -> None:
     """Radera testföretag vars tid har gått ut (jobbet purge_lab)."""

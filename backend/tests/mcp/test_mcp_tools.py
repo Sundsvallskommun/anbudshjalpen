@@ -90,6 +90,8 @@ async def test_notice_details_list_documents_and_published_checklist(
     db_session: AsyncSession, seeded: Seeded
 ) -> None:
     seeded.notice.reference_number = "DEMO-2026-0147"
+    seeded.notice.unread_files = [{"filename": "Ritningar.zip", "reason": "Filformatet .zip stöds inte"}]
+    seeded.document.empty_pages = 1
     await db_session.flush()
     async with mcp_client(db_session) as client:
         details = await client.call_tool("hamta_upphandling", {"upphandling_id": str(seeded.notice.id)})
@@ -100,7 +102,8 @@ async def test_notice_details_list_documents_and_published_checklist(
         malformed = await client.call_tool("hamta_upphandling", {"upphandling_id": "inte-ett-id"})
 
     text = texts(details)
-    assert f"- dokument_id: {seeded.document.id} | {FILENAME} | 6 sidor" in text
+    assert f"- dokument_id: {seeded.document.id} | {FILENAME} | 6 sidor | 1 sidor utan läsbar text" in text
+    assert "- Ritningar.zip (Filformatet .zip stöds inte)" in text  # what the tools cannot see
     assert "45442100 Målning" in text and "FIKTIV UPPHANDLING" in text
     assert "Referensnummer: DEMO-2026-0147" in text
     assert "Referensnummer" not in texts(draft_only)  # no line for a notice without one

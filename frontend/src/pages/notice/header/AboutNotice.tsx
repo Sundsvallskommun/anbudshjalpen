@@ -9,7 +9,7 @@ import { TermText } from "../../../components/TermText";
 import { formatShortDate } from "../../../lib/format";
 import { externalLink, noticeLinkText } from "../../../lib/links";
 import { cpvNames } from "../noticeData";
-import { DocumentList, outsideDocumentsText } from "./Documents";
+import { DocumentList, outsideDocumentsText, UnreadFiles } from "./Documents";
 
 /**
  * The rest of the notice, behind "Om upphandlingen" (direction.md, section 4): the description, what is bought in the
@@ -61,6 +61,7 @@ export function AboutNotice({
         </HStack>
       )}
       {showsDocuments && <DocumentList notice={notice} />}
+      <UnreadFiles notice={notice} />
       {user?.role === "inkopare" && (
         <VStack gap={2}>
           <Text weight="semibold">Ladda upp underlag</Text>

@@ -393,11 +393,11 @@ class EneoEngine:
     async def interpret_document(
         self,
         notice: NoticeContext,
-        document: PagedDocument,
+        documents: DocumentSet,
         answers: Sequence[PublishedAnswerInput] = (),
     ) -> tuple[Checklist, EngineRun]:
         return await self._run_task(
-            Task.INTERPRET_DOCUMENT, Checklist, notice=notice, document=document, answers=list(answers)
+            Task.INTERPRET_DOCUMENT, Checklist, notice=notice, documents=documents, answers=list(answers)
         )
 
     async def assess_match(

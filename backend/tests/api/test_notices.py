@@ -690,3 +690,35 @@ async def test_a_question_inkop_has_answered_in_eavrop_is_answered_from_that_ans
     assert answer["found_in_document"] is True
     [cited] = answer["answer_citations"]
     assert (cited["answer"], cited["check"], cited["answer_key"]) == (1, "verified", "c" * 64)
+
+
+async def test_the_detail_names_unread_files_and_empty_pages_and_hides_replaced_documents(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    """The documents shown are never taken for the whole set (data review 2026-10-12)."""
+
+    demo.notice.unread_files = [{"filename": "Ritningar.zip", "reason": "Filformatet .zip stöds inte"}]
+    demo.document.empty_pages = 2
+    old = await add_document(db_session, demo.notice, ["Gammal version."], filename="gammal.txt")
+    old.superseded_by = demo.document.id
+    await db_session.flush()
+
+    body = (await client.get(f"/api/notices/{demo.notice.id}")).json()
+
+    assert body["unread_files"] == [{"filename": "Ritningar.zip", "reason": "Filformatet .zip stöds inte"}]
+    assert [(item["filename"], item["empty_pages"]) for item in body["documents"]] == [("underlag.txt", 2)]
+
+
+async def test_the_sources_question_deadline_goes_before_the_checklists(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    from_source = end_of_local_day(demo.fragestopp + timedelta(days=2))
+    demo.notice.question_deadline_at = from_source
+    await db_session.flush()
+
+    items = {item["id"]: item for item in (await client.get("/api/notices")).json()["items"]}
+    assert datetime.fromisoformat(items[str(demo.notice.id)]["question_deadline"]) == from_source
+    answer = (
+        await client.post(f"/api/notices/{demo.notice.id}/questions", json={"question": "Krävs försäkring?"})
+    ).json()
+    assert datetime.fromisoformat(answer["question_deadline"]) == from_source

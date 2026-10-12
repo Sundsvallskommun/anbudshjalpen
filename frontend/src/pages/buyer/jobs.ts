@@ -20,8 +20,9 @@ export const JOB_GROUPS: readonly JobGroup[] = [
   },
   {
     title: "Bearbeta",
-    description: "Stänger passerade annonser, tolkar underlag, bedömer vad som passar företagen och raderar testföretag vars tid gått ut.",
-    jobs: ["close_expired", "interpret_pending", "match_all", "purge_lab"],
+    description:
+      "Stänger passerade annonser, tolkar underlag, läser om sparade underlag med ett nyare textuttag, bedömer vad som passar företagen och raderar testföretag vars tid gått ut.",
+    jobs: ["close_expired", "interpret_pending", "reextract_outdated", "match_all", "purge_lab"],
   },
   {
     title: "Skicka",
@@ -73,7 +74,8 @@ const STAT_WORDS: readonly [key: string, words: string][] = [
   ["deleted", "borttagna"],
   ["closed", "stängda"],
   ["interpreted", "tolkade"],
-  ["reinterpreted", "tolkade om efter nya svar"],
+  ["reinterpreted", "tolkade om efter ändringar"],
+  ["reextracted", "underlag lästa om"],
   ["companies", "företag"],
   ["assessed", "bedömda"],
   ["removed", "borttagna"],
@@ -87,6 +89,7 @@ const STAT_WORDS: readonly [key: string, words: string][] = [
   ["skipped", "hoppades över"],
   ["gave_up", "gav upp"],
   ["reinterpret_failed", "omtolkningar misslyckades"],
+  ["reextract_failed", "underlag kunde inte läsas om"],
   ["failed", "misslyckades"],
 ];
 

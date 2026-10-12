@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 
@@ -11,8 +12,10 @@ from fastapi import FastAPI
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from anbudsklar.models import AiCall, ChecklistRecord, JobRun, Reminder
+from anbudsklar.ai.heuristic import HeuristicEngine
+from anbudsklar.models import AiCall, ChecklistRecord, Document, JobRun, Reminder
 from anbudsklar.services import jobs
+from anbudsklar.services.checklists import interpret_changed
 from anbudsklar.services.dates import end_of_local_day
 from anbudsklar.services.jobs import JobContext
 from anbudsklar.services.reminders import planned_due_at
@@ -229,6 +232,36 @@ async def test_create_notice_and_upload_a_document_that_is_interpreted(
         await db_session.scalars(select(ChecklistRecord).where(ChecklistRecord.document_id == document["id"]))
     ).all()
     assert len(records) == 1
+
+    # A later upload is an attachment (decision 0020): no checklist of its own, but the notice is
+    # interpreted again with it by the worker.
+    attachment = await client.post(
+        f"/api/admin/notices/{notice['id']}/documents",
+        files={
+            "file": (
+                "kravspecifikation.txt",
+                "Leverantören ska vara certifierad enligt ISO 14001.".encode(),
+                "text/plain",
+            )
+        },
+    )
+    assert attachment.status_code == 201, attachment.text
+    assert (
+        await db_session.scalar(
+            select(ChecklistRecord).where(ChecklistRecord.document_id == attachment.json()["id"])
+        )
+        is None
+    )
+    stored = await db_session.get(Document, uuid.UUID(attachment.json()["id"]))
+    assert stored is not None and stored.auto_interpret is False
+    assert (await interpret_changed(db_session, HeuristicEngine()))["reinterpreted"] == 1
+    successor = await db_session.scalar(
+        select(ChecklistRecord)
+        .where(ChecklistRecord.notice_id == uuid.UUID(notice["id"]))
+        .order_by(ChecklistRecord.created_at.desc())
+    )
+    assert successor is not None and successor.document_id == uuid.UUID(document["id"])
+    assert any("ISO 14001" in item["citation"]["quote"] for item in successor.payload["requirements"])
 
 
 async def test_insights_hide_questions_until_the_deadline(

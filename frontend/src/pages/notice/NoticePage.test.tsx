@@ -144,6 +144,22 @@ describe("NoticePage header", () => {
     expect(within(panel).getByRole("link", { name: /Öppna annonsen/u })).toHaveAttribute("href", noticeDetail.url);
   });
 
+  it("names the files the source has that were not read in, behind Om upphandlingen", async () => {
+    const unread = [{ filename: "Bilaga 2 Ritningar.zip", reason: "Filformatet .zip stöds inte" }];
+    const scanned = { ...noticeDetail.documents[0]!, empty_pages: 3 };
+    mockApi([...baseRoutes(null), noticeWith({ unread_files: unread, documents: [scanned, { ...scanned, id: "d2" }] })]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    const toggle = await screen.findByRole("button", { name: "Om upphandlingen" });
+    await userEvent.click(toggle);
+    const panel = document.getElementById(toggle.getAttribute("aria-controls")!)!;
+    expect(within(panel).getByText("Finns hos köparen men inte här")).toBeInTheDocument();
+    const list = within(panel).getByRole("list", { name: "Filer som inte lästs in" });
+    expect(within(list).getByText("Bilaga 2 Ritningar.zip · Filformatet .zip stöds inte")).toBeInTheDocument();
+    // Pages without text are said next to the page count, so the reader checks them in the file.
+    expect(within(panel).getAllByText("16 sidor · 3 sidor utan läsbar text · Fiktiv").length).toBeGreaterThan(0);
+  });
+
   it("puts the disclosures and the document in one card on a phone, and the steps without numbers", async () => {
     vi.spyOn(window, "matchMedia").mockImplementation(
       (query: string) =>

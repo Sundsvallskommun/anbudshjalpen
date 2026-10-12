@@ -386,7 +386,17 @@ def _title(notice: Mapping[str, Any]) -> str | None:
 
 
 def _description(notice: Mapping[str, Any]) -> str | None:
-    return _text(notice.get("description-proc")) or _text(notice.get("description-lot"))
+    """The procedure's description, else every lot's: a notice with several lots describes each.
+
+    Only the first lot's text would lose the others from the search, the matching and the
+    notice block the engines read. Identical lot descriptions are kept once.
+    """
+
+    procedure = _text(notice.get("description-proc"))
+    if procedure:
+        return procedure
+    lots = _texts(notice.get("description-lot"))
+    return "\n\n".join(lots) or None
 
 
 def reference_number(notice: Mapping[str, Any]) -> str | None:

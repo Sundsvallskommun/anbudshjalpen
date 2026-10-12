@@ -28,8 +28,9 @@ from anbudsklar.ingest.common import IngestError
 from anbudsklar.ingest.http import user_agent
 from anbudsklar.models import JobRun
 from anbudsklar.services.background import SessionFactory
-from anbudsklar.services.checklists import interpret_answered, interpret_pending
+from anbudsklar.services.checklists import interpret_changed, interpret_pending
 from anbudsklar.services.dates import utcnow
+from anbudsklar.services.documents import reextract_outdated
 from anbudsklar.services.errors import ConflictError, ServiceError
 from anbudsklar.services.lab import purge_expired
 from anbudsklar.services.matching import match_all, notify_matches
@@ -114,9 +115,13 @@ async def _close_expired(session: AsyncSession, ctx: JobContext) -> Mapping[str,
 
 
 async def _interpret_pending(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:
-    """New documents first, then checklists whose published answers changed (decision 0018)."""
+    """New documents first, then checklists whose documents or published answers changed (0018, 0020)."""
 
-    return {**await interpret_pending(session, ctx.engine), **await interpret_answered(session, ctx.engine)}
+    return {**await interpret_pending(session, ctx.engine), **await interpret_changed(session, ctx.engine)}
+
+
+async def _reextract_outdated(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:
+    return await reextract_outdated(session)
 
 
 async def _match_all(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:
@@ -142,6 +147,7 @@ JOBS: dict[str, JobFunction] = {
     "load_cpv": _load_cpv,
     "close_expired": _close_expired,
     "interpret_pending": _interpret_pending,
+    "reextract_outdated": _reextract_outdated,
     "match_all": _match_all,
     "send_reminders": _send_reminders,
     "notify_matches": _notify_matches,

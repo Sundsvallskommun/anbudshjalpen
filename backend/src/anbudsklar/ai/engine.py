@@ -127,13 +127,16 @@ class AiEngine(Protocol):
     async def interpret_document(
         self,
         notice: NoticeContext,
-        document: PagedDocument,
+        documents: DocumentSet,
         answers: Sequence[PublishedAnswerInput] = (),
     ) -> tuple[Checklist, EngineRun]:
-        """tolka_underlag: turn a procurement document into a checklist with citations.
+        """tolka_underlag: turn a procurement's documents into a checklist with citations.
 
-        `answers` are the buyer's published answers (decision 0018): they settle open
-        questions and can change a requirement, so the checklist reflects them.
+        `documents` holds every document of the procurement, the main one first, as the
+        bundle chose them (decision 0020): requirements in attachments are as binding as
+        those in the main document. `answers` are the buyer's published answers (decision
+        0018): they settle open questions and can change a requirement, so the checklist
+        reflects them.
         """
         ...
 

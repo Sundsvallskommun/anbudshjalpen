@@ -169,7 +169,10 @@ stället för sista anbudsdag, med en påminnelse om den), uppskattat värde och
 beloppsgränser"). Därefter de stängda knapparna "Därför verkar den passa (n skäl)" och "Om upphandlingen", och
 "Underlaget · 17 sidor", som öppnar källdialogen på sida 1, med "Ladda ned". Ett skäl som gäller ett krav har länken
 "Visa kravet", som öppnar steg 1 vid kravet. På telefon är knapparna rader i ett kort, och underlaget ligger under "Om
-upphandlingen och underlaget". För en tilldelad upphandling förklaras beslutet och avtalsspärren.
+upphandlingen och underlaget". Ett dokument med sidor utan läsbar text säger det bredvid sidantalet ("3 sidor utan
+läsbar text"), och filer hos köparen som inte kunde läsas in står under "Finns hos köparen men inte här" med skälet,
+så att dokumenten här aldrig tas för hela underlaget ([beslut 0020](decisions/0020-checklistan-lases-ur-alla-dokument.md)).
+För en tilldelad upphandling förklaras beslutet och avtalsspärren.
 
 **Stegraden** är sticky: ① Krav · ② Granska · ③ Lämna in. Valt steg har accentfylld siffra och accentlinje.
 På telefon står de tre korta etiketterna utan siffror i lika breda celler. Frågorna till AI-stödet, förut steg 2,

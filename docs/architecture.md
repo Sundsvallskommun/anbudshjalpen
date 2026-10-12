@@ -34,14 +34,18 @@ Beslut: [0004](decisions/0004-eneo-api-and-own-mcp-server.md) (Eneo och MCP),
 
 ### Så blir ett underlag en checklista
 
-1. Inköparen laddar upp ett underlag till en annons. Appen tar ut texten sida för sida, gissar vilket avsnitt varje
-   sida hör till och sparar sidorna i Postgres.
-2. Appen skickar underlaget till uppgiften "tolka underlag" direkt efter uppladdningen, och jobbet
+1. Inköparen laddar upp ett underlag till en annons, eller insamlaren hämtar upphandlingens filer från e-Avrop. Appen
+   tar ut texten sida för sida (PDF, Word, Excel och text), räknar sidor utan läsbar text, gissar vilket avsnitt varje
+   sida hör till och sparar sidorna i Postgres. Originalfilen sparas också, så att ett bättre textuttag kan läsa om den
+   (jobbet `reextract_outdated`). Filer som inte kan läsas in står med namn och skäl på annonsen.
+2. Appen skickar upphandlingens alla aktuella dokument till uppgiften "tolka underlag" direkt efter uppladdningen,
+   huvuddokumentet först ([beslut 0020](decisions/0020-checklistan-lases-ur-alla-dokument.md)), och jobbet
    `interpret_pending` tar det som inte blivit klart. Med Eneo som motor går texten med sidmarkeringen `[SIDA n]` i en
    fråga till assistenten för uppgiften, och sessionen raderas efteråt. Ett misslyckat försök görs om med allt längre
    paus, och efter fem försök ger jobbet upp. Det ger upp direkt när samma underlag inte kan lyckas, till exempel när
    det är för stort för modellen. Inköparen ser underlagen som saknar checklista under Inköp › Att granska och kan
-   tolka dem igen ([Drift](operations.md#schemalagda-jobb)).
+   tolka dem igen ([Drift](operations.md#schemalagda-jobb)). Ändras underlaget eller inköps publicerade svar tolkas
+   upphandlingen om.
 3. Svaret valideras mot uppgiftens JSON-kontrakt. Är det fel ber motorn modellen rätta det.
 4. Appen kontrollerar varje citat mot sidtexten: verifierat, på annan sida eller kunde inte kontrolleras. Ett datum
    eller en vikt i checklistan måste dessutom stå i sitt citat.
@@ -134,7 +138,7 @@ Indata, kontrakt och kontroller för varje uppgift står i [AI-uppgifterna](ai-t
 
 | Funktion | Teknik | Varför |
 |---|---|---|
-| Checklista och frågor | Hela underlaget i ett anrop, utan RAG | RAG hämtar bara de mest relevanta styckena och tappar krav när frågan är "lista alla skallkrav". 40–60 sidor får plats i kontexten |
+| Checklista och frågor | Alla dokument i upphandlingen i ett anrop, utan RAG | RAG hämtar bara de mest relevanta styckena och tappar krav när frågan är "lista alla skallkrav". 40–60 sidor får plats i kontexten; över budgeten väljs sidor med hänvisningar och sökning |
 | Citat | Vår egen kontroll mot sidtexten | Modellen kan inte själv markera ett citat som kontrollerat |
 | Matchning (företagarens Start) | Först fasta regler (CPV-prefix och nyckelord), sedan bedömer modellen mot kraven som plockats ut | Går att förklara och testa |
 | Prediktion | Datumräkning på avtalskatalogen. Modellen sammanfattar bara förra gångens krav | Mest unikt värde, minst AI |

@@ -133,8 +133,9 @@ class NoticeSummary(ApiModel):
     # What `deadline_at` is the last day for: "tender" (sista anbudsdag) or "request" (sista
     # dag för anbudsansökan, all a restricted procedure's notice in TED gives).
     deadline_kind: DeadlineKind = "tender"
-    # Frågestopp from the published checklist, as the end of that day in Stockholm (like
-    # AnswerView.question_deadline): the last day for questions, so show it as a date.
+    # Frågestopp as the end of that day in Stockholm (like AnswerView.question_deadline): the
+    # source's own date (e-Avrop) when it gives one, else the published checklist's. The
+    # last day for questions, so show it as a date.
     question_deadline: datetime | None = None
     cpv_codes: list[str]
     cpv_label: str | None = None  # Swedish label of the main (first) CPV code, when the code is known
@@ -181,7 +182,30 @@ class DocumentInfo(ApiModel):
     id: uuid.UUID
     filename: str
     page_count: int
+    # Pages without readable text (scans, images): what the AI never saw, so the reader can
+    # check those pages in the file itself.
+    empty_pages: int = 0
     is_fictitious: bool
+
+
+class UnreadFile(ApiModel):
+    """A file the source lists for the procurement that Anbudshjälpen could not read in.
+
+    The reader is told it exists and why it is missing here, so that the documents shown
+    are never taken for the whole set.
+    """
+
+    filename: str
+    reason: str  # Swedish, as the ingestion wrote it: the format, the size or an unreadable file
+
+
+class ReadSummary(ApiModel):
+    """What the engine was given (decision 0012), so the app can say so."""
+
+    documents_read: int
+    documents_total: int
+    pages_read: int
+    pages_total: int
 
 
 class VerificationSummary(ApiModel):
@@ -189,6 +213,8 @@ class VerificationSummary(ApiModel):
     citations_verified: int = 0
     citations_moved: int = 0
     citations_unverified: int = 0
+    # What the interpretation read (decision 0020); None on checklists made before it.
+    read: ReadSummary | None = None
 
 
 class ChecklistView(ApiModel):
@@ -255,7 +281,9 @@ class NoticeDetail(NoticeSummary):
     place: str | None
     estimated_value_sek: int | None
     cpv_labels: dict[str, str] = Field(default_factory=dict)  # code -> Swedish label, for known codes
-    documents: list[DocumentInfo]
+    documents: list[DocumentInfo]  # the current documents; a file the source replaced is left out
+    # Files the source lists that were not read in, so the list above is never taken for all of them.
+    unread_files: list[UnreadFile] = Field(default_factory=list)
     checklist: ChecklistView | None  # companies only see published checklists
     # Where a checklist on its way is; None when none is coming, so a page never promises a
     # checklist that the worker will not make (decision 0019).
@@ -285,15 +313,6 @@ class QuestionRequest(ApiModel):
     history: list[QuestionTurnIn] = Field(default_factory=list, max_length=10)
 
 
-class ReadSummary(ApiModel):
-    """What the engine was given for an answer (decision 0012), so the app can say so."""
-
-    documents_read: int
-    documents_total: int
-    pages_read: int
-    pages_total: int
-
-
 class TokenUsageView(ApiModel):
     """What one answer cost: tokens as the model provider counted them, and money when a price is set.
 
@@ -312,8 +331,8 @@ class AnswerView(ApiModel):
     usage: TokenUsageView | None = None
     document_id: uuid.UUID  # the main document; a citation's own document_id says where its quote is
     read: ReadSummary
-    # Frågestopp from the checklist, as the end of that day in Stockholm: the date is the
-    # last day for questions, so show it as a date.
+    # Frågestopp as the end of that day in Stockholm: the source's date, else the published
+    # checklist's. The date is the last day for questions, so show it as a date.
     question_deadline: datetime | None
     formal_question_url: str  # where to ask formally: the procurement in e-Avrop, else e-Avrop itself
 
@@ -592,6 +611,7 @@ JobName = Literal[
     "ingest_lou",
     "close_expired",
     "interpret_pending",
+    "reextract_outdated",
     "match_all",
     "send_reminders",
     "notify_matches",

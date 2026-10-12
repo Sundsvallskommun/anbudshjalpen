@@ -8,6 +8,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from anbudsklar.contracts import EMPTY_PAGE_TEXT
 from anbudsklar.mcp.context import ToolContext, parse_id
 from anbudsklar.mcp.guidance import ToolGuidance
 from anbudsklar.mcp.output import Content, count, fit_blocks, more_hint, resource_block, text_block
@@ -75,7 +76,7 @@ Citat = Annotated[
 Sida = Annotated[int | None, Field(description="Sidan du tror att citatet står på.", ge=1), clamped(1)]
 
 _CITE_RULE = "Citera ordagrant och ange dokument och sidnummer, t.ex. '(s. 4)'."
-_EMPTY_PAGE = "(Sidan saknar läsbar text, till exempel en bild eller en skannad sida.)"
+_EMPTY_PAGE = EMPTY_PAGE_TEXT
 
 
 def register(server: FastMCP, ctx: ToolContext) -> None:

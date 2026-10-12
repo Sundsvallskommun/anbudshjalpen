@@ -54,6 +54,10 @@ logger = logging.getLogger(__name__)
 
 FormatMode = Literal["json_schema", "json_object", "plain"]
 _MODES: tuple[FormatMode, ...] = ("json_schema", "json_object", "plain")
+_CUT_OFF_MESSAGE = (
+    "Språkmodellens svar blev för långt och höggs av innan det var klart. Dela upp underlaget, eller välj "
+    "en modell som kan skriva längre svar."
+)
 _LAW_REFERENCE = re.compile(r"(\d+)\s*kap\.\s*(\d+\s*[a-z]?)\s*§", re.IGNORECASE)
 
 
@@ -173,7 +177,12 @@ class OpenAICompatEngine:
                 raise _engine_error(error) from error
             if task not in TEXT_TASKS:
                 self._mode = mode
-            text = completion.choices[0].message.content or "" if completion.choices else ""
+            choice = completion.choices[0] if completion.choices else None
+            if choice is not None and choice.finish_reason == "length":
+                # The JSON is cut off. Asking for a corrected answer would be cut off again, so
+                # the caller is told at once instead of after the retries.
+                raise EngineError(_CUT_OFF_MESSAGE, retryable=False)
+            text = (choice.message.content or "") if choice is not None else ""
             return text, _usage(completion)
         raise EngineError("Anropet till språkmodellen misslyckades.")
 
@@ -212,11 +221,11 @@ class OpenAICompatEngine:
     async def interpret_document(
         self,
         notice: NoticeContext,
-        document: PagedDocument,
+        documents: DocumentSet,
         answers: Sequence[PublishedAnswerInput] = (),
     ) -> tuple[Checklist, EngineRun]:
         return await self._run_task(
-            Task.INTERPRET_DOCUMENT, Checklist, notice=notice, document=document, answers=list(answers)
+            Task.INTERPRET_DOCUMENT, Checklist, notice=notice, documents=documents, answers=list(answers)
         )
 
     async def assess_match(

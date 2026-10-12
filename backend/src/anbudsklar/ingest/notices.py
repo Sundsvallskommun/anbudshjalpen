@@ -40,6 +40,8 @@ class NoticeValues:
     published_at: datetime | None = None
     deadline_at: datetime | None = None
     deadline_kind: DeadlineKind = "tender"
+    # The source's last day for questions, as the end of that day; None when it gives none.
+    question_deadline_at: datetime | None = None
     estimated_value_sek: int | None = None
     place: str | None = None
     url: str | None = None

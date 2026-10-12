@@ -13,6 +13,7 @@ from collections.abc import Iterable
 from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from anbudsklar.documents.store import is_current
 from anbudsklar.models import ChecklistRecord, CpvCode, Document, Notice
 from anbudsklar.visibility import is_shown
 
@@ -25,9 +26,11 @@ async def get_notice(session: AsyncSession, notice_id: uuid.UUID) -> Notice | No
 
 
 async def list_documents(session: AsyncSession, notice_id: uuid.UUID) -> list[Document]:
+    """The notice's current documents; a file the source replaced is left out."""
+
     result = await session.scalars(
         select(Document)
-        .where(Document.notice_id == notice_id)
+        .where(Document.notice_id == notice_id, is_current())
         .order_by(Document.created_at, Document.filename, Document.id)
     )
     return list(result)

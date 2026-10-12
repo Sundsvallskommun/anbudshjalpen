@@ -7,6 +7,7 @@ import { CollapsibleGroup } from "@astryxdesign/core/Collapsible";
 import { Grid } from "@astryxdesign/core/Grid";
 import { Heading } from "@astryxdesign/core/Heading";
 import { Icon } from "@astryxdesign/core/Icon";
+import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useId, useState } from "react";
 import { useConfig } from "../../../../api/queries";
@@ -34,6 +35,7 @@ import { formatLongDate } from "../../../../lib/format";
 import { CHECKLIST_STATUS } from "../../../../lib/labels";
 import { useIsPhone } from "../../../../lib/usePhone";
 import { questionDeadlineDate, tenderDeadlineDate } from "../../noticeData";
+import { readLine } from "../question/AnswerCard";
 import { StepLayout } from "../StepLayout";
 import { RequirementsRail } from "./RequirementsRail";
 import styles from "./RequirementsStep.module.css";
@@ -185,6 +187,7 @@ export function RequirementsStep({ notice, view, user }: { notice: NoticeDetail;
           reviewedLabel={reviewedLabel}
           verification={view.verification}
           howLabel="Hur togs listan fram?"
+          details={view.verification.read ? <Text as="p">{readLine(view.verification.read, "Listan")}</Text> : undefined}
         />
         <VStack as="section" id={TASKS_ID} aria-labelledby={tasksHeadingId} gap={3} className={styles.anchor}>
           <Heading level={2} id={tasksHeadingId}>
