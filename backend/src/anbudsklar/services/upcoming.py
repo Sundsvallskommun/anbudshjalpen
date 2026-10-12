@@ -32,6 +32,7 @@ from anbudsklar.cpv import common_prefix_length, shares_cpv_group, significant_d
 from anbudsklar.models import Agreement, Notice
 from anbudsklar.services.dates import add_months, local_datetime
 from anbudsklar.services.text import keywords
+from anbudsklar.visibility import shown_agreements, shown_notices
 
 ANNOUNCE_MONTHS_BEFORE_END = (9, 6)
 SUCCESSOR_MIN_DIGITS = 5  # CPV category level
@@ -51,7 +52,9 @@ async def list_upcoming(
     """Running agreements whose successor is likely to be announced within `months`."""
 
     horizon = add_months(today, months)
-    agreements = await session.scalars(select(Agreement).where(Agreement.end_date >= today))
+    agreements = await session.scalars(
+        select(Agreement).where(Agreement.end_date >= today, shown_agreements())
+    )
     open_notices = await _open_notices(session, today)
     items: list[UpcomingProcurement] = []
     for agreement in agreements:
@@ -89,6 +92,7 @@ async def _open_notices(session: AsyncSession, today: date) -> list[_OpenNotice]
 
     rows = await session.execute(
         select(Notice.title, Notice.cpv_codes).where(
+            shown_notices(),
             Notice.status == "open",
             or_(Notice.deadline_at.is_(None), Notice.deadline_at >= local_datetime(today)),
         )

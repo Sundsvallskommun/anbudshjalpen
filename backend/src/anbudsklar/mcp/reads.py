@@ -14,12 +14,14 @@ from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.models import ChecklistRecord, CpvCode, Document, Notice
+from anbudsklar.visibility import is_shown
 
 PUBLISHED = "published"
 
 
 async def get_notice(session: AsyncSession, notice_id: uuid.UUID) -> Notice | None:
-    return await session.get(Notice, notice_id)
+    notice = await session.get(Notice, notice_id)
+    return notice if notice is not None and is_shown(notice) else None
 
 
 async def list_documents(session: AsyncSession, notice_id: uuid.UUID) -> list[Document]:

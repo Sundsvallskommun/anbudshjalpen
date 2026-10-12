@@ -49,6 +49,7 @@ from anbudsklar.services.cpv import normalize_cpv_codes
 from anbudsklar.services.dates import end_of_local_day, utcnow
 from anbudsklar.services.errors import FileTooLargeError, NotFoundError
 from anbudsklar.services.files import as_service_error, mimetype_for
+from anbudsklar.visibility import is_shown
 
 MANUAL_SOURCE = "manual"
 OPEN = "open"
@@ -60,7 +61,7 @@ _FITS: frozenset[str] = frozenset(get_args(Fit))
 
 async def get_notice(session: AsyncSession, notice_id: uuid.UUID) -> Notice:
     notice = await session.get(Notice, notice_id)
-    if notice is None:
+    if notice is None or not is_shown(notice):
         raise NotFoundError("Upphandlingen finns inte.")
     return notice
 
@@ -169,7 +170,8 @@ async def notice_summaries(
             notice,
             status=effective_status(notice, now),
             has_documents=notice.id in with_documents,
-            checklist_status=statuses.get(notice.id, "none"),
+            checklist_status=statuses[notice.id].status if notice.id in statuses else "none",
+            checklist_reviewed=statuses[notice.id].reviewed if notice.id in statuses else False,
             fit=fits.get(notice.id),
             cpv_label=labels.get(main_cpv_code(notice) or ""),
             question_deadline=question_deadlines.get(notice.id),
@@ -363,6 +365,7 @@ def _summary(
     status: str,
     has_documents: bool,
     checklist_status: str,
+    checklist_reviewed: bool,
     fit: str | None,
     cpv_label: str | None,
     question_deadline: datetime | None,
@@ -383,6 +386,7 @@ def _summary(
             "cpv_label": cpv_label,
             "has_documents": has_documents,
             "checklist_status": checklist_status,
+            "checklist_reviewed": checklist_reviewed,
             "is_fictitious": notice.is_fictitious,
             "fit": fit if fit in _FITS else None,
         }

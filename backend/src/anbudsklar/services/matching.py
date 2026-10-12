@@ -46,6 +46,7 @@ from anbudsklar.services.dates import utcnow
 from anbudsklar.services.errors import NotFoundError
 from anbudsklar.services.notices import match_view, notice_summaries, notice_url, page_url
 from anbudsklar.services.text import keywords
+from anbudsklar.visibility import shown_notices
 from anbudsklar.worker.mail import Mailer, MailError, match_message
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,9 @@ QUICK_ENGINES = frozenset({"heuristic"})
 MAX_QUICK_CANDIDATES = 200
 # Without a CPV match, a notice must contain this many of the company's own keywords.
 MIN_KEYWORD_HITS = 2
+# A bound on the full-text query, not a choice of words: a 4 000-character description has
+# fewer distinct words than this after the stop words.
+MAX_KEYWORDS = 80
 # Outcomes of one "Ny träff" e-mail.
 SENT, ALREADY_SENT, FAILED = "sent", "already_sent", "failed"
 
@@ -227,6 +231,7 @@ async def count_fitting(session: AsyncSession, company_id: uuid.UUID, now: datet
             MatchRecord.dismissed.is_(False),
             MatchRecord.stale.is_(False),
             _deadline_ahead(now),
+            shown_notices(),
         )
     )
     return count or 0
@@ -243,6 +248,7 @@ async def list_matches(session: AsyncSession, viewer: Viewer) -> list[MatchView]
             MatchRecord.dismissed.is_(False),
             MatchRecord.stale.is_(False),
             _deadline_ahead(utcnow()),
+            shown_notices(),
         )
     )
     pairs = rows.all()
@@ -294,9 +300,11 @@ async def notify_matches(
         .where(
             MatchRecord.fit.in_(FITTING),
             MatchRecord.notified_at.is_(None),
+            shown_notices(),
             MatchRecord.dismissed.is_(False),
             MatchRecord.stale.is_(False),
             _deadline_ahead(now),
+            shown_notices(),
         )
         .order_by(MatchRecord.created_at)
     )
@@ -378,10 +386,14 @@ async def _candidates(
     published = select(ChecklistRecord.notice_id).where(ChecklistRecord.status == PUBLISHED)
     notices = (
         await session.scalars(
-            select(Notice).where(_deadline_ahead(now), or_(Notice.status == "open", Notice.id.in_(published)))
+            select(Notice).where(
+                shown_notices(), _deadline_ahead(now), or_(Notice.status == "open", Notice.id.in_(published))
+            )
         )
     ).all()
-    ranks = await _keyword_ranks(session, [notice.id for notice in notices], keywords(company.description))
+    ranks = await _keyword_ranks(
+        session, [notice.id for notice in notices], keywords(company.description, limit=MAX_KEYWORDS)
+    )
     candidates: dict[uuid.UUID, tuple[Notice, float]] = {}
     for notice in notices:
         score = prefilter_score(
