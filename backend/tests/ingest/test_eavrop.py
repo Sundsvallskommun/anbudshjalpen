@@ -224,6 +224,8 @@ def test_a_deadline_at_midnight_is_the_end_of_that_day() -> None:
     # e-Avrop's notice page shows LastBid "2026-11-06T00:00:00+01:00" as tender deadline 2026-11-06.
     assert parse_deadline("2026-11-06T00:00:00+01:00") == datetime(2026, 11, 6, 23, 59, 59, tzinfo=STOCKHOLM)
     assert parse_deadline("2026-10-30T12:00:00+01:00") == datetime(2026, 10, 30, 12, 0, tzinfo=STOCKHOLM)
+    # Summer time ends on 25 October 2026: midnight is +02:00, the end of the day +01:00.
+    assert parse_deadline("2026-10-25T00:00:00+02:00") == datetime(2026, 10, 25, 22, 59, 59, tzinfo=UTC)
     assert parse_deadline(None) is None
     assert parse_deadline("inte ett datum") is None
 

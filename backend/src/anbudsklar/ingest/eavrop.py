@@ -167,11 +167,13 @@ def parse_deadline(value: Any) -> datetime | None:
     "2026-11-06T00:00:00+01:00" is shown as tender deadline 2026-11-06 on e-Avrop's notice
     page (checked 2026-10-12). Read as a moment it would end the day before, so it is stored
     as 23:59:59 on that day, as `anbudsklar.ingest.ted.parse_deadline` stores TED's dates.
+    The end of the day takes Stockholm's offset at that hour, not midnight's: on the day
+    summer time ends the two differ.
     """
 
     moment = parse_moment(value)
     if moment is not None and moment.time() == time.min:
-        moment = moment.replace(hour=23, minute=59, second=59)
+        moment = datetime.combine(moment.date(), time(23, 59, 59), STOCKHOLM)
     return moment
 
 
