@@ -1,6 +1,6 @@
 # 0013: Inköps publicerade svar på leverantörernas frågor hämtas från e-Avrops frågelogg
 
-- **Status:** Accepterat
+- **Status:** Accepterat, för AI-uppgifternas läsning av svaren ersatt av [0018](0018-publicerade-svar-i-ai-uppgifterna.md)
 - **Datum:** 2026-10-12
 - **Gäller:** vad insamlaren läser från e-Avrop utöver annonsens dokument, vad som sparas av frågor och svar, och
   var de visas

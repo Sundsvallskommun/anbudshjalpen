@@ -28,6 +28,18 @@ export interface Citation {
   document_id: Uuid | null;
 }
 
+/** A quote from one of inköp's published answers in e-Avrop (decision 0018). */
+export interface AnswerCitation {
+  /** The answer's number as the model saw it, "[SVAR n]": oldest first, as the page numbers them. */
+  answer: number;
+  quote: string;
+  check: CitationCheck | null;
+  /** Set by verification: the answer that holds the quote, when it differs. */
+  found_answer: number | null;
+  /** Set by verification: the stable key of that answer, `PublishedAnswerView.key`. */
+  answer_key: string | null;
+}
+
 // --- contracts/tasks.py ------------------------------------------------------------------------
 
 export type RequirementKind = "skallkrav" | "kvalificeringskrav" | "krav_pa_uppdraget" | "avtalsvillkor";
@@ -47,6 +59,8 @@ export interface Requirement {
   plain_language: string;
   evidence: string | null;
   citation: Citation;
+  /** A published answer that changes or clarifies the requirement (decision 0018). */
+  answer_citation?: AnswerCitation | null;
 }
 
 export interface RequiredAttachment {
@@ -129,6 +143,8 @@ export interface Answer {
   answer: string;
   found_in_document: boolean;
   citations: Citation[];
+  /** Quotes from inköp's published answers, which go before the documents where they differ (decision 0018). */
+  answer_citations: AnswerCitation[];
   suggest_formal_question: boolean;
 }
 
@@ -359,6 +375,8 @@ export interface MatchView {
 export interface PublishedAnswerView {
   /** "eavrop" */
   source: string;
+  /** Stable across reads; an `AnswerCitation` names it. */
+  key: string;
   question: string;
   answer: string;
   asked_at: IsoDateTime | null;

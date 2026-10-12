@@ -20,6 +20,7 @@ Rules for implementations:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
@@ -33,6 +34,7 @@ from anbudsklar.contracts import (
     MatchAssessment,
     NoticeContext,
     PagedDocument,
+    PublishedAnswerInput,
     ReviewResult,
     RulesAnswer,
 )
@@ -100,9 +102,16 @@ class AiEngine(Protocol):
     name: str
 
     async def interpret_document(
-        self, notice: NoticeContext, document: PagedDocument
+        self,
+        notice: NoticeContext,
+        document: PagedDocument,
+        answers: Sequence[PublishedAnswerInput] = (),
     ) -> tuple[Checklist, EngineRun]:
-        """tolka_underlag: turn a procurement document into a checklist with citations."""
+        """tolka_underlag: turn a procurement document into a checklist with citations.
+
+        `answers` are the buyer's published answers (decision 0018): they settle open
+        questions and can change a requirement, so the checklist reflects them.
+        """
         ...
 
     async def assess_match(
@@ -123,8 +132,10 @@ class AiEngine(Protocol):
         documents: DocumentSet,
         question: str,
         history: list[QuestionTurn],
+        answers: Sequence[PublishedAnswerInput] = (),
     ) -> tuple[Answer, EngineRun]:
-        """besvara_fraga: answer a question grounded in one procurement document."""
+        """besvara_fraga: answer a question grounded in the procurement's documents and the
+        buyer's published answers, which go before the documents where they differ (decision 0018)."""
         ...
 
     async def suggest_cpv(

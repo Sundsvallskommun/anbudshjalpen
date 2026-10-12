@@ -171,7 +171,11 @@ export const JOBS: { job: JobName; label: string; description: string }[] = [
     label: "Stäng passerade annonser",
     description: "Stänger öppna annonser vars sista anbudsdag, eller sista dag för anbudsansökan, har passerat.",
   },
-  { job: "interpret_pending", label: "Tolka nya underlag", description: "Gör checklistor av uppladdade underlag." },
+  {
+    job: "interpret_pending",
+    label: "Tolka nya underlag",
+    description: "Gör checklistor av uppladdade underlag, och tolkar om när inköp har publicerat nya svar i e-Avrop.",
+  },
   { job: "match_all", label: "Bedöm matchningar", description: "Jämför företagens profiler med upphandlingarna." },
   { job: "send_reminders", label: "Skicka påminnelser", description: "Mejlar påminnelser som har förfallit." },
   { job: "notify_matches", label: "Meddela träffar", description: "Mejlar företag om nya upphandlingar som passar dem." },

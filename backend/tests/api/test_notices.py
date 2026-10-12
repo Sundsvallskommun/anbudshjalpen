@@ -591,4 +591,37 @@ async def test_the_detail_lists_the_published_answers_oldest_first(
     first = body["published_answers"][0]
     assert first["answer"] == "Ja, ställning ingår i anbudspriset."
     assert first["source"] == "eavrop" and first["asked_at"] is None
-    assert set(first) == {"source", "question", "answer", "asked_at", "answered_at"}
+    assert set(first) == {"source", "key", "question", "answer", "asked_at", "answered_at"}
+    assert first["key"] == "a" * 64
+
+
+async def test_a_question_inkop_has_answered_in_eavrop_is_answered_from_that_answer(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    """The published answer goes first, quoted with its key and checked by our code (decision 0018)."""
+
+    now = datetime.now(UTC)
+    db_session.add(
+        PublishedAnswer(
+            notice_id=demo.notice.id,
+            source="eavrop",
+            external_key="c" * 64,
+            question="Gäller kravet på F-skattsedel även underleverantörer?",
+            answer="Ja, kravet på F-skattsedel gäller även underleverantörer.",
+            asked_at=now - timedelta(days=2),
+            answered_at=now - timedelta(days=1),
+        )
+    )
+    await db_session.flush()
+
+    response = await client.post(
+        f"/api/notices/{demo.notice.id}/questions",
+        json={"question": "Gäller kravet på F-skattsedel även för underleverantörer?"},
+    )
+
+    assert response.status_code == 200, response.text
+    answer = response.json()["answer"]
+    assert answer["answer"].startswith("Inköp har svarat på en liknande fråga i e-Avrop:")
+    assert answer["found_in_document"] is True
+    [cited] = answer["answer_citations"]
+    assert (cited["answer"], cited["check"], cited["answer_key"]) == (1, "verified", "c" * 64)

@@ -271,6 +271,7 @@ async def notice_detail(session: AsyncSession, notice_id: uuid.UUID, viewer: Vie
 def published_answer_view(answer: PublishedAnswer) -> PublishedAnswerView:
     return PublishedAnswerView(
         source=answer.source,
+        key=answer.external_key,
         question=answer.question,
         answer=answer.answer,
         asked_at=answer.asked_at,

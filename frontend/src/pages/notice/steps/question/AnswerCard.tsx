@@ -6,9 +6,10 @@ import { Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useId } from "react";
-import type { AnswerView, Citation, NoticeDetail, ReadSummary } from "../../../../api/types";
+import type { AnswerCitation, AnswerView, Citation, NoticeDetail, ReadSummary } from "../../../../api/types";
 import { FormalQuestionAdvice } from "../../../../components/FormalQuestionAdvice";
 import { AiProvenance } from "../../../../components/ui/AiProvenance";
+import { PublishedAnswerQuote } from "../../../../components/ui/PublishedAnswerQuote";
 import { SourceLink } from "../../../../components/ui/source/SourceLink";
 import { calendarDateOf, formatShortDate, isPassed } from "../../../../lib/format";
 import { formalQuestionLink, procurementLink } from "../../../../lib/links";
@@ -57,6 +58,25 @@ function Quotes({
   );
 }
 
+/** Inköp's own answers in e-Avrop that the answer rests on (decision 0018): before the document's quotes, as they go first. */
+function AnswerQuotes({ citations, notice }: { citations: readonly AnswerCitation[]; notice: NoticeDetail }) {
+  const labelId = useId();
+  return (
+    <VStack gap={2}>
+      <Text type="supporting" id={labelId}>
+        Inköp har svarat i e-Avrop:
+      </Text>
+      <VStack as="ul" role="list" aria-labelledby={labelId} gap={3}>
+        {citations.map((citation, index) => (
+          <li key={index}>
+            <PublishedAnswerQuote citation={citation} answers={notice.published_answers} noticeId={notice.id} />
+          </li>
+        ))}
+      </VStack>
+    </VStack>
+  );
+}
+
 /** What the engine read (decision 0012): all of it, or how much of the procurement's documents. */
 export function readLine(read: ReadSummary): string {
   const whole = read.pages_read === read.pages_total;
@@ -76,8 +96,9 @@ function ShortAdvice({ questionDeadline }: { questionDeadline: string | null }) 
 }
 
 /**
- * An answer in the thread (direction.md, section 4 "Steg 2 Fråga"): the provenance line, "Står i underlaget" when a
- * quote was found, the lead sentence in bold, each quote with its page, and the line about equal treatment: the whole
+ * An answer in the thread (direction.md, section 4 "Steg 2 Fråga"): the provenance line, "Inköp har svarat" when it
+ * rests on inköp's published answer (decision 0018) or else "Står i underlaget" when a quote was found, the lead
+ * sentence in bold, inköp's answers, each quote with its page, and the line about equal treatment: the whole
  * advice with the date and the reminder when the document does not settle the question.
  */
 export function AnswerCard({ view, question, notice }: { view: AnswerView; question: string; notice: NoticeDetail }) {
@@ -85,6 +106,10 @@ export function AnswerCard({ view, question, notice }: { view: AnswerView; quest
   // The backend says which document it read; without that, it read the first one.
   const documentId: string | undefined = view.document_id ?? answerDocumentId(notice);
   const parts = answerParts(answer);
+  // An answer stored in the browser before decision 0018 has no quotes of inköp's answers.
+  const answerCitations = answer.answer_citations ?? [];
+  // Only an answer that says it is settled gets the green token: never beside the advice to ask formally.
+  const isAnsweredByBuyer = answer.found_in_document && answerCitations.some((citation) => citation.check !== "unverified");
   const isBacked = answer.found_in_document && answer.citations.some((citation) => citation.check !== "unverified");
   const needsFormalQuestion = answer.suggest_formal_question || !answer.found_in_document;
   // A made-up notice with no page of its own is in no e-Avrop: the advice says so instead of linking there.
@@ -99,7 +124,11 @@ export function AnswerCard({ view, question, notice }: { view: AnswerView; quest
             </Text>
             <AiProvenance engine={engine} />
           </HStack>
-          {isBacked && <Token label="Står i underlaget" color="green" size="sm" icon={<Icon icon="success" size="sm" />} />}
+          {isAnsweredByBuyer ? (
+            <Token label="Inköp har svarat" color="green" size="sm" icon={<Icon icon="success" size="sm" />} />
+          ) : (
+            isBacked && <Token label="Står i underlaget" color="green" size="sm" icon={<Icon icon="success" size="sm" />} />
+          )}
         </HStack>
         {parts.lead && (
           <Text as="p" weight="semibold">
@@ -111,6 +140,7 @@ export function AnswerCard({ view, question, notice }: { view: AnswerView; quest
             {paragraph}
           </Text>
         ))}
+        {answerCitations.length > 0 && <AnswerQuotes citations={answerCitations} notice={notice} />}
         {answer.citations.length > 0 && (
           <Quotes citations={answer.citations} notice={notice} documentId={documentId} question={question} />
         )}

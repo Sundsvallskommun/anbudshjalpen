@@ -10,6 +10,7 @@ import { EVALUATION_ID } from "../../../../components/checklist/Evaluation";
 import { KEY_DATES_ID } from "../../../../components/checklist/KeyDates";
 import { OPEN_QUESTIONS_ID, OPEN_QUESTIONS_TITLE } from "../../../../components/checklist/OpenQuestions";
 import { TERMS_ID, TERMS_TITLE } from "../../../../components/checklist/Terms";
+import { PUBLISHED_ANSWERS_ID, PUBLISHED_ANSWERS_TITLE } from "../../../../components/ui/PublishedAnswerQuote";
 
 export const TASKS_ID = "att-gora";
 export const TASKS_TITLE = "Det här behöver du göra";
@@ -19,7 +20,7 @@ function item(id: string, label: string): OutlineItem {
   return { id, label, level: 2 };
 }
 
-export function requirementsOutline(checklist: Checklist): OutlineItem[] {
+export function requirementsOutline(checklist: Checklist, publishedAnswers = 0): OutlineItem[] {
   const byKind = requirementsByKind(checklist.requirements);
   const sections = REQUIREMENT_SECTIONS.map((section) => ({ section, count: byKind[section.kind].length }));
   const [early, late] = [sections.slice(0, 2), sections.slice(2)];
@@ -34,5 +35,6 @@ export function requirementsOutline(checklist: Checklist): OutlineItem[] {
     ...late.filter(({ count }) => count > 0).map(({ section, count }) => item(section.id, `${section.title} (${count})`)),
     ...(checklist.terms.length > 0 ? [item(TERMS_ID, TERMS_TITLE)] : []),
     ...(checklist.open_questions.length > 0 ? [item(OPEN_QUESTIONS_ID, OPEN_QUESTIONS_TITLE)] : []),
+    ...(publishedAnswers > 0 ? [item(PUBLISHED_ANSWERS_ID, `${PUBLISHED_ANSWERS_TITLE} (${publishedAnswers})`)] : []),
   ];
 }

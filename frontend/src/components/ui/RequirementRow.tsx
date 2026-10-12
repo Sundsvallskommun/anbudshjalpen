@@ -4,9 +4,10 @@ import { Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import { VStack } from "@astryxdesign/core/VStack";
 import type { ReactNode } from "react";
-import type { Requirement, TermExplanation } from "../../api/types";
+import type { PublishedAnswerView, Requirement, TermExplanation } from "../../api/types";
 import { keepNumbersTogether, splitTitleAndBody } from "../../lib/text";
 import { TermText } from "../TermText";
+import { PublishedAnswerQuote } from "./PublishedAnswerQuote";
 import styles from "./RequirementRow.module.css";
 import { SourceLink } from "./source/SourceLink";
 
@@ -39,11 +40,14 @@ export interface RequirementRowProps {
   as?: "li" | "div";
   /** Rows edge to edge in a section card get the card's inset and a divider between them (default). */
   isInset?: boolean;
+  /** Inköp's published answers, for a requirement that one of them changes or clarifies (decision 0018). */
+  publishedAnswers?: readonly PublishedAnswerView[];
 }
 
 /**
- * One requirement as a compact row (at least 48 px): the title, an optional "Bevis: …" chip, the body and under it
- * "Källa: 6.1 Upphandlingsföreskrifter.pdf, s. 5".
+ * One requirement as a compact row (at least 48 px): the title, an optional "Bevis: …" chip, the body, inköp's answer
+ * when one changes or clarifies the requirement (decision 0018), and under it "Källa: 6.1 Upphandlingsföreskrifter.pdf,
+ * s. 5".
  * Nothing is said twice (direction.md, section 9.4): a body that repeats the title is left out, one that continues it
  * shows only the continuation, and a title cut off with "…" gives way to the whole sentence. The row carries its
  * anchor (#krav-K12) so other rows can link to it.
@@ -57,6 +61,7 @@ export function RequirementRow({
   actions,
   as = "li",
   isInset = true,
+  publishedAnswers = [],
 }: RequirementRowProps) {
   const shown = splitTitleAndBody(requirement.title, requirement.plain_language);
   return (
@@ -74,6 +79,14 @@ export function RequirementRow({
       description={
         <VStack gap={1}>
           {shown.body && <TermText text={keepNumbersTogether(shown.body)} terms={terms} />}
+          {requirement.answer_citation && (
+            <VStack gap={1}>
+              <Text type="supporting" weight="semibold">
+                Inköp har svarat om kravet i e-Avrop. Svaret gäller före texten i underlaget.
+              </Text>
+              <PublishedAnswerQuote citation={requirement.answer_citation} answers={publishedAnswers} noticeId={noticeId} />
+            </VStack>
+          )}
           <Text type="supporting">
             Källa:{" "}
             <SourceLink

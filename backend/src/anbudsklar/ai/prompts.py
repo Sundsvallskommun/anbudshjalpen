@@ -32,8 +32,10 @@ from anbudsklar.contracts import (
     DocumentSet,
     NoticeContext,
     PagedDocument,
+    PublishedAnswerInput,
     Task,
     model_output_schema,
+    render_published_answers,
 )
 
 STOCKHOLM = ZoneInfo("Europe/Stockholm")
@@ -64,10 +66,10 @@ _CLOSING: dict[Task, str] = {
 
 # Inputs per task, in the order they are rendered. All of them must be passed.
 TASK_INPUTS: dict[Task, tuple[str, ...]] = {
-    Task.INTERPRET_DOCUMENT: ("notice", "document"),
+    Task.INTERPRET_DOCUMENT: ("notice", "document", "answers"),
     Task.ASSESS_MATCH: ("profile", "notice", "checklist"),
     Task.REVIEW_DRAFT: ("checklist", "draft"),
-    Task.ANSWER_QUESTION: ("notice", "documents", "history", "question"),
+    Task.ANSWER_QUESTION: ("notice", "documents", "answers", "history", "question"),
     Task.SUGGEST_CPV: ("description", "candidates"),
     Task.ANSWER_RULES: ("context", "question"),
 }
@@ -155,6 +157,14 @@ def _render_documents(documents: DocumentSet) -> str:
     return _block("underlag", documents.render())
 
 
+def _render_answers(answers: Sequence[PublishedAnswerInput]) -> str:
+    """The buyer's published answers (decision 0018); left out when there are none."""
+
+    if not answers:
+        return ""
+    return _block("publicerade_svar", render_published_answers(list(answers)))
+
+
 def _render_draft(draft: PagedDocument) -> str:
     return _block("anbudsutkast", draft.render())
 
@@ -231,6 +241,7 @@ _RENDERERS: dict[str, Callable[[Any], str]] = {
     "notice": _render_notice,
     "document": _render_document,
     "documents": _render_documents,
+    "answers": _render_answers,
     "draft": _render_draft,
     "profile": _render_profile,
     "checklist": _render_checklist,

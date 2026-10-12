@@ -8,6 +8,7 @@ import pytest
 
 from anbudsklar.contracts import (
     Answer,
+    AnswerCitation,
     Checklist,
     Citation,
     EvaluationCriterion,
@@ -15,6 +16,7 @@ from anbudsklar.contracts import (
     MatchAssessment,
     MatchReason,
     PagedDocument,
+    PublishedAnswerInput,
     RequiredAttachment,
     Requirement,
     RequirementCheck,
@@ -614,3 +616,108 @@ def test_verify_answer_across_documents(tender_pages: list[str]) -> None:
         [main, attachment],
     )
     assert (missing.citations[0].check, missing.citations[0].document_id) == ("unverified", "att")
+
+
+# --- Published answers (decision 0018) -----------------------------------------------------
+
+PUBLISHED = [
+    PublishedAnswerInput(
+        number=1,
+        key="k1",
+        question="Enligt punkt 4 ger 0 poäng fullt påslag. Minskar påslaget med 25 procent per poäng?",
+        answer="Ja, det minskar med 25% per poäng.",
+        answered_at=dt.datetime(2026, 10, 9, 10, 0, tzinfo=dt.UTC),
+    ),
+    PublishedAnswerInput(
+        number=2,
+        key="k2",
+        question="Hur många medarbetare räknar ni med ska gå utbildningen?",
+        answer="Utbildningen skall ges till ca 45 medarbetare.",
+        answered_at=dt.datetime(2026, 10, 9, 11, 0, tzinfo=dt.UTC),
+    ),
+]
+
+
+def _answer_with(*citations: AnswerCitation) -> Answer:
+    return Answer(
+        answer="Inköp har svarat på det i e-Avrop.",
+        found_in_document=True,
+        answer_citations=list(citations),
+        suggest_formal_question=False,
+    )
+
+
+def test_a_quote_from_a_published_answer_is_verified_and_keyed() -> None:
+    verified = verify_answer(
+        _answer_with(AnswerCitation(answer=2, quote="Utbildningen skall ges till ca 45 medarbetare.")),
+        [],
+        PUBLISHED,
+    )
+    [citation] = verified.answer_citations
+    assert (citation.check, citation.found_answer, citation.answer_key) == ("verified", None, "k2")
+
+
+def test_a_quote_in_another_answer_is_moved_and_keyed_to_that_answer() -> None:
+    verified = verify_answer(
+        _answer_with(AnswerCitation(answer=1, quote="ges till ca 45 medarbetare")), [], PUBLISHED
+    )
+    [citation] = verified.answer_citations
+    assert (citation.check, citation.found_answer, citation.answer_key) == ("moved", 2, "k2")
+
+
+def test_a_quote_may_come_from_the_question_the_answer_answers() -> None:
+    quote = "Minskar påslaget med 25 procent per poäng?"
+    verified = verify_answer(_answer_with(AnswerCitation(answer=1, quote=quote)), [], PUBLISHED)
+    assert verified.answer_citations[0].check == "verified"
+
+
+def test_a_short_quote_only_counts_as_whole_words_in_the_answer_it_names() -> None:
+    short = verify_answer(_answer_with(AnswerCitation(answer=1, quote="Ja")), [], PUBLISHED)
+    assert (short.answer_citations[0].check, short.answer_citations[0].answer_key) == ("verified", "k1")
+    # "ca" is in answer 2 only, and "Ja" never as a word in answer 2.
+    elsewhere = verify_answer(_answer_with(AnswerCitation(answer=1, quote="ca")), [], PUBLISHED)
+    assert elsewhere.answer_citations[0].check == "unverified"
+    inside_word = verify_answer(_answer_with(AnswerCitation(answer=2, quote="Ja")), [], PUBLISHED)
+    assert inside_word.answer_citations[0].check == "unverified"
+
+
+def test_an_invented_answer_or_number_is_unverified() -> None:
+    invented = verify_answer(
+        _answer_with(AnswerCitation(answer=1, quote="Påslaget slopas helt för alla leverantörer.")),
+        [],
+        PUBLISHED,
+    )
+    assert (invented.answer_citations[0].check, invented.answer_citations[0].answer_key) == (
+        "unverified",
+        "k1",
+    )
+    no_such = verify_answer(_answer_with(AnswerCitation(answer=9, quote="Ja")), [], PUBLISHED)
+    assert (no_such.answer_citations[0].check, no_such.answer_citations[0].answer_key) == ("unverified", None)
+    without = verify_answer(_answer_with(AnswerCitation(answer=1, quote="Ja")), [], [])
+    assert without.answer_citations[0].check == "unverified"
+
+
+def test_a_requirements_answer_citation_is_verified_with_the_checklist(tender_pages: list[str]) -> None:
+    requirement = Requirement(
+        id="K1",
+        kind="avtalsvillkor",
+        title="Påslag per poäng",
+        plain_language="Påslaget minskar med 25 % per poäng.",
+        citation=_citation(1, "Försäkringsbevis ska bifogas anbudet."),
+        answer_citation=AnswerCitation(answer=1, quote="det minskar med 25% per poäng"),
+    )
+    checklist = Checklist(summary="Utbildning.", requirements=[requirement])
+    verified, summary = verify_checklist(checklist, tender_pages, PUBLISHED)
+    answer_citation = verified.requirements[0].answer_citation
+    assert answer_citation is not None and (answer_citation.check, answer_citation.answer_key) == (
+        "verified",
+        "k1",
+    )
+    # The summary counts the document's citations, which the provenance line names.
+    assert summary.citations_total == 1
+
+
+def test_a_quote_never_runs_from_one_answer_into_the_next() -> None:
+    quote = "Ja, det minskar med 25% per poäng. Hur många medarbetare räknar ni med"
+    verified = verify_answer(_answer_with(AnswerCitation(answer=1, quote=quote)), [], PUBLISHED)
+    assert verified.answer_citations[0].check == "unverified"

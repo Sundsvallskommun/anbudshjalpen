@@ -18,7 +18,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 # Keys that only our code may set. They are removed from the schema shown to models.
-VERIFICATION_KEYS: frozenset[str] = frozenset({"check", "found_page", "draft_check", "document_id"})
+VERIFICATION_KEYS: frozenset[str] = frozenset(
+    {"check", "found_page", "draft_check", "document_id", "found_answer", "answer_key"}
+)
 
 CitationCheck = Literal["verified", "moved", "unverified"]
 
@@ -55,6 +57,37 @@ class Citation(ContractModel):
     )
     document_id: str | None = Field(
         default=None, description="Set by citation verification: the document where the quote was found."
+    )
+
+
+# Citation verification finds the quote among the answers and sets `answer_key`, the answer's
+# stable key, so the web app links to the right entry even if the numbering moves. That is said
+# here and not in the docstring, which becomes the schema description the model reads.
+class AnswerCitation(ContractModel):
+    """A verbatim quote from one of the buyer's published answers in e-Avrop (decision 0018).
+
+    The answers belong to the procurement documents and reach every supplier, so a claim may
+    rest on one.
+    """
+
+    answer: int = Field(ge=1, description="The answer's number from its [SVAR n] marker.")
+    quote: str = Field(
+        min_length=2,
+        max_length=400,
+        description="Exact text copied from the buyer's answer (or the question it answers), "
+        "at most a sentence or two.",
+    )
+    check: CitationCheck | None = Field(
+        default=None,
+        description="Set by citation verification: verified, moved (found in another answer) or unverified.",
+    )
+    found_answer: int | None = Field(
+        default=None,
+        description="Set by citation verification: the answer that holds the quote, when it differs.",
+    )
+    answer_key: str | None = Field(
+        default=None,
+        description="Set by citation verification: the stable key of the answer that holds the quote.",
     )
 
 

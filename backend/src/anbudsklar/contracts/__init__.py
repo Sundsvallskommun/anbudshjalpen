@@ -1,6 +1,7 @@
 """Typed contracts for the AI tasks (inputs and outputs)."""
 
 from anbudsklar.contracts.common import (
+    AnswerCitation,
     Citation,
     CitationCheck,
     ContractModel,
@@ -15,7 +16,9 @@ from anbudsklar.contracts.inputs import (
     DocumentSet,
     NoticeContext,
     PagedDocument,
+    PublishedAnswerInput,
     deadline_kind,
+    render_published_answers,
 )
 from anbudsklar.contracts.tasks import (
     CONTRACT_VERSION,
@@ -44,6 +47,7 @@ __all__ = [
     "DEADLINE_LABELS",
     "TASK_OUTPUTS",
     "Answer",
+    "AnswerCitation",
     "AttachmentCheck",
     "Checklist",
     "Citation",
@@ -62,6 +66,7 @@ __all__ = [
     "MatchReason",
     "NoticeContext",
     "PagedDocument",
+    "PublishedAnswerInput",
     "RequiredAttachment",
     "Requirement",
     "RequirementCheck",
@@ -72,4 +77,5 @@ __all__ = [
     "TermExplanation",
     "deadline_kind",
     "model_output_schema",
+    "render_published_answers",
 ]

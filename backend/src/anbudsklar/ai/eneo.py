@@ -19,6 +19,7 @@ import json
 import logging
 import re
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -40,6 +41,7 @@ from anbudsklar.contracts import (
     MatchAssessment,
     NoticeContext,
     PagedDocument,
+    PublishedAnswerInput,
     ReviewResult,
     RulesAnswer,
     RuleSource,
@@ -374,9 +376,14 @@ class EneoEngine:
         return value, EngineRun(engine=self.name, model=model_name, attempts=attempts)
 
     async def interpret_document(
-        self, notice: NoticeContext, document: PagedDocument
+        self,
+        notice: NoticeContext,
+        document: PagedDocument,
+        answers: Sequence[PublishedAnswerInput] = (),
     ) -> tuple[Checklist, EngineRun]:
-        return await self._run_task(Task.INTERPRET_DOCUMENT, Checklist, notice=notice, document=document)
+        return await self._run_task(
+            Task.INTERPRET_DOCUMENT, Checklist, notice=notice, document=document, answers=list(answers)
+        )
 
     async def assess_match(
         self, profile: CompanyProfile, notice: NoticeContext, checklist: Checklist | None
@@ -396,12 +403,14 @@ class EneoEngine:
         documents: DocumentSet,
         question: str,
         history: list[QuestionTurn],
+        answers: Sequence[PublishedAnswerInput] = (),
     ) -> tuple[Answer, EngineRun]:
         return await self._run_task(
             Task.ANSWER_QUESTION,
             Answer,
             notice=notice,
             documents=documents,
+            answers=list(answers),
             history=history,
             question=question,
         )

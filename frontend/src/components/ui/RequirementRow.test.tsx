@@ -1,7 +1,7 @@
 import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { Requirement } from "../../api/types";
-import { checklistView, NOTICE_ID } from "../../test/fixtures";
+import { checklistView, NOTICE_ID, publishedAnswer } from "../../test/fixtures";
 import { mockApi } from "../../test/render";
 import { requirementAnchor, RequirementRow } from "./RequirementRow";
 import { renderWithProviders } from "./testing";
@@ -42,5 +42,54 @@ describe("RequirementRow", () => {
     const evidence = "Bifoga ett giltigt försäkringsbevis från försäkringsbolaget som visar beloppet.";
     renderRows([{ ...base, evidence }]);
     expect(screen.getByText(`Bevis: ${evidence}`).closest(".astryx-token")).toBeNull();
+  });
+
+  it("shows inköp's answer when one changes the requirement, linked to the entry (decision 0018)", () => {
+    mockApi([]);
+    const changed: Requirement = {
+      ...base,
+      answer_citation: { answer: 1, quote: "Ja, ställning ingår i anbudspriset.", check: "verified", found_answer: null, answer_key: publishedAnswer.key },
+    };
+    renderWithProviders(
+      <ul>
+        <RequirementRow requirement={changed} noticeId={NOTICE_ID} origin="Skallkrav" publishedAnswers={[publishedAnswer]} />
+      </ul>,
+    );
+    expect(screen.getByText("Inköp har svarat om kravet i e-Avrop. Svaret gäller före texten i underlaget.")).toBeInTheDocument();
+    expect(screen.getByText("Fråga 1 · Besvarad 30 sep: Ska ställning ingå i priset för fasadmålningen?")).toBeInTheDocument();
+    expect(screen.getByText("Ja, ställning ingår i anbudspriset.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Frågor och svar från inköp, fråga 1" })).toHaveAttribute(
+      "href",
+      `/upphandlingar/${NOTICE_ID}#svar-${"a".repeat(12)}`,
+    );
+  });
+
+  it("says so when inköp's answer could not be found among the answers", () => {
+    mockApi([]);
+    const invented: Requirement = {
+      ...base,
+      answer_citation: { answer: 4, quote: "Påslaget slopas.", check: "unverified", found_answer: null, answer_key: null },
+    };
+    renderWithProviders(
+      <ul>
+        <RequirementRow requirement={invented} noticeId={NOTICE_ID} publishedAnswers={[publishedAnswer]} />
+      </ul>,
+    );
+    expect(screen.getByText("Hittades inte bland inköps svar")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^Frågor och svar från inköp/u })).not.toBeInTheDocument();
+  });
+
+  it("says so when inköp's answer has since been withdrawn in e-Avrop", () => {
+    mockApi([]);
+    const withdrawn: Requirement = {
+      ...base,
+      answer_citation: { answer: 1, quote: "Ja.", check: "verified", found_answer: null, answer_key: "z".repeat(64) },
+    };
+    renderWithProviders(
+      <ul>
+        <RequirementRow requirement={withdrawn} noticeId={NOTICE_ID} publishedAnswers={[publishedAnswer]} />
+      </ul>,
+    );
+    expect(screen.getByText("Svaret finns inte längre bland inköps svar")).toBeInTheDocument();
   });
 });

@@ -117,8 +117,9 @@ Så används den:
 - **Öppna upphandlingar läses varje körning.** Ett svar ändrar inte projektets `UpdatedDate`, så ändringskontrollen
   i steg 2 ovan skulle missa det. En TED-annons med underlag från e-Avrop läses med
   `/v1/procurements/by-procurement-id/{id}`.
-- **Svaren visas för alla:** i steg 2 Fråga, i `GET /api/notices/{id}` (`published_answers`) och med MCP-verktyget
-  `hamta_fragor_svar`. `hamta_upphandling` säger hur många svar som finns.
+- **Svaren visas för alla:** i steg 1 Krav som "Frågor och svar från inköp", i `GET /api/notices/{id}` (`published_answers`) och med MCP-verktyget
+  `hamta_fragor_svar`. `hamta_upphandling` säger hur många svar som finns. Fråga AI och tolkningen läser dem
+  ([beslut 0018](decisions/0018-publicerade-svar-i-ai-uppgifterna.md)).
 
 Det här är inte dokumenterat av e-Avrop, och parsern är därför försiktig: en post som inte går att läsa hoppas över.
 Det som inte kunnat verifieras är markerat `UNCERTAIN` i `eavrop_qa.py` och ska bekräftas med Antirio:

@@ -16,6 +16,7 @@ from anbudsklar.contracts import (
     DocumentSet,
     NoticeContext,
     PagedDocument,
+    PublishedAnswerInput,
     RequiredAttachment,
     Requirement,
 )
@@ -663,3 +664,61 @@ async def test_shared_words_are_listed_in_running_text() -> None:
     assessment, _ = await HeuristicEngine().assess_match(PAINTER, notice, None)
     words = [reason.text for reason in assessment.reasons if reason.text.startswith("Ni och annonsen")]
     assert words == ["Ni och annonsen använder samma ord: fasader och invändig."]
+
+
+# --- Published answers (decision 0018) -------------------------------------------------------
+
+
+def _published(number: int, question: str, answer: str) -> PublishedAnswerInput:
+    return PublishedAnswerInput(
+        number=number,
+        key=f"k{number}",
+        question=question,
+        answer=answer,
+        answered_at=dt.datetime(2026, 10, 9, 10, 0, tzinfo=dt.UTC),
+    )
+
+
+F_SKATT = _published(
+    1,
+    "Gäller kravet på F-skattsedel även underleverantörer?",
+    "Ja, kravet på F-skattsedel gäller även underleverantörer.",
+)
+
+
+async def test_a_nearly_identical_question_gets_inkops_answer_first() -> None:
+    answer, _ = await HeuristicEngine().answer_question(
+        NOTICE,
+        DocumentSet.of([DOCUMENT]),
+        "Gäller kravet på F-skattsedel även för underleverantörer?",
+        [],
+        [F_SKATT],
+    )
+    assert answer.answer.startswith("Inköp har svarat på en liknande fråga i e-Avrop:")
+    assert [citation.answer for citation in answer.answer_citations] == [1]
+    assert verify_answer(answer, [DOCUMENT], [F_SKATT]).answer_citations[0].check == "verified"
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Gäller kravet på referenser även underleverantörer?",
+        "Gäller kravet på ansvarsförsäkring även underleverantörer?",
+        "Måste underleverantörer uppfylla kravet på miljöledningssystem?",
+    ],
+)
+async def test_a_question_about_something_else_never_gets_that_answer(question: str) -> None:
+    """The reader's distinctive word counts: an answer about F-skatt is not an answer about references."""
+
+    answer, _ = await HeuristicEngine().answer_question(
+        NOTICE, DocumentSet.of([DOCUMENT]), question, [], [F_SKATT]
+    )
+    assert answer.answer_citations == []
+
+
+async def test_a_one_character_answer_is_quoted_by_its_question() -> None:
+    short = _published(1, "Hur många utbildningstillfällen planeras totalt?", "5")
+    answer, _ = await HeuristicEngine().answer_question(
+        NOTICE, DocumentSet.of([DOCUMENT]), "Hur många utbildningstillfällen planeras?", [], [short]
+    )
+    assert answer.answer_citations[0].quote == "Hur många utbildningstillfällen planeras totalt?"

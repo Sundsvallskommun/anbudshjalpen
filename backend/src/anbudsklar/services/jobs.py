@@ -28,7 +28,7 @@ from anbudsklar.ingest.common import IngestError
 from anbudsklar.ingest.http import user_agent
 from anbudsklar.models import JobRun
 from anbudsklar.services.background import SessionFactory
-from anbudsklar.services.checklists import interpret_pending
+from anbudsklar.services.checklists import interpret_answered, interpret_pending
 from anbudsklar.services.dates import utcnow
 from anbudsklar.services.errors import ConflictError, ServiceError
 from anbudsklar.services.lab import purge_expired
@@ -114,7 +114,9 @@ async def _close_expired(session: AsyncSession, ctx: JobContext) -> Mapping[str,
 
 
 async def _interpret_pending(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:
-    return await interpret_pending(session, ctx.engine)
+    """New documents first, then checklists whose published answers changed (decision 0018)."""
+
+    return {**await interpret_pending(session, ctx.engine), **await interpret_answered(session, ctx.engine)}
 
 
 async def _match_all(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:

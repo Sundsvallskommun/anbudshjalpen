@@ -228,6 +228,10 @@ class ChecklistRecord(Base):
     contract_version: Mapped[str] = mapped_column(String(32))
     payload: Mapped[dict[str, Any]] = mapped_column(JSONB)  # contracts.Checklist
     verification: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)  # summary counts
+    # The published answers the checklist was interpreted with (decision 0018); empty when there were none.
+    answers_digest: Mapped[str | None] = mapped_column(String(64))
+    # When inköp last saved the checklist; a saved draft is never replaced by a new interpretation.
+    edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reviewer_note: Mapped[str | None] = mapped_column(Text)
     approved_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

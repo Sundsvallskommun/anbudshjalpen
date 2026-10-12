@@ -2,7 +2,15 @@ import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnswerView, RulesView } from "../../api/types";
-import { answerNotInDocument, companyUser, NOTICE_ID, noticeBuyers, noticeDetail, noticeList } from "../../test/fixtures";
+import {
+  answerNotInDocument,
+  companyUser,
+  NOTICE_ID,
+  noticeBuyers,
+  noticeDetail,
+  noticeList,
+  publishedAnswer,
+} from "../../test/fixtures";
 import { baseRoutes, mockApi, renderApp, type MockRoute } from "../../test/render";
 import { STORAGE_KEY } from "./askAiState";
 
@@ -15,6 +23,7 @@ const answerInDocument: AnswerView = {
     answer: "Ni behöver en ansvarsförsäkring på minst 5 miljoner kronor. Försäkringsbeviset ska bifogas anbudet.",
     found_in_document: true,
     citations: [{ page: 4, quote: "Leverantören ska ha en ansvarsförsäkring", check: "verified", found_page: null, document: null, document_id: null }],
+    answer_citations: [],
     suggest_formal_question: false,
   },
 };
@@ -87,6 +96,49 @@ describe("Fråga AI (decision 0014)", () => {
     expect(within(answer).getByRole("link", { name: "Visa källan för ”Leverantören ska ha en ansvarsförsäkring”, s. 4" })).toBeInTheDocument();
     expect(calls.find((call) => call.path === QUESTIONS)?.body).toEqual({ question: "Vilka försäkringar måste vi ha?", history: [] });
     expect(within(panel).getByRole("textbox")).toHaveTextContent("");
+  });
+
+  it("puts inköp's published answer first when the answer rests on it (decision 0018)", async () => {
+    const fromBuyer: AnswerView = {
+      ...answerInDocument,
+      answer: {
+        ...answerInDocument.answer,
+        answer: "Ja, ställningen ingår i anbudspriset enligt inköps svar i e-Avrop.",
+        answer_citations: [{ answer: 1, quote: "Ja, ställning ingår i anbudspriset.", check: "verified", found_answer: null, answer_key: publishedAnswer.key }],
+      },
+    };
+    mockApi([
+      ...baseRoutes(companyUser),
+      { method: "GET", path: `/api/notices/${NOTICE_ID}`, body: { ...noticeDetail, published_answers: [publishedAnswer] } },
+      { method: "POST", path: QUESTIONS, body: fromBuyer },
+    ]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    const panel = await openPanel();
+    await ask(panel, "Ingår ställning i priset?");
+    const answer = await answerTo(panel, "Ingår ställning i priset?", "Ja, ställningen ingår i anbudspriset enligt inköps svar i e-Avrop.");
+    expect(within(answer).getByText("Inköp har svarat")).toBeInTheDocument();
+    expect(within(answer).queryByText("Står i underlaget")).not.toBeInTheDocument();
+    expect(within(answer).getByText("Ja, ställning ingår i anbudspriset.")).toBeInTheDocument();
+    expect(within(answer).getByRole("link", { name: "Frågor och svar från inköp, fråga 1" })).toBeInTheDocument();
+  });
+
+  it("shows an answer stored before decision 0018, which has no quotes of inköp's answers", async () => {
+    const { answer_citations: _dropped, ...older } = answerInDocument.answer;
+    window.sessionStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        [`notice:${NOTICE_ID}`]: [
+          { id: 1, question: "Vilka försäkringar måste vi ha?", answer: { ...answerInDocument, answer: older }, rules: null, error: null },
+        ],
+      }),
+    );
+    mockApi([...baseRoutes(companyUser), noticeRoute]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    const panel = await openPanel();
+    const answer = await answerTo(panel, "Vilka försäkringar måste vi ha?", LEAD);
+    expect(within(answer).getByText("Står i underlaget")).toBeInTheDocument();
   });
 
   it("keeps the conversation in this tab, shows it again on a new visit and sends it as history", async () => {

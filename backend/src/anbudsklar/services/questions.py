@@ -18,6 +18,7 @@ from anbudsklar.documents.store import load_paged_document
 from anbudsklar.models import Document, Notice, QuestionLog
 from anbudsklar.search.queries import search_document
 from anbudsklar.services.access import Viewer
+from anbudsklar.services.answers import answer_inputs
 from anbudsklar.services.checklists import checklist_payload, key_date, tender_deadline, visible_checklist
 from anbudsklar.services.contexts import notice_context
 from anbudsklar.services.dates import end_of_local_day, utcnow
@@ -41,7 +42,7 @@ async def ask_question(
     *,
     eavrop_url: str,
 ) -> AnswerView:
-    """Answer from the procurement's documents, and log the question.
+    """Answer from the procurement's documents and the buyer's published answers, and log the question.
 
     The main document is the one behind the checklist the viewer sees (companies see the
     published one), else the first document; every other document of the notice follows it.
@@ -64,10 +65,11 @@ async def ask_question(
         documents, hits=[PageRef(str(hit.document_id), hit.page_no) for hit in hits]
     )
 
+    answers = await answer_inputs(session, notice.id)
     answer, run = await engine.answer_question(
-        notice_context(notice), document_set, request.question, bounded_history(request.history)
+        notice_context(notice), document_set, request.question, bounded_history(request.history), answers
     )
-    verified = verify_answer(answer, documents)
+    verified = verify_answer(answer, documents, answers)
 
     payload = checklist_payload(checklist) if checklist else None
     if not viewer.is_buyer and _tender_period_running(notice, payload, utcnow()):

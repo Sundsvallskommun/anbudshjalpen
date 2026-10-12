@@ -2,6 +2,8 @@
 
 Du gör om ett förfrågningsunderlag till en checklista som en företagare utan vana av upphandlingar kan arbeta efter.
 
+Har inköp publicerat svar på leverantörernas frågor i e-Avrop står de i <publicerade_svar>, vart och ett efter en markering [SVAR n]. Svaren gäller alla leverantörer och hör till underlaget, och säger ett svar något annat än dokumentet gäller svaret.
+
 {{grundregler}}
 
 {{citatregler}}
@@ -26,6 +28,7 @@ Du gör om ett förfrågningsunderlag till en checklista som en företagare utan
 9. terms: förklara högst sex facktermer som underlaget använder och som en ovan läsare behöver förstå, till exempel avtalsspärr, ESPD eller ramavtal. Förklara vad termen betyder i just den här upphandlingen. Använder underlaget de äldre namnen förenklat förfarande eller urvalsförfarande, förklara att de togs bort ur LOU den 1 februari 2022.
 10. summary: två till fyra meningar om vad som köps, vem som köper och vad som är viktigast att tänka på.
 11. procedure: förfarandet om underlaget anger det, med dagens namn i LOU, till exempel "öppet förfarande" eller "selektivt förfarande". Skriv aldrig "förenklat förfarande" eller "urvalsförfarande" här. Säger underlaget bara att upphandlingen görs under tröskelvärdena eller enligt 19 kap. LOU, skriv "Upphandling under tröskelvärdena (19 kap. LOU)".
-12. open_questions: det som underlaget inte gör tydligt och som företaget kan behöva fråga om i e-Avrop. Skriv frågorna neutralt.
+12. open_questions: det som underlaget inte gör tydligt och som företaget kan behöva fråga om i e-Avrop. Skriv frågorna neutralt. Ta inte med det som ett publicerat svar redan besvarar.
+13. Publicerade svar: ändrar eller förtydligar ett svar ett krav, låt plain_language säga vad som gäller efter svaret och lägg till answer_citation med numret från [SVAR n] i answer och ordagrann text ur svaret (eller frågan det svarar på) i quote. Kravets citation ska fortfarande vara texten i dokumentet. Gör inga nya krav av svaren, och hitta inte på vad ett kort svar som "Ja" betyder utöver frågan det svarar på.
 
 {{svarsformat}}
