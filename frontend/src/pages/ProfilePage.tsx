@@ -25,7 +25,7 @@ function ProfileContent() {
 
 /**
  * Företagsprofil (direction.md, section 4): the company in plain language. What it does is said in its own words and
- * as CPV codes named first, which Anbudsklar can suggest; the facts requirements usually ask about follow. The
+ * as CPV codes named first, which Anbudshjälpen can suggest; the facts requirements usually ask about follow. The
  * profile decides which notices Start shows and which are marked "Verkar passa". A form, so the form width (640).
  */
 export default function ProfilePage() {
@@ -35,7 +35,7 @@ export default function ProfilePage() {
         <Page
           title="Företagsprofil"
           width={640}
-          intro="Beskriv företaget en gång, så hittar Anbudsklar upphandlingar som passar er och jämför er med kraven."
+          intro="Beskriv företaget en gång, så hittar Anbudshjälpen upphandlingar som passar er och jämför er med kraven."
         >
           <ProfileContent />
         </Page>

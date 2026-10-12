@@ -63,7 +63,7 @@ class Settings(BaseSettings):
 
     # Eneo (AI engine via Eneo's API; see docs/eneo-integration.md)
     eneo_backend_url: str | None = None  # e.g. https://eneo-test.example.se (same name as Eneo modules)
-    eneo_api_key: SecretStr | None = None  # service-owned sk_ key, admin on the Anbudsklar space
+    eneo_api_key: SecretStr | None = None  # service-owned sk_ key, admin on the Anbudshjälpen space
     eneo_api_key_header_name: str = "X-API-Key"
     eneo_assistants_file: Path = REPO_ROOT / "var" / "eneo-assistants.json"  # written by `eneo provision`
 
@@ -96,7 +96,7 @@ class Settings(BaseSettings):
     eavrop_client_id: int | None = None
     riksdagen_lou_url: str = "https://data.riksdagen.se/dokument/sfs-2016-1145.text"
     http_user_agent: str = (
-        "Anbudsklar-PoC/0.1 (Sundsvalls kommun; kontakt via naringslivsenheten)"  # ASCII only
+        "Anbudshjalpen-PoC/0.1 (Sundsvalls kommun; kontakt via naringslivsenheten)"  # ASCII only
     )
     scheduler_enabled: bool = True
     # False hides the fictitious fixtures (notices, documents, agreements) from every read.
@@ -111,7 +111,7 @@ class Settings(BaseSettings):
     # --- E-mail (Mailpit in development)
     smtp_host: str = "localhost"
     smtp_port: int = 1025
-    mail_from: str = "Anbudsklar <noreply@anbudsklar.local>"
+    mail_from: str = "Anbudshjälpen <noreply@anbudsklar.local>"
 
     # --- Organisation branding (same idea as Eneo modules)
     organization_name: str = "Sundsvalls kommun"

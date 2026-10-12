@@ -242,7 +242,7 @@ def test_first_run_creates_space_assistants_knowledge_and_key(eneo: FakeEneo, tm
 
     assert result.model_id == "m-tools"  # tool calling beats the org default
     assert eneo.space_patches[0] == {
-        "description": "AI-uppgifter för Anbudsklar. Hanteras av `anbudsklar eneo provision`.",
+        "description": "AI-uppgifter för Anbudshjälpen. Hanteras av `anbudsklar eneo provision`.",
         "completion_models": [{"id": "m-tools"}],
         "mcp_servers": [],
         "data_retention_days": 1,
@@ -409,7 +409,7 @@ def test_a_failed_mcp_update_keeps_the_registered_server_attached(eneo: FakeEneo
     first = _provision(settings, mcp_url="https://anbudsklar.test/mcp", knowledge=False)
     server_id = first.mcp_server_id or ""
 
-    eneo.mcp_reachable = False  # Anbudsklar is redeploying while provision runs again
+    eneo.mcp_reachable = False  # Anbudshjälpen is redeploying while provision runs again
     result = _provision(settings, mcp_url="https://anbudsklar.test/mcp", knowledge=False)
 
     _assert_mcp_attached(eneo, result, server_id)

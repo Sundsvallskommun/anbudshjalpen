@@ -1,6 +1,6 @@
 # Eneo-integration
 
-Syfte: Beskriva hur Anbudsklar använder en Eneo-testinstans: vad som skapas i Eneo, vilka nycklar som finns, hur
+Syfte: Beskriva hur Anbudshjälpen använder en Eneo-testinstans: vad som skapas i Eneo, vilka nycklar som finns, hur
 MCP-servern registreras och vad verksamheten själv kan ändra.
 
 Läs detta när: Du ska koppla appen till en Eneo-instans, byta en nyckel, felsöka ett anrop till Eneo eller ändra något
@@ -14,9 +14,9 @@ Hör ihop med: [Beslut 0004](decisions/0004-eneo-api-and-own-mcp-server.md), [AI
 ## Översikt
 
 ```
-Anbudsklar app/worker ──(sk_-nyckel)──▶ Eneo API ──▶ assistent för uppgiften ──▶ språkmodell
+Anbudshjälpen app/worker ──(sk_-nyckel)──▶ Eneo API ──▶ assistent för uppgiften ──▶ språkmodell
                                                           │
-Anbudsklar /mcp ◀──(MCP-nyckel, https)─────────────────────┘  (Regelhjälpen och frågor om underlag)
+Anbudshjälpen /mcp ◀──(MCP-nyckel, https)─────────────────────┘  (Regelhjälpen och frågor om underlag)
 ```
 
 I Eneo finns:
@@ -40,7 +40,7 @@ Assistenternas id sparas i `var/eneo-assistants.json` (`ENEO_ASSISTANTS_FILE`) s
 - `ENCRYPTION_KEY` i Eneo, om modelleverantörens nyckel läggs in via Eneos admin.
 - En användare med rollen Owner (eller admin med rätt att skapa API-nycklar och spaces) för uppsättningen. I en ny
   instans skapas den från `DEFAULT_USER_EMAIL` och `DEFAULT_USER_PASSWORD`.
-- Att Anbudsklars `/mcp` går att nå från Eneo via https.
+- Att Anbudshjälpens `/mcp` går att nå från Eneo via https.
 
 ## Sätta upp: `anbudsklar eneo provision`
 
@@ -120,9 +120,9 @@ instruktion, ett kontrakt eller ett MCP-verktyg.
 
 | Nyckel | Används av | Finns i | Behörighet |
 |---|---|---|---|
-| Környckel (`ENEO_API_KEY`) | Anbudsklar när den anropar Eneo | Anbudsklars miljövariabler | Servicenyckel (`sk_`) som bara gäller spacet. Admin, eftersom det krävs för att radera sessioner. Har utgångsdatum |
-| MCP-nyckel (`MCP_API_KEYS`) | Eneo när den anropar Anbudsklars MCP-server | Anbudsklars miljövariabler och krypterad i Eneos registrering | Läser offentliga data |
-| Admininloggning | Bara `anbudsklar eneo provision` | Hos den som sätter upp, aldrig i Anbudsklar | Owner eller admin i Eneo |
+| Környckel (`ENEO_API_KEY`) | Anbudshjälpen när den anropar Eneo | Anbudshjälpens miljövariabler | Servicenyckel (`sk_`) som bara gäller spacet. Admin, eftersom det krävs för att radera sessioner. Har utgångsdatum |
+| MCP-nyckel (`MCP_API_KEYS`) | Eneo när den anropar Anbudshjälpens MCP-server | Anbudshjälpens miljövariabler och krypterad i Eneos registrering | Läser offentliga data |
+| Admininloggning | Bara `anbudsklar eneo provision` | Hos den som sätter upp, aldrig i Anbudshjälpen | Owner eller admin i Eneo |
 
 Byta MCP-nyckel utan avbrott: lägg den nya nyckeln först i `MCP_API_KEYS` och behåll den gamla efter, kör
 `anbudsklar eneo provision --mcp-url …` så att Eneo får den nya, och ta sedan bort den gamla.
@@ -222,7 +222,7 @@ Tänk på:
 - **Rätt värdnamn.** Servern tar emot anrop till värdnamnet i `PUBLIC_URL`, till localhost och till några namn för
   lokal körning (`app`, `anbudsklar`, `host.docker.internal`). Fler namn, till exempel `anbudsklar-app` om Eneo når
   appen på Dokploys interna nätverk, läggs i `MCP_ALLOWED_HOSTS`. Andra värdnamn ger svaret 421. Ska Eneo nå
-  Anbudsklar på Dokploys interna nät, sätt till exempel `MCP_ALLOWED_HOSTS=["anbudsklar-app"]` under Environment.
+  Anbudshjälpen på Dokploys interna nät, sätt till exempel `MCP_ALLOWED_HOSTS=["anbudsklar-app"]` under Environment.
 - **Godkänn ändringar.** Eneo sparar verktygens beskrivningar när servern registreras. Ändras en beskrivning eller
   parameter läggs ändringen som väntande, och den gamla versionen gäller tills verktygen synkas och godkänns, med
   `anbudsklar eneo provision --mcp-url …` eller av en admin i Eneo. Lägg därför bara till nya, valfria parametrar.
@@ -230,7 +230,7 @@ Tänk på:
   32 768. En fråga får högst tio verktygsrundor, och ett anrop får ta högst 60 sekunder.
 - **Fel räknas.** Efter fem fel stänger Eneo av servern i 60 sekunder, för alla användare. I 2.2 räknas även
   verktygssvar som är markerade som fel (`isError`). Verktygen markerar därför bara riktiga fel så: meddelandet
-  "Tekniskt fel i Anbudsklar", till exempel när databasen inte nås, och okända verktygsnamn. Misstag som modellen
+  "Tekniskt fel i Anbudshjälpen", till exempel när databasen inte nås, och okända verktygsnamn. Misstag som modellen
   kan rätta själv blir vanliga svar med vägledning på svenska: ett okänt eller felskrivet `upphandling_id` eller
   `dokument_id`, en annons utan underlag, flera underlag utan `dokument_id`, en sida efter den sista, underlag vars
   text inte är inläst än, en LOU-paragraf som saknas eller inte går att tolka, och alla ogiltiga argument. Ett tomt
@@ -272,9 +272,9 @@ Insights och lagringstid ändras inte. De är satta för att skydda företagens 
 ## Lokalt Eneo
 
 En Eneo-instans för utveckling på den egna datorn fungerar som motor. Eneos utvecklingsmiljö körs i en container och
-har API:t på `http://localhost:8123`. Vilka adresser som gäller beror på hur Anbudsklar körs:
+har API:t på `http://localhost:8123`. Vilka adresser som gäller beror på hur Anbudshjälpen körs:
 
-| Anbudsklar körs med | `ENEO_BACKEND_URL` | `--mcp-url` |
+| Anbudshjälpen körs med | `ENEO_BACKEND_URL` | `--mcp-url` |
 |---|---|---|
 | `make dev-api` | `http://localhost:8123` | `http://host.docker.internal:8500/mcp` |
 | `make up` (Compose) | `http://host.docker.internal:8123` | `http://host.docker.internal:3501/mcp` |
@@ -284,7 +284,7 @@ har API:t på `http://localhost:8123`. Vilka adresser som gäller beror på hur 
   Compose-filen mappar `host.docker.internal` till värddatorn för `migrate`, `app` och `worker`, så att namnet
   fungerar även på Linux. På värddatorn själv finns namnet oftast inte, så `make dev-api` behöver `localhost`.
   Har `.env` adressen för Compose kan du köra `ENEO_BACKEND_URL=http://localhost:8123 make dev-api`.
-- **`--mcp-url` är adressen sedd från Eneo.** Eneo i en container når Anbudsklar på värddatorn via
+- **`--mcp-url` är adressen sedd från Eneo.** Eneo i en container når Anbudshjälpen på värddatorn via
   `host.docker.internal`. Servern tar emot det värdnamnet. Kör Eneo direkt på värddatorn, använd `localhost` i stället.
 - **Headern för nyckeln.** Sätt `ENEO_API_KEY_HEADER_NAME` till samma värde som `API_KEY_HEADER_NAME` i Eneos
   `backend/.env`. Mallen har `X-API-Key`, men den lokala utvecklingsmiljön som PoC:n är provad mot har `example`.

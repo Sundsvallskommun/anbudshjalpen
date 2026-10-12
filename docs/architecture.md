@@ -10,7 +10,7 @@ Hör ihop med: [Beslut](decisions/README.md), [Eneo-integration](eneo-integratio
 ## PoC
 
 ```
-Anbudsklar (det här repot, en image)
+Anbudshjälpen (det här repot, en image)
 ├─ app         FastAPI på port 3001
 │  ├─ /        webbappen: Vite, React och Astryx som statiska filer
 │  ├─ /api     REST-API för webbappen, med inloggning via demoperson
@@ -23,9 +23,9 @@ Anbudsklar (det här repot, en image)
 └─ Mailpit     mejlkorg som fångar alla utskick
 
 Eneo-testinstans (2.2, egen Compose i Dokploy)
-├─ Space för Anbudsklar: en assistent per AI-uppgift, Insights av, lagring en dag
+├─ Space för Anbudshjälpen: en assistent per AI-uppgift, Insights av, lagring en dag
 ├─ Regelhjälpen: kunskap från Upphandlingsmyndigheten och sundsvall.se
-└─ MCP-klient som anropar Anbudsklars /mcp
+└─ MCP-klient som anropar Anbudshjälpens /mcp
 ```
 
 Beslut: [0004](decisions/0004-eneo-api-and-own-mcp-server.md) (Eneo och MCP),
@@ -94,9 +94,9 @@ Eneo (kommunens produktionsinstans)
 │                (samma JSON-kontrakt som i PoC:n; granskningssteg för inköparen)
 ├─ Assistenter:  Regelhjälpen, som widget på sundsvall.se när widgets är släppta;
 │                frågor om ett underlag; inköparnas assistent
-└─ MCP-klient som anropar Anbudsklars MCP-server
+└─ MCP-klient som anropar Anbudshjälpens MCP-server
 
-Anbudsklar
+Anbudshjälpen
 ├─ Upphandlingsdata, sökning och MCP-server som i PoC:n
 ├─ Företagarappen med e-legitimation och kontroll av behörighet
 ├─ Worker: insamling, påminnelser och notiser
@@ -157,7 +157,7 @@ publicerade.
   frågeloggen, som saknar namn, aldrig e-postloggarna bredvid den, och sparar bara besvarade frågor
   ([beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md)). Svaren är samma offentliga uppgifter som
   annonssidan i e-Avrop visar.
-- Anbudsklars assistenter ligger i ett eget space i Eneo, med Insights avstängt och lagringstiden en dag. Appen
+- Anbudshjälpens assistenter ligger i ett eget space i Eneo, med Insights avstängt och lagringstiden en dag. Appen
   använder en `sk_`-nyckel som ägs av ett servicekonto och bara gäller det spacet, och raderar varje session efter
   anropet.
 - MCP-servern lämnar bara ut offentliga data och publicerade checklistor.

@@ -1,6 +1,6 @@
 # Eneos byggstenar
 
-Syfte: Beskriva de delar av Eneo som Anbudsklar kan bygga på: vad de gör, hur färdiga de är och vad de passar till.
+Syfte: Beskriva de delar av Eneo som Anbudshjälpen kan bygga på: vad de gör, hur färdiga de är och vad de passar till.
 
 Läs detta när: Du ska avgöra om något ska byggas i Eneo eller i det här repot, eller undrar varför arkitekturen ser ut
 som den gör.
@@ -14,9 +14,9 @@ Hör ihop med: [Arkitektur](architecture.md), [Beslut 0004](decisions/0004-eneo-
 
 | Byggsten | Vad den gör | Status | Passar för |
 |---|---|---|---|
-| Assistenter och kunskap | Assistenter med kunskapskällor, schemalagd crawling (varje dag eller vecka) och källhänvisningar. Kan anropas via API, en session per fråga | Släppt | Anbudsklars AI-uppgifter i PoC:n och Regelhjälpen |
-| MCP-klient | Assistenter anropar externa MCP-servrar (streamable HTTP, bearer eller API-nyckel i header). Verktygen som finns vid registreringen slås på direkt; senare ändringar godkänns av en admin | Ingår i 2.2 | Anbudsklars assistenter mot upphandlingsdatan, och inköparnas assistent |
-| API-nycklar v2 | `sk_` för servrar och `pk_` för webbläsare. Nycklarna kan ägas av ett servicekonto och har scope, giltiga ursprung, gränser och rotation | Ingår i 2.2 | Anbudsklars környckel |
+| Assistenter och kunskap | Assistenter med kunskapskällor, schemalagd crawling (varje dag eller vecka) och källhänvisningar. Kan anropas via API, en session per fråga | Släppt | Anbudshjälpens AI-uppgifter i PoC:n och Regelhjälpen |
+| MCP-klient | Assistenter anropar externa MCP-servrar (streamable HTTP, bearer eller API-nyckel i header). Verktygen som finns vid registreringen slås på direkt; senare ändringar godkänns av en admin | Ingår i 2.2 | Anbudshjälpens assistenter mot upphandlingsdatan, och inköparnas assistent |
+| API-nycklar v2 | `sk_` för servrar och `pk_` för webbläsare. Nycklarna kan ägas av ett servicekonto och har scope, giltiga ursprung, gränser och rotation | Ingår i 2.2 | Anbudshjälpens környckel |
 | Moduler | En egen webbapp på egen domän. Användaren loggar in med sitt Eneo-konto via en engångsbiljett, och appen använder en servicenyckel. Körs som ett tillägg i Compose | Ingår i 2.2 (Tal till text) | Vyer för medarbetare och driftmönstret |
 | Widgets | En assistent publiceras som inbäddad chatt för anonyma besökare. Varje besökare får en egen token, och det finns skydd mot automatiserade anrop (ALTCHA), kostnadstak, lagringstid och AI-märkning | PR [#867](https://github.com/eneo-ai/eneo/pull/867) öppen | Regelhjälpen på sundsvall.se |
 | Flows | Versionerade flöden i flera steg. De tar emot uppladdningar, ger JSON med typat kontrakt och citat, kan ha granskningssteg där en människa godkänner, kan göra HTTP-anrop in och ut och kan exporteras som paket. Det finns en AI-byggare | Inte klart att bygga på. Finns på taggen `builder-v1-baseline-2026-09-30` och på `feat/flow-*`-grenarna | Tolka underlag, granska utkast, bedöma matchning och föreslå CPV i produktion |
@@ -36,11 +36,11 @@ Hör ihop med: [Arkitektur](architecture.md), [Beslut 0004](decisions/0004-eneo-
 - **Sökningen i kunskap är bara vektorbaserad.** Den kan inte filtrera på metadata, och källhänvisningar gäller hela
   dokument utan sidnummer. Extraherad PDF-text får däremot `[PAGE n]`-markörer.
 - **Insights låter redaktörer och admins i ett space läsa hela konversationer** för assistenter där insikter är
-  påslaget. Anbudsklars assistenter och flöden ska därför ligga i ett eget space där inköpare inte är redaktörer,
+  påslaget. Anbudshjälpens assistenter och flöden ska därför ligga i ett eget space där inköpare inte är redaktörer,
   Insights är avstängt och lagringstiden är kort.
 - **Inga notiser.** Eneo kan inte skicka mejl eller påminnelser.
 - **En servicenyckel kan inte ladda upp filer.** Den kan inte heller skapa spaces, assistenter, MCP-servrar eller
-  nycklar, men den kan ställa frågor och radera sina sessioner om den har admin-behörighet. Anbudsklar skickar därför
+  nycklar, men den kan ställa frågor och radera sina sessioner om den har admin-behörighet. Anbudshjälpen skickar därför
   underlaget som text i frågan.
 - **Verktygsanrop är avslaget som standard** för modeller som läggs till i en tenant. Utan det använder assistenterna
   varken MCP eller kunskap i verktygsläge, och Eneo säger inget om det.

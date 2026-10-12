@@ -64,7 +64,7 @@ export default function SettingsPage() {
   return (
     <RequireRole role="inkopare" title="Inställningar">
       {() => (
-        <Page title="Inställningar" width={640} intro="Så här arbetar Anbudsklar. Ändringar gäller direkt för alla.">
+        <Page title="Inställningar" width={640} intro="Så här arbetar Anbudshjälpen. Ändringar gäller direkt för alla.">
           <SettingsContent />
         </Page>
       )}

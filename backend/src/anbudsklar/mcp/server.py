@@ -1,4 +1,4 @@
-"""Anbudsklar's read-only MCP server for Eneo assistants (mcp>=1.30,<2, FastMCP).
+"""Anbudshjälpen's read-only MCP server for Eneo assistants (mcp>=1.30,<2, FastMCP).
 
 Shaped by how Eneo's MCP client behaves:
 - Stateless streamable HTTP with JSON responses. Eneo opens a fresh connection per chat

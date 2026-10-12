@@ -231,11 +231,11 @@ def _status_error(response: httpx.Response) -> EngineError:
     if status == 429:
         wait = _retry_after(response)
         later = f" om {max(1, round(wait / 60))} minuter" if wait else " senare"
-        return EngineError(f"Eneo tar inte emot fler anrop från Anbudsklar just nu. Försök igen{later}.")
+        return EngineError(f"Eneo tar inte emot fler anrop från Anbudshjälpen just nu. Försök igen{later}.")
     if status in (401, 403):
         return EngineConfigError(
             "Eneo nekade åtkomst. Kontrollera ENEO_API_KEY, ENEO_API_KEY_HEADER_NAME och att nyckeln gäller "
-            "Anbudsklars space."
+            "Anbudshjälpens space."
         )
     if status == 404:
         return EngineConfigError("Assistenten finns inte i Eneo. Kör `anbudsklar eneo provision` igen.")

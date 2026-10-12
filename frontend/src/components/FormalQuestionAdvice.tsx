@@ -22,8 +22,8 @@ export function formalQuestionSentence(questionDeadline: IsoDateTime | null): st
 /**
  * When the document does not settle a question: ask it formally in e-Avrop before the question deadline (direction.md,
  * section 4 "Steg 2 Fråga"). The buyer must treat all suppliers alike, so only an answer published to everyone counts;
- * Anbudsklar never gives one supplier advice the others do not get. A muted box inset in the answer, with the reminder
- * and the way to e-Avrop on one line.
+ * Anbudshjälpen never gives one supplier advice the others do not get. A muted box inset in the answer, with the
+ * reminder and the way to e-Avrop on one line.
  *
  * `questionDeadline` is the published checklist's frågestopp, sent as the end of that day in Swedish time, so it is
  * shown as a date. The reminder is offered only while it is ahead: without it the backend has nothing to remind about.

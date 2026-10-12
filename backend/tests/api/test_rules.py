@@ -153,7 +153,7 @@ async def test_engine_failures_reach_visitors_without_operator_details(
     assert "anbudsklar eneo provision" in caplog.text  # the detail is logged for the operator
 
     async def busy(*_: object) -> tuple[RulesAnswer, EngineRun]:
-        raise EngineError("Eneo tar inte emot fler anrop från Anbudsklar just nu. Försök igen senare.")
+        raise EngineError("Eneo tar inte emot fler anrop från Anbudshjälpen just nu. Försök igen senare.")
 
     monkeypatch.setattr(engine, "answer_rules", busy)
     response = await client.post("/api/rules/ask", json={"question": "Vad är avtalsspärr?"})

@@ -1,6 +1,6 @@
 # Utveckling
 
-Syfte: Visa hur man kör Anbudsklar lokalt, vilka kommandon och portar som finns och hur testerna körs.
+Syfte: Visa hur man kör Anbudshjälpen lokalt, vilka kommandon och portar som finns och hur testerna körs.
 
 Läs detta när: Du sätter upp en utvecklingsmiljö, ska köra testerna eller undrar vilket kommando som gör vad.
 

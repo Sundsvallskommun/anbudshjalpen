@@ -4,7 +4,7 @@ import type { AppConfig } from "../api/types";
 /** Shown until the configuration has loaded, and if it cannot load: the notice is never missing. */
 export const FALLBACK_DEMO_NOTICE = "Det här är en demo. Upphandlingsunderlag, företag och personer är fiktiva.";
 export const FALLBACK_AI_DISCLOSURE =
-  "Anbudsklar använder AI för att tolka underlag och svara på frågor. AI kan ha fel: kontrollera alltid mot underlaget.";
+  "Anbudshjälpen använder AI för att tolka underlag och svara på frågor. AI kan ha fel: kontrollera alltid mot underlaget.";
 
 // The dialog is fetched the first time it is opened.
 const AboutDemoDialog = lazy(() => import("./AboutDemoDialog"));

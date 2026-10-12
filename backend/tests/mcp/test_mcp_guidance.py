@@ -154,6 +154,6 @@ async def test_real_failures_stay_errors_without_internals() -> None:
         failed = await client.call_tool("hamta_upphandling", {"upphandling_id": str(uuid.uuid4())})
         unknown_tool = await client.call_tool("radera_upphandling", {})
 
-    assert failed.isError and "Tekniskt fel i Anbudsklar" in texts(failed)
+    assert failed.isError and "Tekniskt fel i Anbudshjälpen" in texts(failed)
     assert "10.0.0.5" not in texts(failed)
     assert unknown_tool.isError

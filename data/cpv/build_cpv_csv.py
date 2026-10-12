@@ -29,7 +29,7 @@ import openpyxl
 
 SOURCE_URL = "https://ted.europa.eu/documents/d/ted/cpv_2008_xls"
 SHEET_NAME = "CPV codes"
-USER_AGENT = "Anbudsklar-PoC/0.1 (Sundsvalls kommun; build_cpv_csv.py)"
+USER_AGENT = "Anbudshjalpen-PoC/0.1 (Sundsvalls kommun; build_cpv_csv.py)"
 DEFAULT_OUT = Path(__file__).resolve().parent / "cpv_2008_sv.csv"
 HEADER = ("code", "label_sv", "parent_code", "level")
 

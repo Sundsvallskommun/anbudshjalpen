@@ -34,10 +34,10 @@ PACKAGE_DIR = Path(__file__).resolve().parent
 LIMIT_CONCURRENCY = 200
 
 app = typer.Typer(
-    help="Anbudsklar PoC: AI-stöd för småföretag i kommunens upphandlingar.", no_args_is_help=True
+    help="Anbudshjälpen PoC: AI-stöd för småföretag i kommunens upphandlingar.", no_args_is_help=True
 )
 ingest_app = typer.Typer(help="Hämta data från offentliga källor och filer.", no_args_is_help=True)
-eneo_app = typer.Typer(help="Koppla Anbudsklar till en Eneo-instans.", no_args_is_help=True)
+eneo_app = typer.Typer(help="Koppla Anbudshjälpen till en Eneo-instans.", no_args_is_help=True)
 lab_app = typer.Typer(help="Labbläget: testföretag som deltagare skapar själva.", no_args_is_help=True)
 app.add_typer(ingest_app, name="ingest")
 app.add_typer(eneo_app, name="eneo")

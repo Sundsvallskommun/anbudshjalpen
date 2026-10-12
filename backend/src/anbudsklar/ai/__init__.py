@@ -1,1 +1,1 @@
-"""Anbudsklar."""
+"""Anbudshjälpen."""

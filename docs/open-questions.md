@@ -13,7 +13,7 @@ När en fråga är avgjord flyttas svaret till ett beslut i [decisions/](decisio
 | Fråga | Läge |
 |---|---|
 | Vilken modell ska Eneo-testinstansen använda? | Den behöver klara svenska, långa dokument, JSON-svar och verktygsanrop. Samma leverantör som kommunens Eneo är mest likt produktion. Kvalitetstestet jämför kandidaterna |
-| Vilken server och vilka domäner får testmiljön i Dokploy? | Anbudsklar och Eneo-testinstansen behöver var sin domän med https. Se [deploy/dokploy](../deploy/dokploy/README.md) |
+| Vilken server och vilka domäner får testmiljön i Dokploy? | Anbudshjälpen och Eneo-testinstansen behöver var sin domän med https. Se [deploy/dokploy](../deploy/dokploy/README.md) |
 | Ska inköparens vy bli en Eneo-modul i produktion? | I PoC:n ligger den i appen. En modul fungerar för medarbetare, men mycket kan också visas direkt i Eneo |
 | Hur loggar företagare in i produktion, och hur kontrolleras behörigheten? | PoC:n använder demopersoner ([beslut 0007](decisions/0007-poc-login-persona-picker.md)). Produktion behöver kommunens lösning för e-legitimation och en kontroll av att personen får företräda företaget |
 | När är Eneo Flows klart att bygga på? | Avgör när de styrda uppgifterna flyttar från assistenter till flöden ([beslut 0004](decisions/0004-eneo-api-and-own-mcp-server.md)) |
@@ -34,7 +34,7 @@ När en fråga är avgjord flyttas svaret till ett beslut i [decisions/](decisio
 | Kan inköp ta fram 3–5 avslutade upphandlingar inom pilotens verksamhet och markera vilka skallkrav som finns i dem? Får de ligga i ett öppet repo? | Inköp |
 | Vilken träffsäkerhet krävs för att en checklista ska få publiceras? | Inköp |
 | Ligger avtalskatalogen i e-Avrops avtalsdatabas? e-Avrop har ett Avtals-API som kan läsas med samma nyckel | Inköp |
-| Får underlagen från e-Avrops API visas och citeras publikt i Anbudsklar och via MCP till Eneo? Kan vi få en nyckel som bara läser publicerade uppgifter? Se [e-Avrops API](eavrop.md#det-som-saknas) | Inköp och Antirio |
+| Får underlagen från e-Avrops API visas och citeras publikt i Anbudshjälpen och via MCP till Eneo? Kan vi få en nyckel som bara läser publicerade uppgifter? Se [e-Avrops API](eavrop.md#det-som-saknas) | Inköp och Antirio |
 | Frågor och svar läses ur loggfilen `LoggfilOrginalFragor.txt`, som inte är dokumenterad ([beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md)). Får den användas så, håller formatet, och kan svar som inköp bara skickar till frågeställaren hamna där? Bäst vore ett fält i API:t. Se [e-Avrops API](eavrop.md#frågor-och-svar) | Antirio och inköp |
 | Ska inköparen godkänna checklistorna innan de publiceras? Det kostar tid per upphandling och gör checklistan till kommunens sammanfattning. Båda sätten går att pröva: inställningen finns under Inköp › Inställningar ([beslut 0011](decisions/0011-installningar-granskning-valfri.md)) | Inköp |
 | Vilken verksamhet ska piloten gälla? | Näringslivsenheten och inköp |

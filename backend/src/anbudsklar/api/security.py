@@ -195,4 +195,6 @@ def require_same_origin(request: Request) -> None:
     expected: str = request.app.state.public_origin
     presented = request.headers.get("origin") or request.headers.get("referer")
     if presented is None or origin_of(presented) != expected:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Begäran kom inte från Anbudsklar.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Begäran kom inte från Anbudshjälpen."
+        )

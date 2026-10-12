@@ -3,7 +3,7 @@
 Syfte: Samla det en operatör behöver: imagen, miljövariablerna, gränserna, schemalagda jobb, hälsokontroller,
 säkerhetskopiering, uppdatering och felsökning.
 
-Läs detta när: Du driftsätter eller uppdaterar Anbudsklar, lägger till en miljövariabel eller felsöker en körande
+Läs detta när: Du driftsätter eller uppdaterar Anbudshjälpen, lägger till en miljövariabel eller felsöker en körande
 miljö.
 
 Hör ihop med: [Utveckling](development.md), [Eneo-integration](eneo-integration.md), [Dokploy](../deploy/dokploy/README.md),
@@ -58,7 +58,7 @@ Alla inställningar läses av `backend/src/anbudsklar/config.py` vid start. List
 | `AI_MAX_RETRIES` | `2` | Nya försök när ett svar inte följer kontraktet (0–5) |
 | `AI_TIMEOUT_SECONDS` | `180` | Tidsgräns för ett anrop till motorn |
 | `ENEO_BACKEND_URL` | Inget | Eneo-instansens adress, till exempel `https://eneo-test.example.se`. Krävs med `AI_ENGINE=eneo`. Ett Eneo på värddatorn nås från Compose-stacken som `http://host.docker.internal:8123`, inte `localhost` |
-| `ENEO_API_KEY` | Inget | Hemlig. Servicenyckeln (`sk_`) för Anbudsklars space. Krävs med `AI_ENGINE=eneo` |
+| `ENEO_API_KEY` | Inget | Hemlig. Servicenyckeln (`sk_`) för Anbudshjälpens space. Krävs med `AI_ENGINE=eneo` |
 | `ENEO_API_KEY_HEADER_NAME` | `X-API-Key` | Header för nyckeln, samma som Eneos `API_KEY_HEADER_NAME` |
 | `ENEO_ASSISTANTS_FILE` | `var/eneo-assistants.json` i repots rot (`/app/var/eneo-assistants.json` i imagen) | Assistenternas id per uppgift, skrivs av `anbudsklar eneo provision` |
 | `OPENAI_BASE_URL` | Inget | OpenAI-kompatibelt API. Krävs med `AI_ENGINE=openai` |
@@ -75,7 +75,7 @@ Alla inställningar läses av `backend/src/anbudsklar/config.py` vid start. List
 | `EAVROP_API_TOKEN` | Inget | Hemlig. Kommunens nyckel till e-Avrops Projekt-API. Den läser även sekretessbelagda delar av kommunens upphandlingar, se [e-Avrops API](eavrop.md). Utan nyckel hämtas inget från e-Avrop |
 | `EAVROP_CLIENT_ID` | Inget | Kommunens kund-id i e-Avrop. Krävs tillsammans med `EAVROP_API_TOKEN` |
 | `RIKSDAGEN_LOU_URL` | `https://data.riksdagen.se/dokument/sfs-2016-1145.text` | LOU som text från Riksdagen |
-| `HTTP_USER_AGENT` | `Anbudsklar-PoC/0.1 (Sundsvalls kommun; kontakt via naringslivsenheten)` | Hur insamlaren presenterar sig |
+| `HTTP_USER_AGENT` | `Anbudshjalpen-PoC/0.1 (Sundsvalls kommun; kontakt via naringslivsenheten)` | Hur insamlaren presenterar sig |
 | `ACCESS_CODE` | Inget | Hemlig. Skyddar hela testmiljön ([beslut 0010](decisions/0010-labblage-egna-foretag.md)): webbappen visar bara "Ange accesskoden" och varje API-väg svarar 401 tills koden är inskriven, utom `/health` och `/mcp`. Byt koden efter träffen, så gäller inga gamla kakor |
 | `LAB_ENABLED` | `false` | Med `true`, och `ACCESS_CODE` satt, får inloggningssidan "Prova med ditt eget företag" |
 | `LAB_RETENTION_DAYS` | `30` | Hur länge ett labbföretag finns kvar innan jobbet `purge_lab` raderar det |
@@ -83,7 +83,7 @@ Alla inställningar läses av `backend/src/anbudsklar/config.py` vid start. List
 | `SCHEDULER_ENABLED` | `true` | Läses bara av worker. Med `false` avslutas worker direkt. Appen kör aldrig schemalagda jobb |
 | `SMTP_HOST` | `localhost` | SMTP-server. Mailpit i PoC:n |
 | `SMTP_PORT` | `1025` | SMTP-port |
-| `MAIL_FROM` | `Anbudsklar <noreply@anbudsklar.local>` | Avsändare på mejlen |
+| `MAIL_FROM` | `Anbudshjälpen <noreply@anbudsklar.local>` | Avsändare på mejlen |
 | `ORGANIZATION_NAME` | `Sundsvalls kommun` | Organisationens namn i sidhuvudet |
 | `ORGANIZATION_LOGO` | Inget | Sökväg i containern till en logga |
 | `ORGANIZATION_LOGO_DARK` | Inget | Logga för mörkt läge |

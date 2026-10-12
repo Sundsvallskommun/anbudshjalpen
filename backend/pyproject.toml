@@ -1,7 +1,7 @@
 [project]
 name = "anbudsklar"
 version = "0.1.0"
-description = "Anbudsklar PoC: AI-stöd för småföretag i kommunens upphandlingar"
+description = "Anbudshjälpen PoC: AI-stöd för småföretag i kommunens upphandlingar"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi>=0.118",

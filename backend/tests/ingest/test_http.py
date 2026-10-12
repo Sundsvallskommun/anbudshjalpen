@@ -17,9 +17,9 @@ NO_WAIT = RetryPolicy(attempts=3, base_delay=0, max_delay=0)
 
 
 def test_user_agent_is_ascii_even_when_configured_with_swedish_letters() -> None:
-    settings = Settings(http_user_agent="Anbudsklar-PoC/0.1 (näringslivsenheten, Sundsvall)")
+    settings = Settings(http_user_agent="Anbudshjalpen-PoC/0.1 (näringslivsenheten, Sundsvall)")
 
-    assert user_agent(settings) == "Anbudsklar-PoC/0.1 (naringslivsenheten, Sundsvall)"
+    assert user_agent(settings) == "Anbudshjalpen-PoC/0.1 (naringslivsenheten, Sundsvall)"
 
 
 def test_retry_after_accepts_seconds_and_http_dates() -> None:

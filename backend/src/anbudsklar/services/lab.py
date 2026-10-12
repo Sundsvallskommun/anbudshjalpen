@@ -1,4 +1,4 @@
-"""Lab companies: workshop participants try Anbudsklar with their own company (decision 0010).
+"""Lab companies: workshop participants try Anbudshjälpen with their own company (decision 0010).
 
 Behind the service's access code a visitor creates a company with nothing but a name,
 describes it on the profile page and sees which notices seem to fit. Nobody is asked for a

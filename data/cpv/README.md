@@ -1,7 +1,7 @@
 # CPV 2008 med svenska benämningar
 
 `cpv_2008_sv.csv` är EU:s gemensamma terminologi för offentlig upphandling (CPV 2008) med svenska benämningar.
-Anbudsklar läser in filen i tabellen `cpv_codes` med `anbudsklar ingest cpv` (koden finns i
+Anbudshjälpen läser in filen i tabellen `cpv_codes` med `anbudsklar ingest cpv` (koden finns i
 `backend/src/anbudsklar/ingest/cpv.py`).
 
 ## Källa

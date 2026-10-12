@@ -1,7 +1,7 @@
 {
-  "name": "Anbudsklar",
-  "short_name": "Anbudsklar",
-  "description": "Anbudsklar hjälper små företag att hitta, förstå och svara på kommunens upphandlingar.",
+  "name": "Anbudshjälpen",
+  "short_name": "Anbudshjälpen",
+  "description": "Anbudshjälpen hjälper små företag att hitta, förstå och svara på kommunens upphandlingar.",
   "lang": "sv",
   "start_url": "/",
   "display": "standalone",

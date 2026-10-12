@@ -153,7 +153,7 @@ export default function AskAiExportPage() {
           <Heading level={1}>Frågor och svar</Heading>
           <Text weight="semibold">{subject}</Text>
           <Text type="supporting">
-            {`Från Anbudsklar ${formatDateTime(new Date().toISOString())}. Svaren är automatiskt framtagna och inte granskade av inköp. ${applies}`}
+            {`Från Anbudshjälpen ${formatDateTime(new Date().toISOString())}. Svaren är automatiskt framtagna och inte granskade av inköp. ${applies}`}
           </Text>
         </VStack>
         {turns.length === 0 ? (

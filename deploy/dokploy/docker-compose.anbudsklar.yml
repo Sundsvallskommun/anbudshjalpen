@@ -1,4 +1,4 @@
-# Anbudsklar test environment on Dokploy: app (API, MCP server and SPA), worker, a one-shot
+# Anbudshjälpen test environment on Dokploy: app (API, MCP server and SPA), worker, a one-shot
 # migration, Postgres and Mailpit.
 #
 # Dokploy deploys this file from Git (compose path: deploy/dokploy/docker-compose.anbudsklar.yml)
@@ -44,7 +44,7 @@ x-anbudsklar-env: &anbudsklar-env
   DEMO_BUYER_ENABLED: ${DEMO_BUYER_ENABLED:-}
   SMTP_HOST: anbudsklar-mail
   SMTP_PORT: "1025"
-  MAIL_FROM: ${MAIL_FROM:-Anbudsklar <noreply@anbudsklar.local>}
+  MAIL_FROM: ${MAIL_FROM:-Anbudshjälpen <noreply@anbudsklar.local>}
   ORGANIZATION_NAME: ${ORGANIZATION_NAME:-Sundsvalls kommun}
   SHOW_ORGANIZATION: ${SHOW_ORGANIZATION:-true}
   SHOW_FICTITIOUS: ${SHOW_FICTITIOUS:-true}

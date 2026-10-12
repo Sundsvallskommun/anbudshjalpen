@@ -34,7 +34,7 @@ describe("Page", () => {
     expect(screen.getByRole("button", { name: "Ny upphandling" })).toBeInTheDocument();
     expect(screen.getByText("Sundsvalls kommun · DEMO-2026-0147")).toBeInTheDocument();
     expect(within(screen.getByRole("complementary", { name: "Mer om upphandlingen" })).getByText("Railen")).toBeInTheDocument();
-    expect(document.title).toBe("Ommålning av Solbackens förskola – Anbudsklar");
+    expect(document.title).toBe("Ommålning av Solbackens förskola – Anbudshjälpen");
   });
 
   it("says its width in the markup, which the frame follows for the review workspace", () => {

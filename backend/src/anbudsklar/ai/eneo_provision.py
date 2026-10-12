@@ -1,4 +1,4 @@
-"""Set up Anbudsklar's space, assistants and runtime key in an Eneo instance.
+"""Set up Anbudshjälpen's space, assistants and runtime key in an Eneo instance.
 
 `anbudsklar eneo provision` (and `python -m anbudsklar.ai.eneo_provision`) runs this
 once per Eneo instance and again whenever a prompt changes. It is idempotent: objects
@@ -80,7 +80,8 @@ KNOWLEDGE_WEBSITES: tuple[tuple[str, str], ...] = (
     ),
 )
 _PROMPT_NOTE = (
-    "Hanteras av `anbudsklar eneo provision`. Ändra prompten i Anbudsklars repo; ändringar här skrivs över."
+    "Hanteras av `anbudsklar eneo provision`. Ändra prompten i Anbudshjälpens repo; "
+    "ändringar här skrivs över."
 )
 
 
@@ -278,7 +279,9 @@ def _ensure_mcp_server(
         "http_url": mcp_url,
         "http_auth_type": "bearer",
         "http_auth_config_schema": {"token": settings.mcp_api_keys[0].get_secret_value()},
-        "description": "Anbudsklar: upphandlingsdata, publicerade checklistor, LOU och CPV (bara läsning).",
+        "description": (
+            "Anbudshjälpen: upphandlingsdata, publicerade checklistor, LOU och CPV (bara läsning)."
+        ),
         "forward_identity": False,
     }
     try:
@@ -321,7 +324,7 @@ def _ensure_space(api: _EneoAdmin, name: str, result: ProvisionResult) -> None:
     api.patch(
         f"/api/v1/spaces/{result.space_id}/",
         {
-            "description": "AI-uppgifter för Anbudsklar. Hanteras av `anbudsklar eneo provision`.",
+            "description": "AI-uppgifter för Anbudshjälpen. Hanteras av `anbudsklar eneo provision`.",
             "completion_models": [{"id": result.model_id}],
             "mcp_servers": [{"id": result.mcp_server_id}] if result.mcp_server_id else [],
             "data_retention_days": RETENTION_DAYS,
@@ -462,7 +465,7 @@ def _create_runtime_key(api: _EneoAdmin, key_name: str, result: ProvisionResult)
         "/api/v1/api-keys",
         {
             "name": key_name,
-            "description": "Anbudsklars környckel: frågar assistenterna och raderar sessionerna.",
+            "description": "Anbudshjälpens környckel: frågar assistenterna och raderar sessionerna.",
             "key_type": "sk_",
             "ownership": "service",
             "scope_type": "space",
@@ -548,7 +551,7 @@ def provision(
     rotate_key: bool = False,
     client: httpx.Client | None = None,
 ) -> ProvisionResult:
-    """Create or update everything Anbudsklar needs in Eneo. Safe to run again.
+    """Create or update everything Anbudshjälpen needs in Eneo. Safe to run again.
 
     Give either `password` (login as `email`) or `super_key` (mint a token for `email`).
     `knowledge=False` skips the website crawls for Regelhjälpen. `rotate_key=True`
@@ -630,15 +633,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m anbudsklar.ai.eneo_provision",
         description=(
-            "Skapar eller uppdaterar Anbudsklars space, assistenter och környckel i Eneo (ENEO_BACKEND_URL). "
-            "Lösenordet läses från ENEO_PROVISION_PASSWORD eller superadmin-nyckeln från ENEO_SUPER_API_KEY."
+            "Skapar eller uppdaterar Anbudshjälpens space, assistenter och környckel i Eneo "
+            "(ENEO_BACKEND_URL). Lösenordet läses från ENEO_PROVISION_PASSWORD eller superadmin-nyckeln från "
+            "ENEO_SUPER_API_KEY."
         ),
     )
     parser.add_argument(
         "--email", default=os.environ.get("ENEO_PROVISION_EMAIL"), help="Eneo-användare (admin)."
     )
     parser.add_argument(
-        "--mcp-url", help="Adress som Eneo når Anbudsklars MCP-server på, t.ex. https://…/mcp."
+        "--mcp-url", help="Adress som Eneo når Anbudshjälpens MCP-server på, t.ex. https://…/mcp."
     )
     parser.add_argument(
         "--model", help="Språkmodell i Eneo (namn eller smeknamn). Standard: bästa tillgängliga."

@@ -139,7 +139,7 @@ class DocumentTooLarge(DocumentError):
 
 def _too_many_pages() -> DocumentTooLarge:
     return DocumentTooLarge(
-        f"Dokumentet är för långt. Anbudsklar kan läsa högst {MAX_PAGES} sidor. "
+        f"Dokumentet är för långt. Anbudshjälpen kan läsa högst {MAX_PAGES} sidor. "
         "Dela upp det i mindre delar och försök igen."
     )
 
@@ -147,7 +147,7 @@ def _too_many_pages() -> DocumentTooLarge:
 def _too_much_text() -> DocumentTooLarge:
     limit = f"{MAX_CHARS:,}".replace(",", " ")  # Swedish digit grouping: 1 500 000
     return DocumentTooLarge(
-        f"Dokumentet innehåller för mycket text. Anbudsklar kan läsa högst {limit} tecken. "
+        f"Dokumentet innehåller för mycket text. Anbudshjälpen kan läsa högst {limit} tecken. "
         "Dela upp det i mindre delar och försök igen."
     )
 

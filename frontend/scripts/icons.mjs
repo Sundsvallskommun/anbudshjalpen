@@ -1,4 +1,4 @@
-// Builds Anbudsklar's icon set from its one source, public/favicon.svg (the mark, which the top bar also shows): the
+// Builds Anbudshjälpen's icon set from its one source, public/favicon.svg (the mark, which the top bar also shows): the
 // ICO fallback and the home-screen icons in public/, and the logo the README shows in docs/assets/. Run from
 // frontend/ with `npm run icons` after changing the mark.
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -10,7 +10,7 @@ const publicDir = `${repo}frontend/public/`;
 const docsAssets = `${repo}docs/assets/`;
 
 // The mark's own ground: a full-bleed icon fills its corners with it, so the rounded square looks cut by the system.
-const GROUND = "#004595";
+const GROUND = "#0B1220";
 const mark = readFileSync(`${publicDir}favicon.svg`, "utf8");
 
 /** An ICO file holding PNG images, which every browser that still asks for /favicon.ico reads. */
@@ -72,7 +72,7 @@ write(`${publicDir}favicon.ico`, ico([{ size: 16, png: await png(16) }, { size: 
 write(`${publicDir}apple-touch-icon.png`, await png(180, { ground: GROUND }));
 write(`${publicDir}icon-192.png`, await png(192));
 write(`${publicDir}icon-512.png`, await png(512));
-// A maskable icon keeps what matters inside the middle 80 %: at 62 % of the side the spark's tip stays inside it.
+// A maskable icon keeps what matters inside the middle 80 %: at 62 % of the side the chevrons stay well inside it.
 write(`${publicDir}icon-maskable-512.png`, await png(512, { scale: 0.62, ground: GROUND }));
 await browser.close();
 

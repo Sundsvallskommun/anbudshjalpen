@@ -18,7 +18,7 @@ import {
 } from "./profileDraft";
 import { SaveBar } from "./SaveBar";
 
-const TOO_SHORT_TO_SUGGEST = "Skriv några ord till om vad ni gör, så kan Anbudsklar föreslå koder.";
+const TOO_SHORT_TO_SUGGEST = "Skriv några ord till om vad ni gör, så kan Anbudshjälpen föreslå koder.";
 
 /** The browser asks before a reload or a closed tab throws away unsaved changes. */
 function useUnsavedChangesWarning(isActive: boolean) {

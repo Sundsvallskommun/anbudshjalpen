@@ -2,32 +2,32 @@
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
-  <img src="docs/assets/logo.svg" alt="Anbudsklar" width="120">
+  <img src="docs/assets/logo.svg" alt="Anbudshjälpen" width="120">
 </picture>
 
-# Anbudsklar
+# Anbudshjälpen
 
 **AI-coach som hjälper småföretag att hitta, förstå och svara på kommunens upphandlingar**
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Byggd för: offentlig sektor](https://img.shields.io/badge/Byggd%20f%C3%B6r-offentlig%20sektor-green)](#vad-är-anbudsklar)
+[![Byggd för: offentlig sektor](https://img.shields.io/badge/Byggd%20f%C3%B6r-offentlig%20sektor-green)](#vad-är-anbudshjälpen)
 [![Status: PoC](https://img.shields.io/badge/Status-PoC-orange)](docs/poc.md)
 [![Bidrag: välkomna](https://img.shields.io/badge/Bidrag-v%C3%A4lkomna-brightgreen.svg)](#bidra)
 
 [Kom igång](#kom-igång) • [Funktioner](#funktioner) • [Dokumentation](#dokumentation) • [Bidra](#bidra)
 
-<p lang="en"><em>Anbudsklar is an open-source AI coach that helps small businesses take part in public procurement. The documentation is in Swedish.</em></p>
+<p lang="en"><em>Anbudshjälpen is an open-source AI coach that helps small businesses take part in public procurement. The documentation is in Swedish.</em></p>
 
 </div>
 
 ---
 
-## Vad är Anbudsklar?
+## Vad är Anbudshjälpen?
 
-Anbudsklar är en AI-coach som hjälper småföretag att hitta, förstå och svara på kommunens upphandlingar. Den byggs av
+Anbudshjälpen är en AI-coach som hjälper småföretag att hitta, förstå och svara på kommunens upphandlingar. Den byggs av
 Sundsvalls kommun, tillsammans med kommunens näringslivsenhet och inköp.
 
-Företagaren beskriver sitt företag en gång. Anbudsklar bevakar kommunens upphandlingar och gör om
+Företagaren beskriver sitt företag en gång. Anbudshjälpen bevakar kommunens upphandlingar och gör om
 förfrågningsunderlag till checklistor med sidhänvisningar. Tjänsten svarar på frågor om underlaget och granskar
 anbudsutkastet mot kraven före inlämning. Själva anbudet lämnas som i dag i e-Avrop.
 
@@ -36,7 +36,7 @@ anbudsutkastet mot kraven före inlämning. Själva anbudet lämnas som i dag i 
 
 ### Så används AI
 
-Som standard kör Anbudsklar en regelbaserad motor utan AI-modell (`AI_ENGINE=heuristic`). Den plockar ut krav och
+Som standard kör Anbudshjälpen en regelbaserad motor utan AI-modell (`AI_ENGINE=heuristic`). Den plockar ut krav och
 datum med fasta regler och fungerar utan nätverk. En riktig AI-modell kommer från en Eneo-instans (`AI_ENGINE=eneo`,
 efter `anbudsklar eneo provision`, se [Eneo-integration](docs/eneo-integration.md)) eller från en OpenAI-kompatibel
 tjänst (`AI_ENGINE=openai`).
@@ -45,7 +45,7 @@ Oavsett motor har varje påstående som visas för användaren en källa, till e
 paragraf i LOU. Appen kontrollerar själv varje citat mot texten, och en modell kan aldrig markera sitt eget citat som
 kontrollerat. Webbappen säger vilken motor som tog fram innehållet.
 
-### Varför Anbudsklar?
+### Varför Anbudshjälpen?
 
 - **Källa till varje påstående:** krav, svar och skäl hänvisar till sin källa, till exempel sidan i underlaget eller
   paragrafen i lagen.
@@ -129,12 +129,12 @@ containrar och kör testerna står i [Utveckling](docs/development.md).
 ## Så ser det ut
 
 <div align="center">
-<img src="docs/assets/anbudsklar-start.png" alt="Företagets startsida i Anbudsklar med nästa frist och nya träffar" width="700"/>
+<img src="docs/assets/anbudsklar-start.png" alt="Företagets startsida i Anbudshjälpen med nästa frist och nya träffar" width="700"/>
 <p><em>Start för företaget: nästa frist och träffarna som verkar passa (påhittade demodata)</em></p>
 </div>
 
 <div align="center">
-<img src="docs/assets/anbudsklar-upphandling.png" alt="En upphandlings sida i Anbudsklar, steg 1 Krav, med fristerna och det företaget behöver göra" width="700"/>
+<img src="docs/assets/anbudsklar-upphandling.png" alt="En upphandlings sida i Anbudshjälpen, steg 1 Krav, med fristerna och det företaget behöver göra" width="700"/>
 <p><em>En upphandling, steg 1 Krav: fristerna och checklistan som inköp har granskat (påhittade demodata)</em></p>
 </div>
 
@@ -205,7 +205,7 @@ Läs [Bidra](docs/CONTRIBUTING.md) innan du börjar. En säkerhetsbrist rapporte
 
 ## Samverkan och styrning
 
-Anbudsklar utvecklas av Sundsvalls kommun. Arbetet görs tillsammans med näringslivsenheten och inköp i kommunen.
+Anbudshjälpen utvecklas av Sundsvalls kommun. Arbetet görs tillsammans med näringslivsenheten och inköp i kommunen.
 Arkitekturbesluten står i [Beslut](docs/decisions/README.md), och det som återstår att avgöra, med vem som behöver
 svara, står i [Öppna frågor](docs/open-questions.md).
 
@@ -233,7 +233,7 @@ svara, står i [Öppna frågor](docs/open-questions.md).
 ## Licens
 
 ```
-Anbudsklar – AI-coach för småföretag i kommunens upphandlingar
+Anbudshjälpen – AI-coach för småföretag i kommunens upphandlingar
 Copyright (C) 2026 Sundsvalls kommun
 
 Licensierad under GNU Affero General Public License v3.0

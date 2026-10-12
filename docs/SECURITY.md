@@ -1,6 +1,6 @@
 # Säkerhet
 
-Syfte: Beskriva hur du rapporterar en säkerhetsbrist i Anbudsklar, vad som omfattas och vilka svarstider vi siktar på.
+Syfte: Beskriva hur du rapporterar en säkerhetsbrist i Anbudshjälpen, vad som omfattas och vilka svarstider vi siktar på.
 
 Läs detta när: Du har hittat en säkerhetsbrist, misstänker att en nyckel har läckt eller undrar hur repot skyddas.
 
@@ -76,7 +76,7 @@ Särskilt viktigt är:
 
 ## Versioner
 
-Anbudsklar är en PoC utan släppta versioner. Rättningar görs på `main`, och bara det senaste på `main` underhålls.
+Anbudshjälpen är en PoC utan släppta versioner. Rättningar görs på `main`, och bara det senaste på `main` underhålls.
 
 ## Så skyddas repot
 

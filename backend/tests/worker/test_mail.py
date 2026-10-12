@@ -106,7 +106,7 @@ def test_match_message_uses_the_fit_words_and_says_who_assessed() -> None:
     assert "Bedömning: Upphandlingen passar er delvis." in message.text
     assert "Sista anbudsdag: 4 november 2026 kl. 12:00." in message.text
     assert "gjord av AI och är inte granskad av inköp. Den kan vara fel" in message.text
-    assert "Se upphandlingen i Anbudsklar: http://anbudsklar.test/upphandlingar/3" in message.text
+    assert "Se upphandlingen i Anbudshjälpen: http://anbudsklar.test/upphandlingar/3" in message.text
     assert "Alla era träffar finns på Start: http://anbudsklar.test/start" in message.text
     assert "/bevakning" not in message.text
 
@@ -141,7 +141,7 @@ async def test_smtp_mailer_sends_text_and_html(monkeypatch: pytest.MonkeyPatch) 
 
     monkeypatch.setattr(aiosmtplib, "send", fake_send)
     settings = Settings(
-        smtp_host="mailpit", smtp_port=1025, mail_from="Anbudsklar <noreply@anbudsklar.local>"
+        smtp_host="mailpit", smtp_port=1025, mail_from="Anbudshjälpen <noreply@anbudsklar.local>"
     )
     message = reminder_message(
         to="anna@example.test",

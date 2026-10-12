@@ -26,7 +26,7 @@ export default function GatePage() {
   };
 
   return (
-    <Page title="Accesskod" heading="Ange accesskoden" width={640} intro="Anbudsklar är en testmiljö som bara är öppen för inbjudna.">
+    <Page title="Accesskod" heading="Ange accesskoden" width={640} intro="Anbudshjälpen är en testmiljö som bara är öppen för inbjudna.">
       <Card>
         <form aria-label="Accesskod" onSubmit={submit}>
           <VStack gap={4}>

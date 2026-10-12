@@ -43,10 +43,12 @@ REMINDER_LABELS = {
 # The fit words of the web app ("Verkar passa", "Passar delvis"): the assessment compares
 # CPV codes and words, so it never promises more than that.
 FIT_SENTENCES = {
-    "passar": 'Anbudsklar har hittat en upphandling som verkar passa {company}: "{title}".',
-    "passar_delvis": 'Anbudsklar har hittat en upphandling som passar {company} delvis: "{title}".',
+    "passar": 'Anbudshjälpen har hittat en upphandling som verkar passa {company}: "{title}".',
+    "passar_delvis": 'Anbudshjälpen har hittat en upphandling som passar {company} delvis: "{title}".',
 }
-OTHER_FIT_SENTENCE = 'Anbudsklar har hittat en upphandling som kan vara intressant för {company}: "{title}".'
+OTHER_FIT_SENTENCE = (
+    'Anbudshjälpen har hittat en upphandling som kan vara intressant för {company}: "{title}".'
+)
 FAIR_QUESTIONS = "Är något oklart i underlaget? Ställ frågan i e-Avrop, så får alla leverantörer samma svar."
 FOOTER = (
     "Anbudet lämnas som vanligt i e-Avrop. Det är alltid förfrågningsunderlaget som gäller, "
@@ -139,7 +141,7 @@ def reminder_message(
         subject=subject,
         greeting=f"Hej {recipient_name}!",
         paragraphs=lines,
-        link_text="Öppna upphandlingen i Anbudsklar",
+        link_text="Öppna upphandlingen i Anbudshjälpen",
         link_url=notice_url,
         more_links=[("Ändra eller ta bort dina påminnelser", reminders_url)] if reminders_url else [],
         organization=organization,
@@ -178,7 +180,7 @@ def match_message(
         subject=f"Ny träff: {notice_title}",
         greeting=f"Hej {recipient_name}!",
         paragraphs=lines,
-        link_text="Se upphandlingen i Anbudsklar",
+        link_text="Se upphandlingen i Anbudshjälpen",
         link_url=notice_url,
         more_links=[("Alla era träffar finns på Start", start_url)] if start_url else [],
         organization=organization,
@@ -196,7 +198,7 @@ def _compose(
     organization: str,
     more_links: Sequence[tuple[str, str]] = (),
 ) -> MailMessage:
-    signature = f"Vänliga hälsningar\nAnbudsklar, {organization}"
+    signature = f"Vänliga hälsningar\nAnbudshjälpen, {organization}"
     links = [(link_text, link_url), *more_links]
     text = (
         "\n\n".join([greeting, *paragraphs, *(f"{label}: {url}" for label, url in links), FOOTER, signature])

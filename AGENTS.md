@@ -1,7 +1,9 @@
 # Agent instructions: anbudsklar
 
-Anbudsklar is an AI procurement coach for small businesses, built with Sundsvalls kommun's business-development unit
-(näringslivsenheten) and procurement department (inköp). The repository holds a proof of concept (PoC) under
+Anbudshjälpen is an AI procurement coach for small businesses, built with Sundsvalls kommun's business-development
+unit (näringslivsenheten) and procurement department (inköp). It was called Anbudsklar until decision 0015, and the
+technical names keep that name: the repository, the Python package and CLI `anbudsklar`, the Compose services, and the
+Eneo space "Anbudsklar (PoC)" with its MCP server `anbudsklar_poc`. The repository holds a proof of concept (PoC) under
 construction: a FastAPI backend with a read-only MCP server, a Vite + React + Astryx SPA, and an Eneo test instance as
 the AI engine.
 

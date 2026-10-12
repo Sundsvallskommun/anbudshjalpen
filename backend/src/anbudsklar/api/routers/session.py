@@ -25,7 +25,7 @@ from anbudsklar.services.personas import available_roles, list_personas, persona
 router = APIRouter(tags=["session"])
 
 AI_DISCLOSURE = (
-    "Anbudsklar använder AI för att sammanfatta förfrågningsunderlag, svara på frågor och granska "
+    "Anbudshjälpen använder AI för att sammanfatta förfrågningsunderlag, svara på frågor och granska "
     "anbudsutkast. AI kan ha fel. Varje uppgift visar sida och citat så att du kan kontrollera den, "
     "och det är alltid förfrågningsunderlaget som gäller."
 )

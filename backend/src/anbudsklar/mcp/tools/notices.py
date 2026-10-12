@@ -247,7 +247,7 @@ def _render_notice(
         lines.append(f"Upphandlingsdokument hos köparen: {notice.documents_url}")
     if notice.description:
         lines += ["", "## Beskrivning", shorten(notice.description, min(DESCRIPTION_MAX_CHARS, budget // 4))]
-    lines += ["", "## Dokument i Anbudsklar"]
+    lines += ["", "## Dokument i Anbudshjälpen"]
     if documents:
         lines += [document_line(document) for document in documents]
         lines.append("Läs sidor med lasa_sidor och sök i texten med sok_i_underlag.")

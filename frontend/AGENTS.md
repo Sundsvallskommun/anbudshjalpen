@@ -1,6 +1,6 @@
 # Agent instructions: frontend
 
-The Anbudsklar web app: Vite + React 19 + TypeScript + Astryx, served as a static SPA by the FastAPI
+The Anbudshjälpen web app: Vite + React 19 + TypeScript + Astryx, served as a static SPA by the FastAPI
 backend in production and by Vite (port 3502, proxying `/api`, `/health` and `/mcp` to 127.0.0.1:8500) in
 development. Code and comments are English; every user-facing word is Swedish. Read the root `AGENTS.md`
 for the product rules.
@@ -36,7 +36,7 @@ The design as built is in `docs/design.md`. Comments that cite "direction.md, se
   `PageText`, and `sourceTarget.ts`, the address that opens a source), `AiProvenance` (with `basis="law"` for
   Regelhjälpen), `StatTile`, `ResultSummary`, `NextStepCard` and `AccentCard`, `RequirementRow`, `CollapsibleSection`,
   `StepNav`, and the app's own glyphs (`icons.tsx`, among them `DownloadIcon` and `UploadIcon`).
-- `public/favicon.svg` is the mark (Gnistan), shown by the top bar's `Brand` and the browser tab. `npm run icons`
+- `public/favicon.svg` is the mark (Toppen), shown by the top bar's `Brand` and the browser tab. `npm run icons`
   (`scripts/icons.mjs`) builds `favicon.ico`, the home-screen and manifest icons and the README logo from it; rerun it
   after changing the mark, and never edit the generated files by hand.
 - `src/components/ask/` is "Fråga AI" (decision 0014): `AskAiProvider` owns the panel and the conversations

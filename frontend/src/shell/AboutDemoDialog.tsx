@@ -42,7 +42,7 @@ function AboutText({ config }: { config: AppConfig | undefined }) {
             sparas inte, men demon är inte gjord för riktiga uppgifter.
           </Text>
         </Part>
-        <Part title="AI i Anbudsklar">
+        <Part title="AI i Anbudshjälpen">
           <Text as="p">{config?.ai_disclosure ?? FALLBACK_AI_DISCLOSURE}</Text>
           {config && <Text as="p">{engineSummary(config.ai_engine)}</Text>}
           <Text as="p">Varje uppgift visar sin källa i underlaget. Det är alltid förfrågningsunderlaget som gäller.</Text>

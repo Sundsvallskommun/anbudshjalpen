@@ -18,7 +18,7 @@ export function RulesRail() {
         </Heading>
         <Text as="p">
           Gäller frågan en viss upphandling? Öppna den bland <Link href="/upphandlingar">upphandlingarna</Link> och tryck
-          på Fråga AI där. Då svarar Anbudsklar utifrån just det underlaget.
+          på Fråga AI där. Då svarar Anbudshjälpen utifrån just det underlaget.
         </Text>
         <Text as="p">
           Är något oklart i ett förfrågningsunderlag? Ställ frågan i e-Avrop före sista dag för frågor, så får alla

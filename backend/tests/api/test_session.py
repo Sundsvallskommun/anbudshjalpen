@@ -65,7 +65,7 @@ async def test_writes_from_another_origin_are_refused(
     body = {"persona": "foretagare"}
     foreign = await client.post(url, json=body, headers={"Origin": "https://evil.example"})
     assert foreign.status_code == 403
-    assert foreign.json()["detail"] == "Begäran kom inte från Anbudsklar."
+    assert foreign.json()["detail"] == "Begäran kom inte från Anbudshjälpen."
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=PUBLIC_URL) as bare:
         assert (await bare.post(url, json=body)).status_code == 403

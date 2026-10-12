@@ -1,3 +1,3 @@
-"""Anbudsklar PoC backend."""
+"""Anbudshjälpen PoC backend."""
 
 __version__ = "0.1.0"

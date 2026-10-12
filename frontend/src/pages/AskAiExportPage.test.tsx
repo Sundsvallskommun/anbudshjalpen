@@ -43,7 +43,7 @@ describe("The conversation as a document (decision 0014)", () => {
 
     expect(await screen.findByRole("heading", { level: 1, name: "Frågor och svar" })).toBeInTheDocument();
     expect(await screen.findByText(noticeDetail.title)).toBeInTheDocument();
-    expect(screen.getByText(/^Från Anbudsklar 5 okt/u)).toHaveTextContent("inte granskade av inköp");
+    expect(screen.getByText(/^Från Anbudshjälpen 5 okt/u)).toHaveTextContent("inte granskade av inköp");
     const first = screen.getByRole("heading", { level: 2, name: "Fråga 1" }).closest("li");
     const second = screen.getByRole("heading", { level: 2, name: "Fråga 2" }).closest("li");
     if (!first || !second) throw new Error("expected two questions");

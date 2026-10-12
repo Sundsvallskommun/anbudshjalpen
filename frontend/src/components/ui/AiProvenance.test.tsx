@@ -53,7 +53,7 @@ describe("AiProvenance", () => {
     expect(
       within(popover).getByText(/Regelhjälpen letar upp paragrafer i lagen om offentlig upphandling \(LOU\)/),
     ).toBeInTheDocument();
-    expect(within(popover).getByText(/med lagens egna ord, ur Anbudsklars egen kopia av LOU/)).toBeInTheDocument();
+    expect(within(popover).getByText(/med lagens egna ord, ur Anbudshjälpens egen kopia av LOU/)).toBeInTheDocument();
     expect(within(popover).getByText("Inköp har inte granskat det här. Läs alltid hela paragrafen.")).toBeInTheDocument();
     expect(within(popover).getByText("Det är alltid lagtexten som gäller.")).toBeInTheDocument();
     expect(within(popover).queryByText(/underlaget/)).not.toBeInTheDocument();

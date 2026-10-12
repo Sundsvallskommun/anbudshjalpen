@@ -122,7 +122,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
   {
     term: "CPV-kod",
     explanation:
-      "EU:s kodlista för vad som upphandlas, ordnad som ett träd från breda till smala koder. Ni behöver inte kunna koderna: Anbudsklar visar vad de betyder.",
+      "EU:s kodlista för vad som upphandlas, ordnad som ett träd från breda till smala koder. Ni behöver inte kunna koderna: Anbudshjälpen visar vad de betyder.",
     forms: ["CPV-kod", "CPV-koden", "CPV-koder", "CPV-koderna"],
   },
   {

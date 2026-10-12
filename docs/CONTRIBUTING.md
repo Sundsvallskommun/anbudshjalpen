@@ -1,6 +1,6 @@
 # Bidra
 
-Syfte: Beskriva hur du bidrar till Anbudsklar, från ärende till pull request, och vilka regler och kontroller som
+Syfte: Beskriva hur du bidrar till Anbudshjälpen, från ärende till pull request, och vilka regler och kontroller som
 gäller.
 
 Läs detta när: Du vill rapportera ett fel, föreslå en förbättring eller skicka in en ändring i kod eller dokumentation.
@@ -8,7 +8,7 @@ Läs detta när: Du vill rapportera ett fel, föreslå en förbättring eller sk
 Hör ihop med: [Utveckling](development.md), [Säkerhet](SECURITY.md), [Beslut](decisions/README.md),
 [`AGENTS.md`](../AGENTS.md) (engelska)
 
-Anbudsklar utvecklas av Sundsvalls kommun, och bidrag är välkomna från kommuner, organisationer och utvecklare. Repot
+Anbudshjälpen utvecklas av Sundsvalls kommun, och bidrag är välkomna från kommuner, organisationer och utvecklare. Repot
 innehåller en PoC, så mycket kan fortfarande ändras. Börja därför alltid med ett ärende.
 
 ## 1. Börja med ett ärende
@@ -48,7 +48,7 @@ Hur du installerar beroendena, startar appen och kör testerna står i [Utveckli
 
 ## 4. Regler för data
 
-Anbudsklar handlar om företag och upphandlingar. Därför gäller de här reglerna för allt som hamnar i repot:
+Anbudshjälpen handlar om företag och upphandlingar. Därför gäller de här reglerna för allt som hamnar i repot:
 
 - Använd bara offentliga källor och företagets egna data. Lägg aldrig in riktiga anbudsutkast, personuppgifter eller
   konfidentiella avtalspriser.
@@ -102,7 +102,7 @@ ett kolon och en kort beskrivning på engelska i imperativ. Typerna i historiken
 feat: let the visitor choose light or dark
 fix: compare match freshness on one clock
 test: wait for slow renders and the login redirect
-docs: set up Anbudsklar with background, architecture and first decisions
+docs: set up Anbudshjälpen with background, architecture and first decisions
 ```
 
 ## 8. Öppna en pull request

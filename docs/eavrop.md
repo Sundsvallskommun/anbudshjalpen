@@ -1,6 +1,6 @@
 # e-Avrops API
 
-Syfte: Beskriva hur Anbudsklar läser e-Avrops Projekt-API, vilka regler som skyddar sekretessbelagda uppgifter, hur
+Syfte: Beskriva hur Anbudshjälpen läser e-Avrops Projekt-API, vilka regler som skyddar sekretessbelagda uppgifter, hur
 frågor och svar läses ur frågeloggen och vilka uppgifter som saknas i API:t men hade behövts.
 
 Läs detta när: Du ändrar insamlingen från e-Avrop, felsöker en upphandling som saknas eller har fel underlag, eller

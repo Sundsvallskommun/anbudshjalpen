@@ -11,7 +11,7 @@ import { isLawSource, sourceTitle } from "./rulesAnswer";
 /**
  * One paragraph an answer rests on, as a muted card inside the answer (direction.md, section 4 "Regelhjälpen"):
  * "LOU 20 kap. 1 § · Avtalsspärr", the start of the law text cut at a whole sentence, and "Läs hela paragrafen ↗".
- * The excerpt comes from Anbudsklar's own copy of LOU, never from a model. The link's name ends with the reference,
+ * The excerpt comes from Anbudshjälpen's own copy of LOU, never from a model. The link's name ends with the reference,
  * so every link on the page says where it goes (WCAG 2.4.4). On a phone the card sits closer to its edge, since it
  * is inside the answer's card and the quote is indented again.
  */

@@ -1,6 +1,6 @@
 # Beslut
 
-Syfte: Samla de arkitekturbeslut som formar Anbudsklar, ett beslut per fil, så att man kan se varför något är som det
+Syfte: Samla de arkitekturbeslut som formar Anbudshjälpen, ett beslut per fil, så att man kan se varför något är som det
 är.
 
 Läs detta när: Du undrar varför en lösning ser ut som den gör, vill ändra något som ett beslut förutsätter, eller ska
@@ -26,6 +26,7 @@ Hör ihop med: [Dokumentationsindex](../README.md), [Arkitektur](../architecture
 | [0012](0012-fragor-mot-alla-dokument.md) | Frågor besvaras mot alla dokument i upphandlingen, med ett urval över en budget | Accepterat | 2026-10-12 |
 | [0013](0013-fragor-och-svar-fran-eavrop.md) | Inköps publicerade svar på leverantörernas frågor hämtas från e-Avrops frågelogg | Accepterat | 2026-10-12 |
 | [0014](0014-fraga-ai-panel.md) | AI-stödet är en panel som följer läsaren, och samtalet går att spara som PDF | Accepterat | 2026-10-12 |
+| [0015](0015-namnet-anbudshjalpen.md) | Tjänsten heter Anbudshjälpen och får märket Toppen, och de tekniska namnen behåller anbudsklar | Accepterat | 2026-10-12 |
 
 ## Så skriver du ett beslut
 

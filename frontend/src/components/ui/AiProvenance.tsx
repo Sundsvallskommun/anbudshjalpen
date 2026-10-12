@@ -51,13 +51,13 @@ interface BasisCopy {
 const BASIS_COPY: Record<ProvenanceBasis, BasisCopy> = {
   document: {
     sources:
-      "Varje uppgift har en källhänvisning till underlaget. Anbudsklar kontrollerar själv att citatet står på den sida som anges; AI:n kan inte påverka kontrollen.",
+      "Varje uppgift har en källhänvisning till underlaget. Anbudshjälpen kontrollerar själv att citatet står på den sida som anges; AI:n kan inte påverka kontrollen.",
     unreviewed: "Inköp har inte granskat det här. Kontrollera alltid mot underlaget.",
     rule: "Det är alltid förfrågningsunderlaget som gäller.",
   },
   law: {
     sources:
-      "Varje paragraf som svaret bygger på visas med lagens egna ord, ur Anbudsklars egen kopia av LOU, med en länk till hela paragrafen.",
+      "Varje paragraf som svaret bygger på visas med lagens egna ord, ur Anbudshjälpens egen kopia av LOU, med en länk till hela paragrafen.",
     unreviewed: "Inköp har inte granskat det här. Läs alltid hela paragrafen.",
     rule: "Det är alltid lagtexten som gäller.",
   },

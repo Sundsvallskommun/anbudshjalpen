@@ -29,7 +29,7 @@ export const CHECKLIST_ID = "c4a1e7f2-3b6d-4c8e-9f0a-1b2c3d4e5f60";
 export const config: AppConfig = {
   organization_name: "Sundsvalls kommun",
   ai_engine: "heuristic",
-  ai_disclosure: "Anbudsklar använder AI. Kontrollera alltid svaren mot underlaget.",
+  ai_disclosure: "Anbudshjälpen använder AI. Kontrollera alltid svaren mot underlaget.",
   demo_notice: "Demo: underlag, företag och personer är fiktiva.",
   eavrop_url: "https://www.e-avrop.com/sundsvall",
   gate_required: false,

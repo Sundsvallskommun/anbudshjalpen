@@ -12,11 +12,11 @@ Hör ihop med: [Design](design.md), [Beslut 0002](decisions/0002-react-and-astry
 Riktningen godkändes 2026-10-05 och är genomförd. Sidan skrivs inte om när gränssnittet ändras: det som är byggt står i
 [Design](design.md), och säger sidorna olika gäller den och koden. Granskningarna och skärmbilderna som nämns nedan finns
 inte i repot. Före-bilderna, målbilden och den byggda appen ligger bredvid varandra i Claude Design:
-[Anbudsklar – målbild](https://claude.ai/artifact/YZUesFY9gAH4MiBALTuseW), som är privat tills den delas.
+[Anbudshjälpen – målbild](https://claude.ai/artifact/YZUesFY9gAH4MiBALTuseW), som är privat tills den delas.
 
 **Utgångsläge.** Underlaget är fem granskningar (företagaren, informationsarkitektur, visuell form, förtroende och inköparen) och 28 skärmbilder från 2026-10-05. Grunden håller: Eneo och Astryx, lugn typografi, en källa till varje påstående, inköparens grind och klarspråk. Det som brister är strukturen, inte stilen. Allt är utfällt och väger lika mycket. Därför blir upphandlingens sida 13 623 px hög på desktop och 20 619 px på telefon, verktygen hamnar under vecket och förtroendesignalerna drunknar i upprepning.
 
-**Målbilden.** Anbudsklar ska kännas som en lugn och modern e-tjänst. Den leder Anna från frågan "passar det här oss?" till "jag vet vad jag ska lämna in" i fyra steg. Fristen är ankaret, och källan finns alltid ett klick bort.
+**Målbilden.** Anbudshjälpen ska kännas som en lugn och modern e-tjänst. Den leder Anna från frågan "passar det här oss?" till "jag vet vad jag ska lämna in" i fyra steg. Fristen är ankaret, och källan finns alltid ett klick bort.
 
 **Vi byter inte varumärke.** Eneo-accenten (#004595), systemtypsnittet, Astryx-komponenterna och tillgänglighetsöverstyrningarna i `eneo.theme.ts` ligger fast. Moderniseringen kommer från ytor, hierarki och färre men tydligare val. Ingen ny färg, inga gradienter, inga illustrationer.
 
@@ -83,7 +83,7 @@ inte i repot. Före-bilderna, målbilden och den byggda appen ligger bredvid var
 - **Toppnav** 64 px på ytan #FBFCFF med kant nedtill (AppShell variant "section"). Innehållet följer sidbehållaren på 1 152 px. Vald menypunkt har accentfärgad text i semibold och en 2 px accentlinje under, i stället för dagens grå pill.
 - **Sidans bakgrund** #F0F0F6 (`--color-background-body`, som inte används i dag). Det användaren agerar på ligger på vita kort (#FBFCFF) med 1 px kant och 12 px radie.
 - **Bredder:** sidbehållare 1 152 px. Två spalter: innehåll 760 px och högerspalt 360 px med 32 px mellanrum. Formulär 640 px. Telefon har 16 px marginal.
-- **Fot:** "Anbudsklar · Sundsvalls kommun · Om demon och AI · Tillgänglighetsredogörelse".
+- **Fot:** "Anbudshjälpen · Sundsvalls kommun · Om demon och AI · Tillgänglighetsredogörelse".
 
 ### Start (företagare)
 1. H1 "Välkommen, Anna" och raden "Målerifirman i Matfors AB · 2 nya träffar · nästa frist om 25 dagar".
@@ -237,7 +237,7 @@ Avsnitten "Kommande" och "Skickade". Varje påminnelse är ett kort med fristblo
 
 **Ikoner:** Astryx semantiska ikoner (success, warning, error, info, close, calendar, clock, externalLink, trash, moreHorizontal).
 
-**Logomärke:** en egen SVG på 24 px, ett dokument med vikt hörn och en bock i accentfärg, linje 2 px. Det sitter före ordmärket "Anbudsklar" (19 px semibold) med "Sundsvalls kommun" i 13 px under. Kommunvapnet används inte utan klartecken.
+**Logomärke:** Toppen, en egen SVG på 28 px: två vinklar i varandra som bildar ett A, vitt och klarblått på en nästan svart ruta (beslut 0015). Det sitter före ordmärket "Anbudshjälpen" (19 px semibold) med "Sundsvalls kommun" i 13 px under. Kommunvapnet används inte utan klartecken.
 
 **Theme overrides i `eneo.theme.ts`** (i stället för egen CSS):
 - `top-nav-item` i vald stil: accentfärg, semibold och 2 px linje i stället för grå bakgrund.

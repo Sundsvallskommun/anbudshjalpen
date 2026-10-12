@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 SessionFactory = Callable[[], AbstractAsyncContextManager[AsyncSession]]
 
 _TECHNICAL_ERROR = (
-    "Tekniskt fel i Anbudsklar, försök igen om en stund. Om felet kvarstår: svara utan verktyget, "
+    "Tekniskt fel i Anbudshjälpen, försök igen om en stund. Om felet kvarstår: svara utan verktyget, "
     "säg att uppgiften inte kunde hämtas och hänvisa till annonsen i e-Avrop."
 )
 

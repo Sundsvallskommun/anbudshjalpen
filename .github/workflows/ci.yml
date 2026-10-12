@@ -94,7 +94,7 @@ jobs:
       - uses: actions/checkout@v7
       - name: Local stack
         run: docker compose --env-file .env.example config --quiet
-      - name: Dokploy, Anbudsklar
+      - name: Dokploy, Anbudshjälpen
         # The template leaves secrets empty on purpose; supply placeholders for validation only.
         env:
           SESSION_SECRET: ci-placeholder

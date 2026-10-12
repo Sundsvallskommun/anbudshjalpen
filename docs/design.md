@@ -9,7 +9,7 @@ Hör ihop med: [PoC](poc.md), [Arkitektur](architecture.md), [AI-uppgifterna](ai
 [Beslut 0002](decisions/0002-react-and-astryx.md), [Beslut 0007](decisions/0007-poc-login-persona-picker.md),
 [Målbild för gränssnittet](direction.md), [`frontend/AGENTS.md`](../frontend/AGENTS.md) (engelska)
 
-Målbilden är ritad i Claude Design: [Anbudsklar – målbild](https://claude.ai/artifact/YZUesFY9gAH4MiBALTuseW), som är
+Målbilden är ritad i Claude Design: [Anbudshjälpen – målbild](https://claude.ai/artifact/YZUesFY9gAH4MiBALTuseW), som är
 privat tills den delas. Den här sidan beskriver det som är byggt i `frontend/src`. Säger sidan och koden olika har koden
 rätt. Skälen bakom besluten och utgångsläget före står i [Målbild för gränssnittet](direction.md), som kodkommentarerna
 hänvisar till med avsnittsnummer.
@@ -89,16 +89,16 @@ Varje sida visas i ramen `AppFrame` i `frontend/src/shell/`:
   ska laddas upp.
 - **Toppnaven** (`FrameHeader`, `MainNav`, `AccountMenu` och `Brand`) är 64 px hög på bredare skärmar och följer
   sidbehållarens bredd. Vald menypunkt har accentfärgad text i semibold och en accentlinje på 2 px under. Logomärket är
-  Gnistan: coachens vita pratbubbla med en bock, på en blå ruta, och en gul gnista i hörnet som står för AI. Rutan har
-  egen bakgrund och ser likadan ut i ljust och mörkt läge. Gult finns bara i märket, aldrig som statusfärg.
-  Kommunvapnet används inte utan klartecken.
+  Toppen: två vinklar i varandra som bildar ett A och pekar uppåt, den yttre vit och den inre klarblå (#4C82FF), på en
+  nästan svart ruta (#0B1220). Rutan har egen bakgrund och ser likadan ut i ljust och mörkt läge. Märkets blå finns
+  bara i märket, aldrig som accent- eller statusfärg. Kommunvapnet används inte utan klartecken.
 - **Märket** är filen `frontend/public/favicon.svg`, som både toppnaven och webbläsarfliken visar. Från den bygger
   `npm run icons` (från `frontend/`) reservikonen `favicon.ico`, hemskärmsikonerna och manifestets ikoner i
   `frontend/public/` och README-loggan i `docs/assets/`. Ändras märket körs skriptet igen.
 - **Sidan** (`Page`) har sidans enda h1, som får fokus efter en navigering i appen. Över h1 kan brödsmulor (bara på
   bredare skärmar) och en kort rad som "Granska checklista" stå. I rubrikraden kan en knapp stå, under den en ingress,
   och bredvid innehållet en högerspalt.
-- **Foten** (`SiteFooter`): "Anbudsklar · Sundsvalls kommun · Om demon och AI", där länken öppnar samma dialog som
+- **Foten** (`SiteFooter`): "Anbudshjälpen · Sundsvalls kommun · Om demon och AI", där länken öppnar samma dialog som
   demobandet, och sist på raden valet Utseende, som även den som inte har loggat in når. Foten står efter sidans `main`, inte i den, så att den är sidans enda `contentinfo` på översta nivån:
   `ModuleShell` lägger den efter Astryx `AppShell`. Den har en linje över sig och samma innehållslinje som toppnaven,
   och på en kort sida följer den direkt efter innehållet i stället för att stå under första skärmen. Målbildens länk
@@ -208,7 +208,7 @@ Samtalen sparas per ämne i webbläsarens sessionslagring, så de finns kvar mel
 samma flik. "Ställ en fråga" i steg 1, "Fråga om kravet" i Granska (med frågan ifylld, också via `?fraga=` i en ny
 flik), "Fråga underlaget" utan checklista och den gamla adressen `?flik=fraga` öppnar panelen.
 
-**Utskriftsvyn** (`/fraga-ai/utskrift?amne=…`) ligger utanför ramen: "Frågor och svar", ämnet, "Från Anbudsklar 5 okt
+**Utskriftsvyn** (`/fraga-ai/utskrift?amne=…`) ligger utanför ramen: "Frågor och svar", ämnet, "Från Anbudshjälpen 5 okt
 2026 kl. 10:00. Svaren är automatiskt framtagna och inte granskade av inköp. Det är alltid förfrågningsunderlaget som
 gäller." och varje fråga med sitt svar, citaten med sida ("s. 6 (AI angav 5)", "hittades inte i underlaget") eller
 paragraferna. Knapparna "Tillbaka" och "Skriv ut eller spara som PDF" syns inte i utskriften, och ingen fråga delas
@@ -227,7 +227,7 @@ tillbaka till länken när dialogen stängs.
 
 - **Regelhjälpen** har samma samtalsform som Fråga AI, med "Fråga" bredvid skrivfältet och, när ett samtal har börjat,
   "Börja om" under det. Ett svar har ursprungsraden, en fet slutsats när motorn skrev en, förklaringen och ett kort per
-  paragraf: "LOU 20 kap. 1 § · Avtalsspärr", början av lagtexten ur Anbudsklars egen kopia av LOU och "Läs hela
+  paragraf: "LOU 20 kap. 1 § · Avtalsspärr", början av lagtexten ur Anbudshjälpens egen kopia av LOU och "Läs hela
   paragrafen". Korten står under rubriken "Svaret bygger på", eller "Paragrafer som kan handla om din fråga" när den
   regelbaserade motorn svarar utan slutsats. Ursprungsraden förklarar att svaret bygger på lagen och att det alltid är
   lagtexten som gäller. Exempelfrågorna står kvar efter svaret, utom de som redan har ställts.
@@ -346,7 +346,7 @@ Orden till statusarna och motorerna står på ett ställe, `frontend/src/lib/lab
 - **Fackord** förklaras vid klick, inte i varje mening.
 - **Inga emojis.** Ett enda utropstecken är tillåtet, i bekräftelsen "Klart!".
 - **Likabehandling:** när underlaget inte svarar hänvisar texten till frågefunktionen i e-Avrop före sista dag för
-  frågor, så att alla leverantörer får samma svar. Anbudsklar ger aldrig en leverantör råd som de andra inte får.
+  frågor, så att alla leverantörer får samma svar. Anbudshjälpen ger aldrig en leverantör råd som de andra inte får.
 
 | Säg | Inte |
 |---|---|

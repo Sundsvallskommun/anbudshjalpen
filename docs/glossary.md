@@ -51,11 +51,11 @@ sidan. Ändras en term här, ändra den där också. Förklarar en checklista sj
 | RAG | Ett sätt att svara där AI:n först hämtar relevanta textstycken och sedan bara svarar utifrån dem |
 | MCP | Ett standardprotokoll som låter en AI-assistent hämta data från andra system |
 | Citatkontroll | Att kontrollera att ett citat som AI:n anger faktiskt står på den sida den hänvisar till |
-| Assistent | En AI-tjänst i Eneo med egen instruktion, modell och kunskap. Anbudsklar har en assistent per AI-uppgift |
+| Assistent | En AI-tjänst i Eneo med egen instruktion, modell och kunskap. Anbudshjälpen har en assistent per AI-uppgift |
 | Space | En arbetsyta i Eneo som samlar assistenter, behörigheter och lagringstid |
 | Servicenyckel | En API-nyckel (`sk_`) i Eneo som ägs av en tjänst i stället för en person |
-| MCP-server | Ett system som erbjuder MCP-verktyg. Anbudsklars MCP-server låter Eneos assistenter läsa offentlig upphandlingsdata |
+| MCP-server | Ett system som erbjuder MCP-verktyg. Anbudshjälpens MCP-server låter Eneos assistenter läsa offentlig upphandlingsdata |
 | Fulltextsökning | Sökning på ord, där böjningar räknas som samma ord, till exempel "försäkring" och "försäkringar" |
 | Trigramsökning | Sökning som jämför bitar om tre tecken och därför hittar ord trots stavfel |
 | Demoperson | En påhittad användare som man loggar in som i PoC:n |
-| Heuristisk motor | Anbudsklars AI-motor utan språkmodell, som plockar ut krav och datum med fasta regler. Webbappen kallar den regelbaserad |
+| Heuristisk motor | Anbudshjälpens AI-motor utan språkmodell, som plockar ut krav och datum med fasta regler. Webbappen kallar den regelbaserad |

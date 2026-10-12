@@ -1,6 +1,6 @@
 # Datakällor
 
-Syfte: Beskriva varifrån Anbudsklars data kommer, hur den hämtas och vilka villkor som gäller.
+Syfte: Beskriva varifrån Anbudshjälpens data kommer, hur den hämtas och vilka villkor som gäller.
 
 Läs detta när: Du ska ändra insamlingen, lägga till en källa, förklara för verksamheten vad som är riktigt och vad som
 är påhittat, eller undrar varför en annons saknas.
@@ -66,7 +66,7 @@ Kontaktpersoners namn, e-post och telefonnummer i annonser sparas inte.
 ## e-Avrop
 
 Sundsvalls kommun annonserar alla upphandlingar i e-Avrop, även de under tröskelvärdena, och underlagen finns bara där.
-Anbudsklar läser kommunens upphandlingar via e-Avrops Projekt-API med kommunens nyckel (`EAVROP_API_TOKEN`,
+Anbudshjälpen läser kommunens upphandlingar via e-Avrops Projekt-API med kommunens nyckel (`EAVROP_API_TOKEN`,
 `EAVROP_CLIENT_ID`). Hur det går till, reglerna som skyddar sekretessbelagda uppgifter och det API:t saknar står i
 [e-Avrops API](eavrop.md).
 

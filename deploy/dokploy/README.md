@@ -1,6 +1,6 @@
 # Testmiljö i Dokploy
 
-Syfte: Beskriva hur Anbudsklar och en Eneo-testinstans sätts upp i Dokploy, med filerna i den här katalogen.
+Syfte: Beskriva hur Anbudshjälpen och en Eneo-testinstans sätts upp i Dokploy, med filerna i den här katalogen.
 
 Läs detta när: Du ska sätta upp eller uppdatera testmiljön, eller undrar varför Compose-filerna ser ut som de gör.
 
@@ -14,8 +14,8 @@ Hör ihop med: [Drift](../../docs/operations.md), [Eneo-integration](../../docs/
 
 | Fil | Innehåll |
 |---|---|
-| `docker-compose.anbudsklar.yml` | Anbudsklar: `anbudsklar-app`, `anbudsklar-worker`, `anbudsklar-migrate`, `anbudsklar-db` och `anbudsklar-mail` |
-| `anbudsklar.env.example` | Mall för Anbudsklars miljövariabler |
+| `docker-compose.anbudsklar.yml` | Anbudshjälpen: `anbudsklar-app`, `anbudsklar-worker`, `anbudsklar-migrate`, `anbudsklar-db` och `anbudsklar-mail` |
+| `anbudsklar.env.example` | Mall för Anbudshjälpens miljövariabler |
 | `docker-compose.eneo-test.yml` | Eneo 2.2: `eneo-frontend`, `eneo-backend`, `eneo-worker`, `eneo-db`, `eneo-redis` och `eneo-db-init`. Bygger på Eneos egen Compose-fil, utan Traefik |
 | `eneo-test.env.example` | Mall för Eneo-testinstansens miljövariabler |
 
@@ -52,9 +52,9 @@ adresser och kommandon.
 4. Driftsätt. `eneo-db-init` kör migreringarna och skapar den första användaren med rollen Owner.
 5. Logga in på `https://eneo-test.example.se` med `ENEO_ADMIN_EMAIL` och `ENEO_ADMIN_PASSWORD`, och byt lösenord.
 6. Lägg till en modelleverantör och en språkmodell under Admin. Slå på verktygsanrop (`supports_tool_calling`) för
-   modellen, annars använder assistenterna aldrig Anbudsklars MCP-verktyg.
+   modellen, annars använder assistenterna aldrig Anbudshjälpens MCP-verktyg.
 
-## 2. Anbudsklar
+## 2. Anbudshjälpen
 
 1. Skapa en ny Compose-tjänst med Git som källa och Compose-sökvägen `deploy/dokploy/docker-compose.anbudsklar.yml`.
 2. Klistra in `anbudsklar.env.example` under Environment. Sätt `PUBLIC_URL=https://anbudsklar.example.se`, fyll i
@@ -67,9 +67,9 @@ adresser och kommandon.
 5. Öppna en terminal i containern för `anbudsklar-app` och läs in demodata: `anbudsklar seed`.
 6. Kontrollera: `curl -fsS https://anbudsklar.example.se/health` ska svara `{"ok": true}`.
 
-## 3. Koppla ihop Anbudsklar och Eneo
+## 3. Koppla ihop Anbudshjälpen och Eneo
 
-1. Sätt `ENEO_BACKEND_URL=https://eneo-test.example.se` i Anbudsklars Environment och driftsätt igen.
+1. Sätt `ENEO_BACKEND_URL=https://eneo-test.example.se` i Anbudshjälpens Environment och driftsätt igen.
 2. Öppna en bash-terminal i containern för `anbudsklar-app` och kör:
 
    ```bash
@@ -81,7 +81,7 @@ adresser och kommandon.
 
    Kommandot registrerar MCP-servern, skapar spacet, assistenterna och környckeln och sparar assistenternas id i
    volymen `anbudsklar_var`. Se [Eneo-integration](../../docs/eneo-integration.md#sätta-upp-anbudsklar-eneo-provision).
-   Ska Eneo nå Anbudsklar på Dokploys interna nät i stället för den publika adressen: sätt
+   Ska Eneo nå Anbudshjälpen på Dokploys interna nät i stället för den publika adressen: sätt
    `MCP_ALLOWED_HOSTS=["anbudsklar-app"]` i Environment, driftsätt igen och använd
    `--mcp-url http://anbudsklar-app:3001/mcp`.
 3. Sätt `ENEO_API_KEY` till nyckeln från steg 2 och `AI_ENGINE=eneo` i Environment, och driftsätt igen.
@@ -89,8 +89,8 @@ adresser och kommandon.
 
 ## Uppdatera
 
-- **Anbudsklar:** driftsätt igen i Dokploy. Migreringarna körs automatiskt. Har en instruktion, ett kontrakt eller ett
-  MCP-verktyg ändrats: öppna en bash-terminal i containern för `anbudsklar-app`, exportera `ENEO_PROVISION_EMAIL` och
+- **Anbudshjälpen:** driftsätt igen i Dokploy. Migreringarna körs automatiskt. Har en instruktion, ett kontrakt eller
+  ett MCP-verktyg ändrats: öppna en bash-terminal i containern för `anbudsklar-app`, exportera `ENEO_PROVISION_EMAIL` och
   `ENEO_PROVISION_PASSWORD` som i avsnitt 3 och kör
   `anbudsklar eneo provision --mcp-url https://anbudsklar.example.se/mcp --env-file /tmp/eneo.env`. Det uppdaterar
   assistenterna och synkar och godkänner verktygen. En nyckel i Environment som fungerar behålls, och då skrivs ingen
@@ -128,4 +128,4 @@ adresser och kommandon.
 
 - Eneos frontend kör 2.2.0-rc.4 och backend 2.2.0-rc.6, eftersom frontendimagen för rc.5 och rc.6 saknades på ghcr.io
   den 2026-10-05. Byt båda till 2.2.0 när den är släppt.
-- Det finns ingen publicerad image för Anbudsklar. Dokploy bygger den från källkoden vid varje driftsättning.
+- Det finns ingen publicerad image för Anbudshjälpen. Dokploy bygger den från källkoden vid varje driftsättning.

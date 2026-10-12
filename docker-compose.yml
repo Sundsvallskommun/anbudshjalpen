@@ -1,4 +1,4 @@
-# Local development stack for the Anbudsklar PoC.
+# Local development stack for the Anbudshjälpen PoC.
 #
 #   docker compose up -d db mailpit        # services the backend and tests need
 #   docker compose up --build              # everything, app on http://127.0.0.1:3501

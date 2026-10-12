@@ -101,7 +101,7 @@ async def spa_client(
 ) -> AsyncIterator[httpx.AsyncClient]:
     dist = tmp_path / "dist"
     (dist / "assets").mkdir(parents=True)
-    (dist / "index.html").write_text("<!doctype html><title>Anbudsklar</title>")
+    (dist / "index.html").write_text("<!doctype html><title>Anbudshjälpen</title>")
     (dist / "assets" / "app.js").write_text("console.log('ok')")
     (dist / "favicon.svg").write_text("<svg/>")
     (tmp_path / "secret.txt").write_text("hemlig")
@@ -124,7 +124,7 @@ async def test_spa_fallback_serves_pages_and_files_but_never_html_for_missing_fi
     for path in ("/", "/upphandlingar/abc"):
         response = await spa_client.get(path)
         assert response.status_code == 200
-        assert "<title>Anbudsklar</title>" in response.text
+        assert "<title>Anbudshjälpen</title>" in response.text
         assert response.headers["cache-control"] == "no-cache"
         assert response.headers["content-security-policy"] == SECURITY_HEADERS["Content-Security-Policy"]
     assert (await spa_client.get("/assets/app.js")).status_code == 200

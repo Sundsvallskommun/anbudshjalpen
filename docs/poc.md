@@ -20,7 +20,7 @@ mäta, inte bara se bra ut i en demo.
 Resan följer underlagets påhittade målerifirma i Matfors, som har fem anställda och aldrig har lämnat anbud. I demon
 loggar man in som Anna Berg på firman ([beslut 0007](decisions/0007-poc-login-persona-picker.md)).
 
-1. **Profil:** firman beskriver sig i klartext, och Anbudsklar föreslår CPV-koder med förklaring.
+1. **Profil:** firman beskriver sig i klartext, och Anbudshjälpen föreslår CPV-koder med förklaring.
 2. **Start:** träffarna visas som kort, markerade Verkar passa eller Passar delvis, med högst tre skäl och källan
    ("s. 5"). Övriga träffar ligger i en stängd lista, "Verkar inte passa (n)", under korten. Överst står nästa frist
    med Påminn mig, och under träffarna kommande upphandlingar utifrån avtalskatalogen. Gamla adressen /bevakning leder
@@ -35,7 +35,7 @@ loggar man in som Anna Berg på firman ([beslut 0007](decisions/0007-poc-login-p
    Knappen visas bara för en öppen upphandling och aldrig för ett datum som har passerat, och för frågestoppet bara när
    checklistan är publicerad.
 5. **Fråga AI:** en panel som öppnas på varje sida ([beslut 0014](decisions/0014-fraga-ai-panel.md)), med svar med
-   citat och slutsatsen först. Om underlaget inte ger svar föreslår Anbudsklar att firman ställer frågan formellt i
+   citat och slutsatsen först. Om underlaget inte ger svar föreslår Anbudshjälpen att firman ställer frågan formellt i
    e-Avrop före frågestoppet och skapar en påminnelse, när den publicerade checklistan anger ett frågestopp som inte
    har passerat. Samtalet följer med mellan sidorna och går att spara som PDF. I steg 1 står de svar inköp redan har
    publicerat i e-Avrop på andra leverantörers frågor, samma för alla ([beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md)).
@@ -43,7 +43,7 @@ loggar man in som Anna Berg på firman ([beslut 0007](decisions/0007-poc-login-p
    åtgärdas, och sedan kraven grupperade som Måste åtgärdas, Kontrollera själv och Ser bra ut. Inget sparas.
 7. **Lämna in:** sker i e-Avrop. Steg 4 är en sista kontroll att bocka av, där det som granskningen bedömde som "Ser
    bra ut" redan är förbockat, och en länk till e-Avrop.
-8. **Tilldelning:** Anbudsklar förklarar beslutet och vad avtalsspärren innebär.
+8. **Tilldelning:** Anbudshjälpen förklarar beslutet och vad avtalsspärren innebär.
 
 Regelhjälpen svarar på allmänna frågor om upphandling med hänvisning till LOU och vägledningar. Varje paragraf som
 svaret bygger på visas med lagens egna ord.
@@ -61,7 +61,7 @@ sidan Drift i kontomenyn.
    citat och en vy i React med Astryx.
 3. **Resten av resan:** matchning och Start, frågor, granskning, inköparens vy med godkännande, Regelhjälpen och
    kommande upphandlingar.
-4. **Testmiljö:** Anbudsklar och en Eneo-testinstans i Dokploy, så att verksamheten och panelen kan prova.
+4. **Testmiljö:** Anbudshjälpen och en Eneo-testinstans i Dokploy, så att verksamheten och panelen kan prova.
 
 ## Uppsättning
 

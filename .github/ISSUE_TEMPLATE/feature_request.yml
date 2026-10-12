@@ -8,7 +8,7 @@ body:
       value: |
         Tack för ditt förslag. Beskriv vad du vill kunna göra och varför det skulle hjälpa.
 
-        Anbudsklar bygger bara på offentliga källor och företagets egna data, sparar aldrig anbudsutkast och ger aldrig en leverantör råd som går utöver underlaget.
+        Anbudshjälpen bygger bara på offentliga källor och företagets egna data, sparar aldrig anbudsutkast och ger aldrig en leverantör råd som går utöver underlaget.
         Reglerna står i [Bidra](https://github.com/Sundsvallskommun/anbudsklar/blob/main/docs/CONTRIBUTING.md).
 
   - type: textarea

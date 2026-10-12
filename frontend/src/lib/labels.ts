@@ -211,7 +211,7 @@ export type ProvenanceBasis = "document" | "law";
 const ENGINE_DESCRIPTIONS: Record<ProvenanceBasis, Record<string, string>> = {
   document: {
     heuristic:
-      "Det här togs fram regelbaserat: Anbudsklar letar efter ord och mönster i underlaget med fasta regler. Ingen AI-modell tolkar texten.",
+      "Det här togs fram regelbaserat: Anbudshjälpen letar efter ord och mönster i underlaget med fasta regler. Ingen AI-modell tolkar texten.",
     eneo: "Det här togs fram med AI via Eneo, Sundsvalls kommuns AI-plattform. Underlaget skickas som text till Eneo och sparas inte där efter svaret.",
     openai: "Det här togs fram med en AI-modell som läser underlaget som text.",
   },

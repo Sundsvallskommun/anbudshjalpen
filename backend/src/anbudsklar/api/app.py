@@ -92,11 +92,11 @@ def create_app(
             )
             await stack.enter_async_context(mcp.lifespan())  # mounted lifespans never run on their own
             app.state.job_context = context
-            logger.info("Anbudsklar started with the %s engine", context.engine.name)
+            logger.info("Anbudshjälpen started with the %s engine", context.engine.name)
             yield
 
     app = FastAPI(
-        title="Anbudsklar",
+        title="Anbudshjälpen",
         version=__version__,
         lifespan=lifespan,
         docs_url=None,  # Swagger UI loads scripts from a CDN, which the CSP forbids

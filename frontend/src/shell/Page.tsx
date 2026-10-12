@@ -9,11 +9,11 @@ import { useLocation } from "react-router";
 import { useIsPhone } from "../lib/usePhone";
 import styles from "./Page.module.css";
 
-const APP_NAME = "Anbudsklar";
+const APP_NAME = "Anbudshjälpen";
 /** The page's side gutter (16 px, --spacing-4): Layout pads inside its content width, so the width includes it. */
 const GUTTERS = 2 * 16;
 
-/** Sets the window title: "<page> – Anbudsklar". */
+/** Sets the window title: "<page> – Anbudshjälpen". */
 export function usePageTitle(title: string) {
   useEffect(() => {
     document.title = title ? `${title} – ${APP_NAME}` : APP_NAME;
