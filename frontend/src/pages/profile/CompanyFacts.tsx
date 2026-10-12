@@ -5,12 +5,15 @@ import { Heading } from "@astryxdesign/core/Heading";
 import { NumberInput } from "@astryxdesign/core/NumberInput";
 import { TextArea } from "@astryxdesign/core/TextArea";
 import { Tokenizer } from "@astryxdesign/core/Tokenizer";
+import { TypeaheadItem } from "@astryxdesign/core/Typeahead";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useId, useMemo } from "react";
 import { formatNumber } from "../../lib/format";
 import { useIsPhone } from "../../lib/usePhone";
 import {
   chipValues,
+  coverOf,
+  KNOWN_CERTIFICATIONS,
   LIMITS,
   NEARBY_MUNICIPALITIES,
   wordChips,
@@ -20,7 +23,7 @@ import {
 } from "./profileDraft";
 
 const municipalitySource = wordSource(NEARBY_MUNICIPALITIES);
-const certificationSource = wordSource([]);
+const certificationSource = wordSource(Object.keys(KNOWN_CERTIFICATIONS), KNOWN_CERTIFICATIONS);
 
 /** A cleared number field means "not given". */
 function numberOrNull(value: number | null): number | null {
@@ -87,9 +90,11 @@ export function CompanyFacts({ draft, errors, onChange }: CompanyFactsProps) {
           />
           <Tokenizer
             label="Certifieringar"
-            description="Till exempel ISO 9001 eller ISO 14001. Skriv namnet och välj Lägg till i listan."
-            placeholder="Skriv en certifiering"
+            description="Välj i listan eller skriv en egen. Sök på namnet eller på vad den gäller, till exempel miljö."
+            placeholder="Till exempel ISO 9001"
             searchSource={certificationSource}
+            renderItem={(item) => <TypeaheadItem item={item} description={coverOf(KNOWN_CERTIFICATIONS, item.id)} />}
+            hasEntriesOnFocus
             value={certifications}
             onChange={(items) => onChange({ certifications: chipValues(items) })}
             maxEntries={LIMITS.certifications}

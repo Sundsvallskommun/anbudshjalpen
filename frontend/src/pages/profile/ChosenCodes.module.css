@@ -1,0 +1,6 @@
+/* The chosen codes' table sits mid-card, between the search field and "Föreslå koder". Astryx lets a table that is
+   its container's last child bleed down to the card's lower edge, which pulled "Föreslå koder" up over the last row;
+   the table keeps its edge-to-edge dividers but stops at its own bottom. */
+.codes {
+  --container-padding-block-end: 0px;
+}

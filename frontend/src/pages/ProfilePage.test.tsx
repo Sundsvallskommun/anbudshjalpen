@@ -57,12 +57,13 @@ describe("ProfilePage", () => {
     expect(screen.getByRole("link", { name: "Se träffarna" })).toHaveAttribute("href", "/start");
     const activity = screen.getByRole("region", { name: "Vad ni gör (CPV-koder)" });
     expect(within(activity).getByRole("textbox", { name: "Beskriv företaget" })).toHaveValue(profileView.description);
-    // The chosen codes as rows under their division, named first with the code after it; "Ta bort" shows one
-    // word but is named by the code it takes away.
+    // The chosen codes as a table grouped by division, the name and the code in columns of their own; "Ta bort"
+    // shows one word but is named by the code it takes away.
     const codes = within(activity).getByRole("group", { name: "Era koder · 1" });
-    expect(within(codes).getByRole("heading", { level: 3, name: "Anläggningsarbete" })).toBeInTheDocument();
-    expect(within(codes).getByText("Målning")).toBeInTheDocument();
-    expect(within(codes).getByText("· 45442100")).toBeInTheDocument();
+    expect(within(codes).getByRole("columnheader", { name: "CPV-kod" })).toBeInTheDocument();
+    expect(within(codes).getByText("Anläggningsarbete · 1")).toBeInTheDocument();
+    expect(within(codes).getByRole("cell", { name: "Målning" })).toBeInTheDocument();
+    expect(within(codes).getByRole("cell", { name: "45442100" })).toBeInTheDocument();
     expect(within(codes).getByRole("button", { name: "Ta bort Målning · 45442100" })).toHaveTextContent(/^Ta bort$/);
     expect(within(screen.getByRole("region", { name: "Om företaget" })).getByText("Sundsvall")).toBeInTheDocument();
     expect(screen.queryByText("Du har ändringar som inte är sparade.")).not.toBeInTheDocument();
