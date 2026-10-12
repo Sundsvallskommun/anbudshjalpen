@@ -24,15 +24,17 @@ from anbudsklar.api.schemas import (
     NoticeStatus,
     NoticeSummary,
     PageView,
+    PublishedAnswerView,
 )
 from anbudsklar.contracts import MatchAssessment
 from anbudsklar.documents.extract import DocumentError
 from anbudsklar.documents.store import store_document
-from anbudsklar.models import Document, DocumentPage, MatchRecord, Notice
+from anbudsklar.models import Document, DocumentPage, MatchRecord, Notice, PublishedAnswer
 from anbudsklar.search.queries import (
     count_notices_by_buyer,
     count_notices_by_status,
     cpv_labels,
+    list_published_answers,
     notice_order,
     search_notices,
 )
@@ -249,6 +251,7 @@ async def notice_detail(session: AsyncSession, notice_id: uuid.UUID, viewer: Vie
     )
     checklist = await visible_checklist(session, notice.id, viewer)
     match = await _match_record(session, notice.id, viewer)
+    answers = await list_published_answers(session, notice.id)
     return NoticeDetail(
         **summary.model_dump(),
         description=notice.description,
@@ -261,6 +264,17 @@ async def notice_detail(session: AsyncSession, notice_id: uuid.UUID, viewer: Vie
         documents=[document_info(document) for document in documents],
         checklist=to_checklist_view(checklist) if checklist else None,
         match=match_view(match, summary) if match else None,
+        published_answers=[published_answer_view(answer) for answer in answers],
+    )
+
+
+def published_answer_view(answer: PublishedAnswer) -> PublishedAnswerView:
+    return PublishedAnswerView(
+        source=answer.source,
+        question=answer.question,
+        answer=answer.answer,
+        asked_at=answer.asked_at,
+        answered_at=answer.answered_at,
     )
 
 

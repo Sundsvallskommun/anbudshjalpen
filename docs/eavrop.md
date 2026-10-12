@@ -1,15 +1,17 @@
 # e-Avrops API
 
-Syfte: Beskriva hur Anbudsklar läser e-Avrops Projekt-API, vilka regler som skyddar sekretessbelagda uppgifter och
-vilka uppgifter som saknas i API:t men hade behövts.
+Syfte: Beskriva hur Anbudsklar läser e-Avrops Projekt-API, vilka regler som skyddar sekretessbelagda uppgifter, hur
+frågor och svar läses ur frågeloggen och vilka uppgifter som saknas i API:t men hade behövts.
 
 Läs detta när: Du ändrar insamlingen från e-Avrop, felsöker en upphandling som saknas eller har fel underlag, eller
 förbereder ett samtal med Antirio eller inköp.
 
-Hör ihop med: [Beslut 0009](decisions/0009-eavrop-projekt-api.md), [Datakällor](data-sources.md),
-[Drift](operations.md), [Öppna frågor](open-questions.md)
+Hör ihop med: [Beslut 0009](decisions/0009-eavrop-projekt-api.md),
+[Beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md), [Datakällor](data-sources.md), [Drift](operations.md),
+[Öppna frågor](open-questions.md)
 
-> Kontrollerat mot API:t 2026-10-08. Koden ligger i `backend/src/anbudsklar/ingest/eavrop.py`.
+> Kontrollerat mot API:t 2026-10-08 och, för frågeloggen, 2026-10-12. Koden ligger i
+> `backend/src/anbudsklar/ingest/eavrop.py` och `backend/src/anbudsklar/ingest/eavrop_qa.py`.
 
 ## Vad vi läser
 
@@ -28,6 +30,8 @@ Jobbet `ingest_eavrop` körs varje dag 06:30:
    vad insamlaren läser hämtar `anbudsklar ingest eavrop --full` alla projekt igen, vilket tar ungefär en kvart.
 3. Tar med projektet bara om det är publicerat, och sparar bara fälten i vitlistan (se nedan).
 4. Hämtar underlaget för öppna upphandlingar och lägger det på annonsen.
+5. Läser frågeloggen för varje öppen upphandling, även de som inte ändrats, och speglar inköps publicerade svar
+   (se [Frågor och svar](#frågor-och-svar)).
 
 Provkörningen 2026-10-08 gav 458 projekt. 115 av dem var publicerade: 77 blev egna annonser och 38 fanns redan som
 TED-annonser och fick underlaget där. 12 var öppna.
@@ -42,6 +46,7 @@ gäller en vitlista ([beslut 0009](decisions/0009-eavrop-projekt-api.md)):
 | Bara publicerade upphandlingar | Händelsen `Announced` och en annons med `AnnouncementDate`. En inbjudan till utvalda leverantörer (`InvitationDate`) räknas inte |
 | Bara fälten i vitlistan | Titel, omfattning, diarienummer, CPV-koder, förfarande, datum, händelser och annonsens filnamn. Svaret sparas aldrig i sin helhet |
 | Bara annonsens dokument | Från `RequestForTender` eller `RequestForApplications`, och bara från adressen `/v1/announcement-documents/`. Projektets `Documents` läses aldrig |
+| Bara frågeloggen bland loggfilerna | Av `AnnouncementLogFiles` hämtas `LoggfilOrginalFragor.txt`, efter exakt filnamn och bara från adressen `/v1/announcements/{id}/log-documents` ([beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md)). E-postloggarna bredvid den, som namnger frågeställarna, hämtas aldrig |
 | Inget uppskattat värde | `Value` kan vara en intern uppskattning och visas inte |
 | Nyckeln stannar i worker | Bara `ingest_eavrop` använder `EAVROP_API_TOKEN`. Appen och MCP-servern läser bara det som sparats |
 
@@ -86,6 +91,43 @@ En PDF går före en Word-fil med samma namn. Har annonsen bara en läsbar fil b
 inget automatiskt. De andra filerna sparas som bilagor: de går att söka i och läsa via MCP, och inköp kan be om en
 tolkning av dem under Inköp › Att granska.
 
+## Frågor och svar
+
+Leverantörernas frågor och inköps svar visas på annonsens publika sida i e-Avrop, utan inloggning och utan
+frågeställarens namn. API:t har inget fält för dem, men när den första frågan kommer skriver e-Avrop fyra filer i
+projektets `AnnouncementLogFiles`:
+
+| Fil | Innehåll | Läses |
+|---|---|---|
+| `LoggfilOrginalFragor.txt` | Frågeloggen: varje fråga som den ställdes och som den publicerades, inköps svar och tidpunkter. Inga namn. Även meddelanden till de registrerade intressenterna | Ja |
+| `frågor.txt`, `svar.txt`, `meddelanden.txt` | E-postloggar: frågeställarens namn, företag och e-post, listan över alla registrerade intressenter och handläggarens adress | Aldrig |
+| `Loggfil<datum>.txt` | En ögonblicksbild av annonsen vid varje publicering, med handläggarens namn och e-post och det interna värdet | Aldrig |
+
+Loggen är Windows-1252 och består av block med en rubrikrad var: `Orginal Fraga <tid>:`, `Besvarad Fraga <tid>:`
+(utan tid tills frågan är besvarad), `Svar :` och `Meddelande <tid>:`. Jämfört med annonssidan 2026-10-12 på två
+upphandlingar: de besvarade posterna är exakt det sidan visar, och obesvarade frågor visas inte där.
+
+Så används den:
+
+- **Bara besvarade frågor sparas**, i tabellen `published_answers`, med frågan som den publicerades, svaret och
+  tidpunkterna. Obesvarade frågor och meddelanden sparas inte. Nyckeln är frågans ursprungliga lydelse och tid, så
+  att ett redigerat svar uppdateras i stället för att sparas två gånger.
+- **Loggen är sanningen.** Ett svar som inte längre står i loggen tas bort. En logg som inte går att hämta eller läsa
+  ändrar ingenting och räknas som `answers_failed` i jobbets statistik.
+- **Öppna upphandlingar läses varje körning.** Ett svar ändrar inte projektets `UpdatedDate`, så ändringskontrollen
+  i steg 2 ovan skulle missa det. En TED-annons med underlag från e-Avrop läses med
+  `/v1/procurements/by-procurement-id/{id}`.
+- **Svaren visas för alla:** i steg 2 Fråga, i `GET /api/notices/{id}` (`published_answers`) och med MCP-verktyget
+  `hamta_fragor_svar`. `hamta_upphandling` säger hur många svar som finns.
+
+Det här är inte dokumenterat av e-Avrop, och parsern är därför försiktig: en post som inte går att läsa hoppas över.
+Det som inte kunnat verifieras är markerat `UNCERTAIN` i `eavrop_qa.py` och ska bekräftas med Antirio:
+
+- om inköp kan svara enbart till frågeställaren, och om ett sådant svar i så fall hamnar i loggen
+- om annonssidan visar meddelandena ("Meddelande") till de registrerade intressenterna
+- om `by-procurement-id` fungerar för enskilda annonser (`SimpleProcurementProject`)
+- om formatet och teckenkodningen är stabila
+
 ## Det som saknas
 
 Det här ger API:t inte, eller inte tillförlitligt, men tjänsten hade behövt det. Listan är underlag för samtal med
@@ -95,10 +137,10 @@ Antirio och inköp.
 |---|---|---|
 | **En nyckel som bara läser publicerat** | Nyckeln läser sekretessbelagda uppgifter, och bara vår vitlista skyddar dem | En nyckel eller ett omfång som bara ger annonserade upphandlingar och annonsens dokument |
 | **Tillförlitlig sekretessmarkering** | `IsClassified` saknades på utvärderingsprotokoll och kreditupplysningar | Att markeringen sätts, eller att arbetsfiler hålls helt utanför API:t |
-| **Frågor och svar** | Bara flaggan `IsQuestionsOnline`. Svaren kan inte visas eller sökas | Publicerade frågor och svar per upphandling, med datum |
+| **Frågor och svar som fält** | Bara flaggan `IsQuestionsOnline`. Svaren läses ur en odokumenterad loggfil, se [Frågor och svar](#frågor-och-svar) | Publicerade frågor och svar per upphandling, med datum, som en del av API:t |
 | **Vad som har ändrats** | Bara `UpdatedDate` på annonsen, och på enstaka filer. Rättelser syns inte som rättelser | En ändringslogg eller versioner av annonsen och dokumenten |
 | **Besked om ändringar** | Listan filtreras bara på när projektet skapades, så alla projekt listas varje gång | Filtrering på ändringsdatum, eller webhooks |
-| **Köpare per upphandling** | Alla e-Avrop-annonser får `ORGANIZATION_NAME`, även när kommunen köper åt ett bolag | Köparens namn och organisationsnummer |
+| **Köpare per upphandling** | Alla e-Avrop-annonser får `ORGANIZATION_NAME`, även när kommunen köper åt ett bolag. Annonsens `Loggfil<datum>.txt` anger `Avtalstecknare`, men filen innehåller också handläggarens e-post och det interna värdet, så den läses inte | Köparens namn och organisationsnummer |
 | **Delområden** | Bara flaggan `HasLots` | Delområdenas namn, CPV-koder och omfattning |
 | **Planerade upphandlingar** | Listan "Planerade" på e-Avrops webbplats finns inte i API:t | Planerade upphandlingar med kvartal och CPV-koder |
 | **Publicerat värde** | `Value` används inte, eftersom det kan vara internt | En markering av om värdet är publicerat |

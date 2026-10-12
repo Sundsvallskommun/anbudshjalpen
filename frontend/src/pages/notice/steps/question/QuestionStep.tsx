@@ -8,6 +8,7 @@ import type { IsoDateTime, NoticeDetail } from "../../../../api/types";
 import { calendarDateOf, formatLongDate, isPassed } from "../../../../lib/format";
 import { StepLayout } from "../StepLayout";
 import { Conversation } from "./Conversation";
+import { PublishedAnswers } from "./PublishedAnswers";
 import { QuestionRail } from "./QuestionRail";
 
 /** The id of the step's heading, so a notice without steps can move the focus to it. */
@@ -49,6 +50,7 @@ export function QuestionStep({ notice, nextStep }: { notice: NoticeDetail; nextS
         </Heading>
         <Text color="secondary">{questionIntro(notice.question_deadline)}</Text>
       </VStack>
+      <PublishedAnswers notice={notice} />
       <Conversation notice={notice} />
       {nextStep}
     </StepLayout>

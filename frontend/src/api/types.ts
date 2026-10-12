@@ -350,6 +350,19 @@ export interface MatchView {
   created_at: IsoDateTime;
 }
 
+/**
+ * A question a supplier asked in e-Avrop and the answer the buyer published there (decision 0013). Public for every
+ * supplier, and never says who asked. `asked_at` is null when the source's log gave no time for the question.
+ */
+export interface PublishedAnswerView {
+  /** "eavrop" */
+  source: string;
+  question: string;
+  answer: string;
+  asked_at: IsoDateTime | null;
+  answered_at: IsoDateTime;
+}
+
 export interface NoticeDetail extends NoticeSummary {
   description: string | null;
   procedure: string | null;
@@ -362,6 +375,8 @@ export interface NoticeDetail extends NoticeSummary {
   documents: DocumentInfo[];
   checklist: ChecklistView | null;
   match: MatchView | null;
+  /** The buyer's published answers to suppliers' questions, oldest answer first, as e-Avrop numbers them. */
+  published_answers: PublishedAnswerView[];
 }
 
 export interface PageView {

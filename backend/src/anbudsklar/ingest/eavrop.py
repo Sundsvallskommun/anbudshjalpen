@@ -14,7 +14,10 @@ module therefore reads by allowlist:
   project's documents cannot be trusted: evaluation protocols and credit checks of tenderers
   carry False;
 - only documents attached to the public request, and only from the announcement-document
-  address. A document address outside it is skipped.
+  address. A document address outside it is skipped;
+- of the announcement's log files only the question log, by exact filename, for the
+  questions suppliers asked and the answers the buyer published (decision 0013, see
+  `anbudsklar.ingest.eavrop_qa`). The log files next to it hold who asked and are never read.
 
 A procurement that e-Avrop also sent to TED is the same procurement: its documents are added
 to the TED notice instead of creating a second notice. The other way round, the TED job does
@@ -32,13 +35,20 @@ from pathlib import PurePosixPath
 from typing import Any, Literal
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.config import Settings
 from anbudsklar.documents.extract import DocumentError
 from anbudsklar.documents.store import safe_filename, store_document
 from anbudsklar.ingest.common import IngestError, IngestStats
+from anbudsklar.ingest.eavrop_qa import (
+    MAX_LOG_BYTES,
+    decode_log,
+    parse_question_log,
+    question_log_url,
+    sync_published_answers,
+)
 from anbudsklar.ingest.http import ensure_ok, send
 from anbudsklar.ingest.notices import (
     STOCKHOLM,
@@ -350,8 +360,8 @@ class _Api:
             raise IngestError("e-Avrop nekade åtkomst. Kontrollera EAVROP_API_TOKEN och EAVROP_CLIENT_ID.")
         return response
 
-    async def download(self, url: str) -> tuple[bytes, str]:
-        """The file's bytes and content type, refusing files larger than `MAX_DOCUMENT_BYTES`."""
+    async def download(self, url: str, *, max_bytes: int = MAX_DOCUMENT_BYTES) -> tuple[bytes, str]:
+        """The file's bytes and content type, refusing files larger than `max_bytes`."""
 
         await self._pace()
         request = self.client.build_request("GET", url, headers=self._headers())
@@ -361,8 +371,8 @@ class _Api:
             chunks, size = [], 0
             async for chunk in response.aiter_bytes():
                 size += len(chunk)
-                if size > MAX_DOCUMENT_BYTES:
-                    raise DocumentError("Filen är större än 50 MB.")
+                if size > max_bytes:
+                    raise DocumentError(f"Filen är större än {max_bytes // (1024 * 1024)} MB.")
                 chunks.append(chunk)
             return b"".join(chunks), response.headers.get("Content-Type", "application/octet-stream")
         finally:
@@ -396,6 +406,11 @@ class EavropStats(IngestStats):
     linked: int = 0  # procurements stored as a TED notice, which got the documents
     documents_stored: int = 0
     documents_skipped: int = 0  # formats we cannot read, too large or unreadable
+    # Published questions and answers from the question log (decision 0013).
+    answers_inserted: int = 0
+    answers_updated: int = 0
+    answers_deleted: int = 0
+    answers_failed: int = 0  # question logs we could not fetch or read; nothing changed for them
 
     def as_dict(self) -> dict[str, int]:
         extra = {
@@ -403,6 +418,10 @@ class EavropStats(IngestStats):
             "linked": self.linked,
             "documents_stored": self.documents_stored,
             "documents_skipped": self.documents_skipped,
+            "answers_inserted": self.answers_inserted,
+            "answers_updated": self.answers_updated,
+            "answers_deleted": self.answers_deleted,
+            "answers_failed": self.answers_failed,
         }
         return super().as_dict() | {key: value for key, value in extra.items() if value}
 
@@ -473,6 +492,104 @@ async def _sync_documents(
         stats.documents_stored += 1
 
 
+async def _sync_answers(
+    session: AsyncSession, api: _Api, notice: Notice, detail: Mapping[str, Any], stats: EavropStats
+) -> None:
+    """Mirror the published questions and answers of an announced project onto its notice.
+
+    The log is small and has no change date of its own, so it is fetched whenever the
+    project is read; the sync then changes only what differs. A log that cannot be fetched
+    or read leaves the stored answers as they are and is counted, never deleted.
+    """
+
+    url = question_log_url(detail, api.settings.eavrop_api_url)
+    if url is None:
+        return  # nobody has asked a question yet, which is the common case
+    try:
+        data, _ = await api.download(url, max_bytes=MAX_LOG_BYTES)
+        entries = parse_question_log(decode_log(data))
+    except (DocumentError, IngestError) as error:
+        log.warning("e-Avrop question log for %s skipped: %s", notice.id, error)
+        stats.answers_failed += 1
+        return
+    result = await sync_published_answers(session, notice.id, entries)
+    stats.answers_inserted += result.inserted
+    stats.answers_updated += result.updated
+    stats.answers_deleted += result.deleted
+
+
+async def _open_eavrop_notices(session: AsyncSession, settings: Settings) -> list[tuple[Notice, str]]:
+    """Open notices that live in the municipality's e-Avrop, with their procurement id.
+
+    Our own notices, and TED notices whose document link is the municipality's page in
+    e-Avrop (`EAVROP_BASE_URL`). Other buyers announce in e-Avrop too, and TED links to
+    their pages the same way, but the key reads only the municipality's projects: asking
+    for theirs is refused, so they are not asked for.
+    """
+
+    own_pages = settings.eavrop_base_url.rstrip("/") + "/"
+    rows = await session.scalars(
+        select(Notice).where(
+            Notice.status == "open",
+            or_(
+                Notice.source == SOURCE, (Notice.source == "ted") & Notice.documents_url.like(f"{own_pages}%")
+            ),
+        )
+    )
+    found = []
+    for notice in rows:
+        procurement_id = (
+            notice.external_id if notice.source == SOURCE else eavrop_procurement_id(notice.documents_url)
+        )
+        if procurement_id is not None:
+            found.append((notice, procurement_id))
+    return found
+
+
+async def _refresh_open_answers(
+    session: AsyncSession, api: _Api, settings: Settings, synced: set[str], stats: EavropStats
+) -> None:
+    """Read the question log of every open procurement the main loop did not fetch.
+
+    Answering a question does not change the project's `UpdatedDate` in the list (seen on
+    2026-10-12: answers two days after the list's date), so the change check that keeps the
+    daily run short would miss every new answer. Open procurements are few, and a detail
+    call each is cheap next to the documents.
+
+    UNCERTAIN: a TED twin is fetched by procurement id on the documented address
+    `/v1/procurements/by-procurement-id/{id}`, which the documentation describes for projects
+    only, not for "enskilda annonser" (`SimpleProcurementProject`). A 404 is skipped quietly.
+    """
+
+    for notice, procurement_id in await _open_eavrop_notices(session, settings):
+        if procurement_id in synced:
+            continue
+        list_url = notice.raw.get("list_url") if notice.source == SOURCE else None
+        url = (
+            list_url
+            if isinstance(list_url, str) and _is_detail_url(list_url, settings.eavrop_api_url)
+            else f"{api.base}/v1/procurements/by-procurement-id/{procurement_id}"
+        )
+        try:
+            response = await api.get(url)
+            if response.status_code == 404:
+                log.info("e-Avrop: no project found for open notice %s (%s)", notice.id, procurement_id)
+                continue
+            detail = ensure_ok(response, "e-Avrop").json()
+        except IngestError as error:
+            # The list call has already shown that the token works, so a refusal here is about
+            # this one project (seen 2026-10-12 for a procurement outside the client). One
+            # notice without answers must not fail the whole run.
+            log.warning("e-Avrop: question log of open notice %s not read: %s", notice.id, error)
+            stats.answers_failed += 1
+            continue
+        # Only an announced project is public; anything else is left alone, answers included.
+        if not isinstance(detail, Mapping) or public_procurement(detail, settings.eavrop_api_url) is None:
+            continue
+        synced.add(procurement_id)
+        await _sync_answers(session, api, notice, detail, stats)
+
+
 async def ingest_eavrop(
     session: AsyncSession,
     client: httpx.AsyncClient,
@@ -488,6 +605,8 @@ async def ingest_eavrop(
     changed since then is not fetched again: announcing it, correcting its documents and
     awarding it all change its `UpdatedDate`. About two thirds of the projects are never
     public, and fetching each one takes a few seconds, so this keeps a daily run short.
+    Answering a question does not change it, so the open procurements' question logs are
+    read on every run regardless (`_refresh_open_answers`).
 
     Without `EAVROP_API_TOKEN` and `EAVROP_CLIENT_ID` the job does nothing: e-Avrop is then
     simply not a source, as in every environment without the municipality's token.
@@ -508,6 +627,8 @@ async def ingest_eavrop(
     by_procurement = {notice.external_id: notice for notice in ours}
     # The list gives the project's address, whose id is not the procurement id.
     by_list_url = {notice.raw.get("list_url"): notice for notice in ours if notice.raw.get("list_url")}
+    # Procurements whose question log this run has read, so the pass below skips them.
+    synced_answers: set[str] = set()
 
     for item in items:
         url = str(item.get("Url") or "")
@@ -538,6 +659,9 @@ async def ingest_eavrop(
         )
         if _status(procurement, now) == "open":
             await _sync_documents(session, api, notice, procurement, stats)
+            await _sync_answers(session, api, notice, detail, stats)
+            synced_answers.add(procurement.procurement_id)
+    await _refresh_open_answers(session, api, settings, synced_answers, stats)
     await session.flush()
     log.info("e-Avrop ingestion: %s", stats.as_dict())
     return stats.as_dict()

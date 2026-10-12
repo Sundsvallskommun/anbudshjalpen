@@ -36,7 +36,8 @@ loggar man in som Anna Berg på firman ([beslut 0007](decisions/0007-poc-login-p
    checklistan är publicerad.
 5. **Fråga:** svar med citat, med slutsatsen först. Om underlaget inte ger svar föreslår Anbudsklar att firman ställer
    frågan formellt i e-Avrop före frågestoppet och skapar en påminnelse, när den publicerade checklistan anger ett
-   frågestopp som inte har passerat.
+   frågestopp som inte har passerat. Före den egna tråden står de svar inköp redan har publicerat i e-Avrop på
+   andra leverantörers frågor, samma för alla ([beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md)).
 6. **Granska:** firman laddar upp ett utkast och får först ett besked, till exempel hur många saker som behöver
    åtgärdas, och sedan kraven grupperade som Måste åtgärdas, Kontrollera själv och Ser bra ut. Inget sparas.
 7. **Lämna in:** sker i e-Avrop. Steg 4 är en sista kontroll att bocka av, där det som granskningen bedömde som "Ser

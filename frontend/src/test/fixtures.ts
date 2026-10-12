@@ -15,6 +15,7 @@ import type {
   NoticeSummary,
   PageView,
   Persona,
+  PublishedAnswerView,
   ReminderView,
   ReviewView,
   SessionView,
@@ -194,6 +195,16 @@ export const noticeDetail: NoticeDetail = {
   documents: [{ id: DOCUMENT_ID, filename: "Förfrågningsunderlag Solbacken.pdf", page_count: 16, is_fictitious: true }],
   checklist: checklistView,
   match: null,
+  published_answers: [],
+};
+
+/** An answer the buyer published in e-Avrop, as the question step lists them. */
+export const publishedAnswer: PublishedAnswerView = {
+  source: "eavrop",
+  question: "Ska ställning ingå i priset för fasadmålningen?",
+  answer: "Ja, ställning ingår i anbudspriset. Prisbilagan är uppdaterad.",
+  asked_at: "2026-09-28T16:42:46+02:00",
+  answered_at: "2026-09-30T10:38:45+02:00",
 };
 
 export const pageFour: PageView = {

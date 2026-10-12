@@ -35,6 +35,7 @@ from anbudsklar.models import (
     LouSection,
     MatchRecord,
     Notice,
+    PublishedAnswer,
     QuestionLog,
 )
 from anbudsklar.services.dates import add_months
@@ -226,6 +227,25 @@ async def seed(db_session: AsyncSession) -> Seeded:
                 fit="passar",
                 engine="heuristic",
                 payload={"summary": COMPANY_SECRET},
+            ),
+            # The buyer's published answers (decision 0013): public, and never who asked.
+            PublishedAnswer(
+                notice_id=notice.id,
+                source="eavrop",
+                external_key="a" * 64,
+                question="Ska ställning ingå i priset?",
+                answer="Ja, ställning ingår i anbudspriset.",
+                asked_at=now - timedelta(days=4),
+                answered_at=now - timedelta(days=3),
+            ),
+            PublishedAnswer(
+                notice_id=notice.id,
+                source="eavrop",
+                external_key="b" * 64,
+                question="Gäller kravet på F-skatt även underleverantörer?",
+                answer="Ja.",
+                asked_at=now - timedelta(days=3),
+                answered_at=now - timedelta(days=2),
             ),
         ]
     )
