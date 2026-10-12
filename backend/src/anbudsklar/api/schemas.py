@@ -52,12 +52,26 @@ class CompanyRef(ApiModel):
     name: str
 
 
+class LabInfo(ApiModel):
+    """When a lab company is deleted (decision 0010)."""
+
+    expires_at: datetime
+
+
+class LabCompanyRef(ApiModel):
+    """A lab company the login page offers to continue as."""
+
+    id: uuid.UUID
+    name: str
+
+
 class UserView(ApiModel):
     id: uuid.UUID
     name: str
     email: str
     role: Role
     company: CompanyRef | None = None
+    lab: LabInfo | None = None  # set for a lab company's participant
 
 
 class Persona(ApiModel):
@@ -69,10 +83,24 @@ class Persona(ApiModel):
 class SessionView(ApiModel):
     user: UserView | None
     personas: list[Persona]
+    # Lab companies to continue as (decision 0010); empty when the lab is off.
+    lab_companies: list[LabCompanyRef] = Field(default_factory=list)
 
 
 class LoginRequest(ApiModel):
     persona: Role
+
+
+class GateRequest(ApiModel):
+    code: str = Field(min_length=1, max_length=200)
+
+
+class LabCreateRequest(ApiModel):
+    name: str = Field(min_length=2, max_length=120)
+
+
+class LabLoginRequest(ApiModel):
+    company_id: uuid.UUID
 
 
 class AppConfig(ApiModel):
@@ -81,6 +109,8 @@ class AppConfig(ApiModel):
     ai_disclosure: str
     demo_notice: str  # explains what is fictitious in the PoC
     eavrop_url: str  # the municipality's page in e-Avrop, for notices without a page of their own
+    gate_required: bool  # the service wants its access code before anything else (decision 0010)
+    lab_enabled: bool  # the login page offers "Prova med ditt eget företag" (decision 0010)
 
 
 # --- Notices ------------------------------------------------------------------------
@@ -108,6 +138,8 @@ class NoticeSummary(ApiModel):
     cpv_label: str | None = None  # Swedish label of the main (first) CPV code, when the code is known
     has_documents: bool
     checklist_status: ChecklistStatus
+    # The published checklist was approved by inköp; False when published without review (decision 0011).
+    checklist_reviewed: bool = False
     is_fictitious: bool
     fit: Fit | None = None  # for the signed-in company, when assessed
 
@@ -167,6 +199,8 @@ class ChecklistView(ApiModel):
     created_at: datetime
     approved_at: datetime | None
     published_at: datetime | None
+    # Inköp approved it. False for a checklist published without review (decision 0011).
+    reviewed: bool
     reviewer_note: str | None
     verification: VerificationSummary
     checklist: Checklist
@@ -429,6 +463,20 @@ class JobRunView(ApiModel):
     error: str | None
 
 
+class AppSettingsView(ApiModel):
+    """Settings inköp changes at run time (decision 0011)."""
+
+    review_required: bool  # inköp reviews checklists before companies see them
+
+
+class AppSettingsUpdate(ApiModel):
+    review_required: bool
+
+
+class AppSettingsSaved(AppSettingsView):
+    published_now: int  # checklists published because the review was turned off
+
+
 JobName = Literal[
     "ingest_ted",
     "ingest_eavrop",
@@ -438,6 +486,7 @@ JobName = Literal[
     "match_all",
     "send_reminders",
     "notify_matches",
+    "purge_lab",
 ]
 
 

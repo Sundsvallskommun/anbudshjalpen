@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import type { UserView } from "../api/types";
 import { renderWithProviders } from "../components/ui/testing";
-import { buyerUser, companyUser, config, session } from "../test/fixtures";
+import { buyerUser, companyUser, config, labUser, session } from "../test/fixtures";
 import { mockApi, renderApp, type MockRoute } from "../test/render";
 import LoginPage, { safeReturnPath } from "./LoginPage";
 import { personaIdentity } from "./login/personas";
@@ -34,6 +34,49 @@ describe("LoginPage", () => {
     expect(screen.getByRole("button", { name: "Fortsätt som Anna, företagare" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Fortsätt som Lars, inköpare" })).toBeInTheDocument();
     expect(screen.getAllByText(config.demo_notice)).toHaveLength(1);
+  });
+
+  it("creates the participant's own company when the lab is on, and lands on the profile", async () => {
+    const calls = mockApi([
+      { method: "GET", path: "/api/config", body: { ...config, lab_enabled: true } },
+      { method: "GET", path: "/api/session", body: session(null) },
+      { method: "POST", path: "/api/lab/companies", body: session(labUser) },
+    ]);
+    renderWithProviders(<LoginPage />, { path: "/logga-in" });
+
+    expect(await screen.findByRole("heading", { level: 2, name: "Prova med ditt eget företag" })).toBeInTheDocument();
+    expect(screen.getByText(/Skriv inga personuppgifter och inget som är hemligt/)).toBeInTheDocument();
+    const create = screen.getByRole("button", { name: "Skapa testföretag" });
+    expect(create).toBeDisabled();
+    await userEvent.type(screen.getByLabelText(/Företagets namn/), "Mitt bolag");
+    await userEvent.click(create);
+
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent(/^\/profil$/));
+    expect(calls.find((call) => call.path === "/api/lab/companies")?.body).toEqual({ name: "Mitt bolag" });
+  });
+
+  it("lists the lab companies and continues as the chosen one", async () => {
+    const companies = [{ id: labUser.company!.id, name: labUser.company!.name }];
+    const calls = mockApi([
+      { method: "GET", path: "/api/config", body: { ...config, lab_enabled: true } },
+      { method: "GET", path: "/api/session", body: session(null, companies) },
+      { method: "POST", path: "/api/lab/sessions", body: session(labUser, companies) },
+    ]);
+    renderWithProviders(<LoginPage />, { path: "/logga-in" });
+
+    expect(await screen.findByRole("heading", { level: 2, name: "Testföretag från träffen" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Fortsätt som Fiktiv Snickeri AB" }));
+
+    await waitFor(() => expect(screen.getByTestId("location")).toHaveTextContent(/^\/start$/));
+    expect(calls.find((call) => call.path === "/api/lab/sessions")?.body).toEqual({ company_id: companies[0]!.id });
+  });
+
+  it("does not offer the lab when it is off", async () => {
+    mockApi(routes(null));
+    renderApp("/logga-in");
+
+    expect(await screen.findByRole("heading", { level: 2, name: "Anna Berg" })).toBeInTheDocument();
+    expect(screen.queryByText("Prova med ditt eget företag")).not.toBeInTheDocument();
   });
 
   it("logs in as the chosen role and lands on its start", async () => {

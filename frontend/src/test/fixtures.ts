@@ -7,6 +7,7 @@ import type {
   AppConfig,
   ChecklistAdminItem,
   ChecklistView,
+  LabCompanyRef,
   MatchView,
   NoticeBuyers,
   NoticeDetail,
@@ -30,6 +31,8 @@ export const config: AppConfig = {
   ai_disclosure: "Anbudsklar använder AI. Kontrollera alltid svaren mot underlaget.",
   demo_notice: "Demo: underlag, företag och personer är fiktiva.",
   eavrop_url: "https://www.e-avrop.com/sundsvall",
+  gate_required: false,
+  lab_enabled: false,
 };
 
 export const companyUser: UserView = {
@@ -38,6 +41,17 @@ export const companyUser: UserView = {
   email: "anna@example.invalid",
   role: "foretagare",
   company: { id: "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d", name: "Målerifirman i Matfors AB" },
+  lab: null,
+};
+
+/** A workshop participant's own company (decision 0010). */
+export const labUser: UserView = {
+  id: "5e6f7a8b-9c0d-4e1f-a2b3-c4d5e6f7a8b9",
+  name: "Deltagare",
+  email: "lab-5e6f7a8b@anbudsklar.local",
+  role: "foretagare",
+  company: { id: "6f7a8b9c-0d1e-4f2a-b3c4-d5e6f7a8b9c0", name: "Fiktiv Snickeri AB" },
+  lab: { expires_at: "2026-11-11T12:00:00Z" },
 };
 
 export const buyerUser: UserView = {
@@ -46,6 +60,7 @@ export const buyerUser: UserView = {
   email: "lars@example.invalid",
   role: "inkopare",
   company: null,
+  lab: null,
 };
 
 /** The personas as the backend names them (services/personas.py): "Name, company" and the role in a sentence. */
@@ -62,8 +77,8 @@ const personas: Persona[] = [
   },
 ];
 
-export function session(user: UserView | null): SessionView {
-  return { user, personas };
+export function session(user: UserView | null, labCompanies: LabCompanyRef[] = []): SessionView {
+  return { user, personas, lab_companies: labCompanies };
 }
 
 export const noticeSummary: NoticeSummary = {
@@ -82,6 +97,7 @@ export const noticeSummary: NoticeSummary = {
   cpv_label: "Målning",
   has_documents: true,
   checklist_status: "published",
+  checklist_reviewed: true,
   is_fictitious: true,
   fit: "passar_delvis",
 };
@@ -112,6 +128,7 @@ export const checklistView: ChecklistView = {
   created_at: "2026-09-22T09:00:00+02:00",
   approved_at: "2026-09-23T10:00:00+02:00",
   published_at: "2026-09-23T10:05:00+02:00",
+  reviewed: true,
   reviewer_note: null,
   verification: { citations_total: 4, citations_verified: 2, citations_moved: 1, citations_unverified: 1 },
   checklist: {
@@ -238,6 +255,7 @@ export const draftChecklistView: ChecklistView = {
   status: "draft",
   approved_at: null,
   published_at: null,
+  reviewed: false,
 };
 
 /** A draft the buyer rejected, with the reason; POST .../reopen turns it back into a draft that keeps the note. */

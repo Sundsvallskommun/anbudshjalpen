@@ -13,10 +13,13 @@ from anbudsklar.api.deps import (
     SessionStoreDep,
     SettingsDep,
 )
+from anbudsklar.api.gate import WRONG_CODE_MESSAGE, code_matches, gate_enabled, gate_passed, set_gate_cookie
 from anbudsklar.api.limits import rate_limited
-from anbudsklar.api.schemas import AppConfig, LoginRequest, SessionView
+from anbudsklar.api.schemas import AppConfig, GateRequest, LoginRequest, SessionView
 from anbudsklar.api.security import SESSION_COOKIE, clear_session_cookie, set_session_cookie
 from anbudsklar.services.access import ROLE_BUYER
+from anbudsklar.services.dates import utcnow
+from anbudsklar.services.lab import lab_enabled, list_lab_companies
 from anbudsklar.services.personas import available_roles, list_personas, persona_user, user_view
 
 router = APIRouter(tags=["session"])
@@ -38,25 +41,45 @@ DEMO_NOTICE = (
 
 
 @router.get("/config")
-async def app_config(settings: SettingsDep, engine: EngineDep) -> AppConfig:
+async def app_config(
+    request: Request, response: Response, settings: SettingsDep, engine: EngineDep
+) -> AppConfig:
     disclosure = AI_DISCLOSURE + (HEURISTIC_NOTE if engine.name == "heuristic" else "")
+    response.headers["Cache-Control"] = "no-store"  # gate_required is per browser
     return AppConfig(
         organization_name=settings.organization_name,
         ai_engine=engine.name,
         ai_disclosure=disclosure,
         demo_notice=DEMO_NOTICE,
         eavrop_url=settings.eavrop_base_url,
+        gate_required=gate_enabled(settings) and not gate_passed(request, settings),
+        lab_enabled=lab_enabled(settings),
     )
+
+
+@router.post("/gate", status_code=204, dependencies=[Depends(rate_limited("gate"))])
+async def enter_gate(body: GateRequest, response: Response, settings: SettingsDep) -> None:
+    """Present the access code once per browser (decision 0010). Wrong codes are counted per address."""
+
+    if not code_matches(settings, body.code):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=WRONG_CODE_MESSAGE)
+    set_gate_cookie(response, settings)
+    response.headers["Cache-Control"] = "no-store"
 
 
 @router.get("/session")
 async def current_session(
-    user: CurrentUserDep, session: SessionDep, response: Response, buyer_enabled: BuyerEnabledDep
+    user: CurrentUserDep,
+    session: SessionDep,
+    response: Response,
+    settings: SettingsDep,
+    buyer_enabled: BuyerEnabledDep,
 ) -> SessionView:
     response.headers["Cache-Control"] = "no-store"
     return SessionView(
         user=await user_view(session, user) if user else None,
         personas=await list_personas(session, available_roles(buyer_enabled=buyer_enabled)),
+        lab_companies=await list_lab_companies(session, now=utcnow()) if lab_enabled(settings) else [],
     )
 
 
@@ -84,7 +107,8 @@ async def login(
     set_session_cookie(response, store.create(user.id), settings)
     response.headers["Cache-Control"] = "no-store"
     personas = await list_personas(session, available_roles(buyer_enabled=buyer_enabled))
-    return SessionView(user=await user_view(session, user), personas=personas)
+    lab_companies = await list_lab_companies(session, now=utcnow()) if lab_enabled(settings) else []
+    return SessionView(user=await user_view(session, user), personas=personas, lab_companies=lab_companies)
 
 
 @router.post("/session/logout", status_code=204)

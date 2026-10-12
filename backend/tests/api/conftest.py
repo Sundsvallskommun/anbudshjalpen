@@ -29,6 +29,9 @@ def settings(database_url: str, tmp_path: Path) -> Settings:
         ai_engine="heuristic",
         mcp_enabled=False,
         scheduler_enabled=False,
+        # Open and without the lab, whatever the developer's .env says; the gate tests turn them on.
+        access_code=None,
+        lab_enabled=False,
     )
 
 
