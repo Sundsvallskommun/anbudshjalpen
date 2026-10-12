@@ -38,7 +38,7 @@ export function Terms({
             key={term.term}
             label={<Text weight="semibold">{term.term}</Text>}
             description={term.explanation}
-            endContent={
+            source={
               term.citation ? (
                 <SourceLink
                   noticeId={noticeId}

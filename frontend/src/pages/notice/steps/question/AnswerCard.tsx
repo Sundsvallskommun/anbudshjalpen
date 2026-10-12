@@ -15,12 +15,6 @@ import { formalQuestionLink, procurementLink } from "../../../../lib/links";
 import { answerDocumentId } from "../../noticeData";
 import { answerParts, QUOTES_LEAD, quoteClaim } from "./answerText";
 
-/** The file a citation's quote is in, named only when the procurement has several documents. */
-function documentNameFor(citation: Citation, notice: NoticeDetail): string | undefined {
-  if (notice.documents.length <= 1) return undefined;
-  return notice.documents.find((document) => document.id === citation.document_id)?.filename ?? citation.document ?? undefined;
-}
-
 function Quotes({
   citations,
   notice,
@@ -43,7 +37,7 @@ function Quotes({
           <li key={index}>
             <VStack gap={1}>
               <Blockquote>{citation.quote}</Blockquote>
-              {/* "Källa: 6.6 Krav på Entreprenör.pdf, s. 8": the file is named when there are several (decision 0012). */}
+              {/* "Källa: 6.6 Krav på Entreprenör.pdf, s. 8": the link names the file from the notice's documents. */}
               <Text type="supporting">
                 Källa:{" "}
                 <SourceLink
@@ -52,7 +46,6 @@ function Quotes({
                   claim={quoteClaim(citation.quote)}
                   origin={`Svar på ”${question}”`}
                   documentId={citation.document_id ?? documentId}
-                  documentName={documentNameFor(citation, notice)}
                   isInline
                 />
               </Text>
