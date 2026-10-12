@@ -4,14 +4,14 @@ import { Heading } from "@astryxdesign/core/Heading";
 import { HStack } from "@astryxdesign/core/HStack";
 import { Text } from "@astryxdesign/core/Text";
 import { TextArea } from "@astryxdesign/core/TextArea";
-import { Tokenizer } from "@astryxdesign/core/Tokenizer";
-import type { SearchableItem, SearchSource } from "@astryxdesign/core/Typeahead";
+import { Typeahead, type SearchableItem, type SearchSource } from "@astryxdesign/core/Typeahead";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useId, type Ref } from "react";
 import { searchCpv, useSuggestCpv } from "../../api/queries";
 import type { CpvSuggestion } from "../../api/types";
 import { ErrorNotice } from "../../components/states";
 import { useIsPhone } from "../../lib/usePhone";
+import { ChosenCodes } from "./ChosenCodes";
 import { CpvSuggestions } from "./CpvSuggestions";
 import { cpvChip, LIMITS } from "./profileDraft";
 
@@ -34,17 +34,20 @@ export interface ActivitySectionProps {
   /** Why the description cannot be used as it is: too long to save, or too short to suggest codes from. */
   descriptionError: string | null;
   descriptionRef: Ref<HTMLTextAreaElement>;
-  /** The chosen CPV codes as chips. */
+  /** The chosen CPV codes, named first ("Målning · 45442100"). */
   codes: SearchableItem[];
   onCodesChange: (items: SearchableItem[]) => void;
+  /** Every CPV division by code, for grouping the chosen codes. */
+  divisions: Record<string, string>;
   /** The description is too short to suggest from: the form points there. */
   onDescriptionNeeded: () => void;
 }
 
 /**
  * "Vad ni gör (CPV-koder)" (direction.md, section 4 "Företagsprofil"): the company in its own words, and the CPV
- * codes it works in, named first ("Målning · 45442100") in a field that also searches. "Föreslå koder" reads the
- * description, so the two share one card. A phone gives the description more rows, so it shows without scrolling.
+ * codes it works in: a search field adds one at a time, and the chosen ones stand as rows grouped by area, which
+ * stays readable at twenty codes where chips did not. "Föreslå koder" reads the description, so the two share one
+ * card. A phone gives the description more rows, so it shows without scrolling.
  */
 export function ActivitySection({
   description,
@@ -53,6 +56,7 @@ export function ActivitySection({
   descriptionRef,
   codes,
   onCodesChange,
+  divisions,
   onDescriptionNeeded,
 }: ActivitySectionProps) {
   const suggest = useSuggestCpv();
@@ -67,6 +71,12 @@ export function ActivitySection({
       return;
     }
     suggest.mutate(text);
+  };
+
+  const isFull = codes.length >= LIMITS.cpv;
+  const addCode = (item: SearchableItem | null) => {
+    if (!item || chosen.has(item.id) || isFull) return;
+    onCodesChange([...codes, item]);
   };
 
   const applySuggestions = (added: readonly CpvSuggestion[], removed: readonly string[]) => {
@@ -92,17 +102,25 @@ export function ActivitySection({
           status={descriptionError ? { type: "error", message: descriptionError } : undefined}
         />
         <VStack gap={3}>
-          <Tokenizer
-            label="Era koder"
-            description="EU:s kodlista för vad som upphandlas. Ni behöver inte kunna koderna – tryck Föreslå koder."
+          <Typeahead
+            label="Lägg till kod"
+            description={
+              isFull
+                ? `Profilen har det högsta antalet koder, ${LIMITS.cpv}. Ta bort en för att lägga till en annan.`
+                : "EU:s kodlista för vad som upphandlas. Ni behöver inte kunna koderna – tryck Föreslå koder."
+            }
             placeholder="Sök, till exempel målning eller 45442"
             searchSource={cpvSource}
-            value={codes}
-            onChange={(items) => onCodesChange(items)}
+            value={null}
+            onChange={addCode}
             minQueryLength={2}
             debounceMs={250}
-            maxEntries={LIMITS.cpv}
             emptySearchResultsText="Inga koder hittades"
+          />
+          <ChosenCodes
+            codes={codes}
+            divisions={divisions}
+            onRemove={(code) => onCodesChange(codes.filter((item) => item.id !== code))}
           />
           <HStack gap={2} vAlign="center" wrap="wrap">
             <Button label="Föreslå koder" isLoading={suggest.isPending} onClick={askForSuggestions} />

@@ -199,6 +199,7 @@ describe("useUpdateProfile", () => {
     description: "Vi målar invändigt och utvändigt.",
     cpv_codes: ["45442100"],
     cpv_labels: { "45442100": "Målning" },
+    cpv_divisions: {},
     municipalities: ["Sundsvall", "Timrå"],
     employees: 5,
     annual_turnover_sek: 4_800_000,

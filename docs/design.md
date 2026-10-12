@@ -207,8 +207,11 @@ tillbaka till länken när dialogen stängs.
   lagtexten som gäller. Exempelfrågorna står kvar efter svaret, utom de som redan har ställts.
 - **Företagsprofil** är ett formulär på 640 px. Det börjar med ett kort som säger vad profilen styr och hur många
   träffar som verkar passa just nu, samma antal som på Start. Under "Vad ni gör (CPV-koder)" står först beskrivningen
-  med egna ord och sedan koderna, med benämningen först ("Målning · 45442100"). "Föreslå koder" visar förslagen som
-  rutor att kryssa i, med skälet under varje och en rad om hur de togs fram. Fälten har tips om vad kraven brukar vara.
+  med egna ord, sedan sökfältet "Lägg till kod" och de valda koderna som rader grupperade under sin huvudgrupp
+  ("Anläggningsarbete"), med benämningen som rubrik, koden under och "Ta bort" i slutet. Rader håller formen vid tjugo
+  koder där chips inte gjorde det. "Föreslå koder" visar förslagen som rutor att kryssa i, med skälet under varje och
+  en rad om hur de togs fram; fler än fem förslag skrollar i en ruta på fast höjd. Fälten har tips om vad kraven
+  brukar vara.
   Raden med "Spara profilen" blir sticky när något har ändrats. Efter sparandet får träffarna en ny bedömning, och en
   avisering säger hur många som verkar passa nu: "Profilen är sparad · 2 upphandlingar verkar passa er" med "Se
   träffarna". Med en språkmodell bedöms träffarna efter svaret, och då står det "Träffarna uppdateras om en stund".

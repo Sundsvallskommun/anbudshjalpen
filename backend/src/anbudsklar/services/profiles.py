@@ -44,6 +44,7 @@ async def company_view(session: AsyncSession, company: Company) -> CompanyView:
         description=company.description,
         cpv_codes=list(company.cpv_codes or []),
         cpv_labels=await cpv_labels(session, company.cpv_codes or []),
+        cpv_divisions=await cpv_divisions(session),
         municipalities=list(company.municipalities or []),
         employees=company.employees,
         annual_turnover_sek=company.annual_turnover_sek,
@@ -73,6 +74,12 @@ async def update_profile(session: AsyncSession, viewer: Viewer, update: CompanyU
     await session.flush()
     await session.refresh(company)
     return await company_view(session, company)
+
+
+async def cpv_divisions(session: AsyncSession) -> dict[str, str]:
+    """The 45 divisions of the CPV list, by code: the areas the profile groups its codes under."""
+
+    return {area.code: area.label_sv for area in await cpv_areas(session) if len(cpv_prefix(area.code)) <= 2}
 
 
 async def cpv_hits(session: AsyncSession, query: str) -> list[CpvHit]:

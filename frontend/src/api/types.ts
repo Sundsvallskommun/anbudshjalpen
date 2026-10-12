@@ -436,6 +436,8 @@ export interface CompanyView {
   description: string;
   cpv_codes: string[];
   cpv_labels: Record<string, string>;
+  /** Every CPV division ("45000000" → "Anläggningsarbete"), so the chosen codes can be grouped by area. */
+  cpv_divisions: Record<string, string>;
   municipalities: string[];
   employees: number | null;
   annual_turnover_sek: number | null;

@@ -302,6 +302,8 @@ class CompanyView(ApiModel):
     description: str
     cpv_codes: list[str]
     cpv_labels: dict[str, str] = Field(default_factory=dict)
+    # Every CPV division ("45000000" -> "Anläggningsarbete"), so the chosen codes can be grouped by area.
+    cpv_divisions: dict[str, str] = Field(default_factory=dict)
     municipalities: list[str]
     employees: int | None
     annual_turnover_sek: int | None
