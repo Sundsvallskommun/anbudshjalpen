@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import { matchView } from "../../test/fixtures";
 import {
   chipValues,
+  coverOf,
   cpvChipLabel,
   draftErrors,
   draftFromProfile,
   fittingMatchCount,
   hasUnsavedChanges,
+  KNOWN_CERTIFICATIONS,
   matchCountText,
   savedMessage,
   toUpdate,
@@ -96,5 +98,17 @@ describe("wordSource", () => {
 
   it("stores the word itself, not the entry's wording", () => {
     expect(chipValues([{ id: "Härnösand", label: "Lägg till ”Härnösand”" }])).toEqual(["Härnösand"]);
+  });
+  it("finds a certification by what it covers, and ignores case and spaces", () => {
+    const certifications = wordSource(Object.keys(KNOWN_CERTIFICATIONS), KNOWN_CERTIFICATIONS);
+    expect(certifications.search("miljöledning")).toEqual([
+      { id: "ISO 14001", label: "ISO 14001" },
+      { id: "ISO 45001", label: "ISO 45001" },
+      { id: "miljöledning", label: "Lägg till ”miljöledning”" },
+    ]);
+    // A known name typed another way is the known one, not a second free-text entry.
+    expect(certifications.search("iso9001")).toEqual([{ id: "ISO 9001", label: "ISO 9001" }]);
+    expect(coverOf(KNOWN_CERTIFICATIONS, "ISO 45001")).toBe("Arbetsmiljöledning");
+    expect(coverOf(KNOWN_CERTIFICATIONS, "constructor")).toBeUndefined();
   });
 });

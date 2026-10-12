@@ -157,16 +157,61 @@ export function chipValues(items: readonly SearchableItem[]): string[] {
 }
 
 /**
- * A search for a Tokenizer of words: the known words that match, then the typed word itself unless it is already
- * known or chosen.
+ * Certifications Swedish public procurement often asks a small business for, each with what it covers, so a search
+ * for "miljö" finds ISO 14001 and Svensk Miljöbas. No open register lists them (ISO's open data is every standard,
+ * not what one is certified to), so the list is ours; any other certification can still be typed.
  */
-export function wordSource(known: readonly string[]): SearchSource<SearchableItem> {
+export const KNOWN_CERTIFICATIONS: Readonly<Record<string, string>> = {
+  "ISO 9001": "Kvalitetsledning",
+  "ISO 14001": "Miljöledning",
+  "ISO 45001": "Arbetsmiljöledning",
+  "ISO 27001": "Informationssäkerhet",
+  "ISO 50001": "Energiledning",
+  "ISO 22000": "Livsmedelssäkerhet",
+  "ISO 39001": "Trafiksäkerhet",
+  "ISO 22301": "Kontinuitetshantering",
+  "ISO 3834": "Kvalitet vid svetsning",
+  "EN 1090": "Tillverkning av stål- och aluminiumkonstruktioner",
+  EMAS: "EU:s miljöstyrningsordning",
+  "Svensk Miljöbas": "Miljödiplomering för mindre företag",
+  FR2000: "Kvalitet, miljö och arbetsmiljö för mindre företag",
+  BF9K: "Kvalitet och miljö för byggföretag",
+  "Säker Vatten": "Auktoriserat VVS-företag",
+  GVK: "Auktoriserat våtrumsföretag",
+  "F-gascertifiering": "Företagscertifikat för arbete med köldmedier",
+  Svanen: "Miljömärkt tjänst, till exempel städning",
+  "Bra Miljöval": "Miljömärkt tjänst, till exempel el och transporter",
+  KRAV: "Ekologiska livsmedel",
+  FSC: "Spårbart trä och papper från hållbart skogsbruk",
+  PEFC: "Spårbart trä och papper från hållbart skogsbruk",
+};
+
+/** Case and spaces do not matter in a search: "iso9001" finds and is "ISO 9001". */
+function searchKey(text: string): string {
+  return text.toLocaleLowerCase("sv").replace(/\s+/g, "");
+}
+
+/** What a known word covers, or nothing for a typed one ("constructor" is not a certification). */
+export function coverOf(covers: Readonly<Record<string, string>>, word: string): string | undefined {
+  return Object.hasOwn(covers, word) ? covers[word] : undefined;
+}
+
+/**
+ * A search for a Tokenizer of words: the known words that match, by the word or by what it covers, then the typed
+ * word itself unless it is already known or chosen.
+ */
+export function wordSource(
+  known: readonly string[],
+  covers: Readonly<Record<string, string>> = {},
+): SearchSource<SearchableItem> {
   return {
     search: (query) => {
       const typed = query.trim();
-      const lower = typed.toLocaleLowerCase("sv");
-      const matches = known.filter((word) => word.toLocaleLowerCase("sv").includes(lower));
-      const isKnown = known.some((word) => word.toLocaleLowerCase("sv") === lower);
+      const key = searchKey(typed);
+      const matches = known.filter(
+        (word) => searchKey(word).includes(key) || searchKey(coverOf(covers, word) ?? "").includes(key),
+      );
+      const isKnown = known.some((word) => searchKey(word) === key);
       const items = matches.map((word) => ({ id: word, label: word }));
       return typed && !isKnown ? [...items, { id: typed, label: `Lägg till ”${typed}”` }] : items;
     },

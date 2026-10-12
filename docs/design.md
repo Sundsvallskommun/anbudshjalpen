@@ -239,12 +239,16 @@ tillbaka till länken när dialogen stängs.
   lagtexten som gäller. Exempelfrågorna står kvar efter svaret, utom de som redan har ställts.
 - **Företagsprofil** är ett formulär på 640 px. Det börjar med ett kort som säger vad profilen styr och hur många
   träffar som verkar passa just nu, samma antal som på Start. Under "Vad ni gör (CPV-koder)" står först beskrivningen
-  med egna ord, sedan sökfältet "Lägg till kod" och de valda koderna som rader grupperade under sin huvudgrupp
-  ("Anläggningsarbete"), med benämningen först, koden efter i dämpad färg ("Trädgårdstjänster · 77300000", som
-  sökfältet och förslagen skriver dem) och en dämpad "Ta bort" i slutet. Långa benämningar radbryts. Rader håller
-  formen vid tjugo koder där chips inte gjorde det. "Föreslå koder" visar förslagen som rutor att kryssa i, med
+  med egna ord, sedan sökfältet "Lägg till kod" och de valda koderna i en tabell grupperad under sin huvudgrupp
+  ("Anläggningsarbete · 3", som kan fällas ihop), med kolumnerna Benämning och CPV-kod så att koderna står i linje,
+  och en dämpad "Ta bort" i slutet. En lång benämning kortas till en rad och visas hel när man hovrar över den. På en
+  telefon, som inte har hovring, står koden under benämningen och benämningen radbryts. Tabellen håller formen vid
+  tjugo koder där chips inte gjorde det. "Föreslå koder" visar förslagen som rutor att kryssa i, med
   skälet under varje och en rad om hur de togs fram; fler än fem förslag skrollar i en ruta på fast höjd. Fälten har
-  tips om vad kraven brukar vara.
+  tips om vad kraven brukar vara. Certifieringar föreslår en egen lista med det upphandlingar brukar fråga efter (ISO
+  9001, ISO 14001, Svensk Miljöbas, BF9K och liknande), med vad var och en gäller under namnet. Man kan söka på
+  namnet eller på vad den gäller ("miljö"), och skriva en egen som inte finns i listan. Något öppet register över
+  certifieringar finns inte att hämta från.
   Raden med "Spara profilen" blir sticky när något har ändrats. Efter sparandet får träffarna en ny bedömning, och en
   avisering säger hur många som verkar passa nu: "Profilen är sparad · 2 upphandlingar verkar passa er" med "Se
   träffarna". Med en språkmodell bedöms träffarna efter svaret, och då står det "Träffarna uppdateras om en stund".
