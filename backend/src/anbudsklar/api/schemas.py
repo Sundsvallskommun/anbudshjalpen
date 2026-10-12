@@ -248,10 +248,20 @@ class QuestionRequest(ApiModel):
     history: list[QuestionTurnIn] = Field(default_factory=list, max_length=10)
 
 
+class ReadSummary(ApiModel):
+    """What the engine was given for an answer (decision 0012), so the app can say so."""
+
+    documents_read: int
+    documents_total: int
+    pages_read: int
+    pages_total: int
+
+
 class AnswerView(ApiModel):
     answer: Answer
     engine: str
-    document_id: uuid.UUID  # the document that was read; the answer's page citations refer to it
+    document_id: uuid.UUID  # the main document; a citation's own document_id says where its quote is
+    read: ReadSummary
     # Frågestopp from the checklist, as the end of that day in Stockholm: the date is the
     # last day for questions, so show it as a date.
     question_deadline: datetime | None

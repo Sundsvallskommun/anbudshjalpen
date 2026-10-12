@@ -36,6 +36,7 @@ from anbudsklar.contracts import (
     ContractModel,
     CpvCandidate,
     CpvSuggestions,
+    DocumentSet,
     MatchAssessment,
     NoticeContext,
     PagedDocument,
@@ -392,12 +393,17 @@ class EneoEngine:
     async def answer_question(
         self,
         notice: NoticeContext,
-        document: PagedDocument,
+        documents: DocumentSet,
         question: str,
         history: list[QuestionTurn],
     ) -> tuple[Answer, EngineRun]:
         return await self._run_task(
-            Task.ANSWER_QUESTION, Answer, notice=notice, document=document, history=history, question=question
+            Task.ANSWER_QUESTION,
+            Answer,
+            notice=notice,
+            documents=documents,
+            history=history,
+            question=question,
         )
 
     async def suggest_cpv(

@@ -27,7 +27,7 @@ export interface PaneFocus {
   claim: string;
   /** The row's group, as the line under the heading names it ("Krav på uppdraget · s. 4"). */
   group: string;
-  citation: Pick<Citation, "page" | "quote" | "check" | "found_page"> | null;
+  citation: Pick<Citation, "page" | "quote" | "check" | "found_page" | "document" | "document_id"> | null;
 }
 
 export interface SourcePaneProps {

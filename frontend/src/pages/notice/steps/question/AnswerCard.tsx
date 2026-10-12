@@ -6,7 +6,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useId } from "react";
-import type { AnswerView, Citation, NoticeDetail } from "../../../../api/types";
+import type { AnswerView, Citation, NoticeDetail, ReadSummary } from "../../../../api/types";
 import { FormalQuestionAdvice } from "../../../../components/FormalQuestionAdvice";
 import { AiProvenance } from "../../../../components/ui/AiProvenance";
 import { SourceLink } from "../../../../components/ui/source/SourceLink";
@@ -42,7 +42,7 @@ function Quotes({
                 citation={citation}
                 claim={quoteClaim(citation.quote)}
                 origin={`Svar på ”${question}”`}
-                documentId={documentId}
+                documentId={citation.document_id ?? documentId}
                 isInline
               />
             </Blockquote>
@@ -51,6 +51,17 @@ function Quotes({
       </VStack>
     </VStack>
   );
+}
+
+/** What the engine read (decision 0012): all of it, or how much of the procurement's documents. */
+export function readLine(read: ReadSummary): string {
+  const whole = read.pages_read === read.pages_total;
+  if (read.documents_total <= 1) {
+    return whole ? "Svaret bygger på hela underlaget." : `Svaret bygger på ${read.pages_read} av ${read.pages_total} sidor i underlaget.`;
+  }
+  return whole
+    ? `Svaret bygger på alla ${read.documents_total} dokument i underlaget.`
+    : `Svaret bygger på ${read.pages_read} av ${read.pages_total} sidor i underlagets ${read.documents_total} dokument.`;
 }
 
 /** "Oklart? Ställ frågan i e-Avrop senast 30 okt.", for an answer the document settles. */
@@ -99,6 +110,7 @@ export function AnswerCard({ view, question, notice }: { view: AnswerView; quest
         {answer.citations.length > 0 && (
           <Quotes citations={answer.citations} noticeId={notice.id} documentId={documentId} question={question} />
         )}
+        <Text type="supporting">{readLine(view.read)}</Text>
         {needsFormalQuestion ? (
           <FormalQuestionAdvice
             noticeId={notice.id}

@@ -141,7 +141,7 @@ export const checklistView: ChecklistView = {
         title: "Ansvarsförsäkring om minst 5 miljoner kronor",
         plain_language: "Företaget måste ha en ansvarsförsäkring och visa ett försäkringsbevis.",
         evidence: "Bifoga försäkringsbevis.",
-        citation: { page: 4, quote: "Leverantören ska ha en ansvarsförsäkring", check: "verified", found_page: null },
+        citation: { page: 4, quote: "Leverantören ska ha en ansvarsförsäkring", check: "verified", found_page: null, document: null, document_id: null },
       },
       {
         id: "K2",
@@ -149,14 +149,14 @@ export const checklistView: ChecklistView = {
         title: "Två referensuppdrag",
         plain_language: "Två liknande uppdrag i offentlig miljö de senaste tre åren.",
         evidence: null,
-        citation: { page: 5, quote: "två referensuppdrag", check: "moved", found_page: 6 },
+        citation: { page: 5, quote: "två referensuppdrag", check: "moved", found_page: 6, document: null, document_id: null },
       },
     ],
     attachments: [
       {
         name: "Prisbilaga",
         description: null,
-        citation: { page: 12, quote: "Bilaga 1 Prisbilaga", check: "unverified", found_page: null },
+        citation: { page: 12, quote: "Bilaga 1 Prisbilaga", check: "unverified", found_page: null, document: null, document_id: null },
       },
     ],
     evaluation: [
@@ -164,7 +164,7 @@ export const checklistView: ChecklistView = {
         name: "Pris",
         weight_percent: 70,
         how_assessed: "Lägst pris får högst poäng.",
-        citation: { page: 9, quote: "Pris 70 %", check: "verified", found_page: null },
+        citation: { page: 9, quote: "Pris 70 %", check: "verified", found_page: null, document: null, document_id: null },
       },
     ],
     dates: [
@@ -172,7 +172,7 @@ export const checklistView: ChecklistView = {
         kind: "fragestopp",
         date: "2026-10-16",
         description: "Frågor ställs i e-Avrop.",
-        citation: { page: 2, quote: "Sista dag för frågor", check: "verified", found_page: null },
+        citation: { page: 2, quote: "Sista dag för frågor", check: "verified", found_page: null, document: null, document_id: null },
       },
     ],
     terms: [
@@ -207,11 +207,12 @@ export const answerNotInDocument: AnswerView = {
   answer: {
     answer: "Underlaget säger inget om arbete på helger.",
     found_in_document: false,
-    citations: [{ page: 4, quote: "Leverantören ska ha en ansvarsförsäkring", check: "verified", found_page: null }],
+    citations: [{ page: 4, quote: "Leverantören ska ha en ansvarsförsäkring", check: "verified", found_page: null, document: null, document_id: null }],
     suggest_formal_question: true,
   },
   engine: "heuristic",
   document_id: DOCUMENT_ID,
+  read: { documents_read: 1, documents_total: 1, pages_read: 16, pages_total: 16 },
   // The checklist's frågestopp is a date; the backend sends it as the end of that day in Swedish time.
   question_deadline: "2026-10-16T23:59:59+02:00",
   formal_question_url: "https://example.invalid/e-avrop/underlag/1",
@@ -285,14 +286,14 @@ export const matchView: MatchView = {
           page: 4,
           quote: "Leverantören ska ha en ansvarsförsäkring",
           check: "verified",
-          found_page: null,
+          found_page: null, document: null, document_id: null,
         },
       },
       {
         kind: "oklart",
         text: "Underlaget ställer krav på referensuppdrag, men er profil säger inget om det.",
         requirement_id: "K2",
-        citation: { page: 5, quote: "två referensuppdrag", check: "moved", found_page: 6 },
+        citation: { page: 5, quote: "två referensuppdrag", check: "moved", found_page: 6, document: null, document_id: null },
       },
     ],
   },

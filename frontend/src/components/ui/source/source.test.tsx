@@ -18,7 +18,7 @@ import { useSourceDeepLink } from "./SourceDialogProvider";
 import { SourceLink } from "./SourceLink";
 import { primaryDocumentId, sourceHref, targetFromParams } from "./sourceTarget";
 
-const verified: Citation = { page: 4, quote: "Leverantören ska ha en ansvarsförsäkring", check: "verified", found_page: null };
+const verified: Citation = { page: 4, quote: "Leverantören ska ha en ansvarsförsäkring", check: "verified", found_page: null, document: null, document_id: null };
 const claim = "Ni har ansvarsförsäkring";
 
 const routes: MockRoute[] = [
@@ -49,7 +49,7 @@ describe("SourceLink", () => {
     mockApi(routes);
     renderWithProviders(
       <>
-        <SourceLink noticeId={NOTICE_ID} citation={{ ...verified, page: 5, check: "moved", found_page: 6 }} claim="A" />
+        <SourceLink noticeId={NOTICE_ID} citation={{ ...verified, page: 5, check: "moved", found_page: 6, document: null, document_id: null }} claim="A" />
         <SourceLink noticeId={NOTICE_ID} citation={{ ...verified, check: "unverified" }} claim="B" />
       </>,
     );
@@ -94,7 +94,7 @@ describe("SourceLink", () => {
 
   it("shows the cited words when the page does not have them", async () => {
     mockApi(routes);
-    const missing: Citation = { page: 4, quote: "Referensuppdrag i offentlig miljö", check: "unverified", found_page: null };
+    const missing: Citation = { page: 4, quote: "Referensuppdrag i offentlig miljö", check: "unverified", found_page: null, document: null, document_id: null };
     renderWithProviders(<SourceLink noticeId={NOTICE_ID} citation={missing} claim="Två referensuppdrag" />);
 
     await userEvent.click(screen.getByRole("link", { name: /^Visa källan för/ }));

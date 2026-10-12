@@ -18,11 +18,12 @@ from anbudsklar.ai.engine import EngineConfigError, EngineError, RuleContext
 from anbudsklar.ai.openai_compat import OpenAICompatEngine, cited_sources
 from anbudsklar.ai.prompts import load_prompt
 from anbudsklar.config import Settings
-from anbudsklar.contracts import NoticeContext, PagedDocument, Task
+from anbudsklar.contracts import DocumentSet, NoticeContext, PagedDocument, Task
 
 BASE_URL = "https://llm.test/v1"
 NOTICE = NoticeContext(notice_id="n1", title="Ommålning (fiktiv)")
 DOCUMENT = PagedDocument(filename="u.pdf", pages=["Leverantören ska ha F-skatt."])
+DOCUMENTS = DocumentSet.of([DOCUMENT])
 ANSWER = {"answer": "Ja, F-skatt krävs.", "found_in_document": True, "suggest_formal_question": False}
 
 
@@ -70,7 +71,7 @@ def _completion(content: str) -> httpx2.Response:
 
 async def test_asks_with_json_schema_and_the_prompt_file() -> None:
     endpoint = FakeEndpoint(_completion(json.dumps(ANSWER)))
-    answer, run = await _engine(endpoint).answer_question(NOTICE, DOCUMENT, "Krävs F-skatt?", [])
+    answer, run = await _engine(endpoint).answer_question(NOTICE, DOCUMENTS, "Krävs F-skatt?", [])
     body = endpoint.bodies[0]
     assert body["response_format"]["type"] == "json_schema"
     assert body["response_format"]["json_schema"]["name"] == "besvara_fraga"
@@ -87,15 +88,15 @@ async def test_steps_down_to_json_object_and_remembers_it() -> None:
         _completion(json.dumps(ANSWER)),
     )
     engine = _engine(endpoint)
-    await engine.answer_question(NOTICE, DOCUMENT, "Krävs F-skatt?", [])
-    await engine.answer_question(NOTICE, DOCUMENT, "Krävs F-skatt?", [])
+    await engine.answer_question(NOTICE, DOCUMENTS, "Krävs F-skatt?", [])
+    await engine.answer_question(NOTICE, DOCUMENTS, "Krävs F-skatt?", [])
     formats = [body["response_format"]["type"] for body in endpoint.bodies]
     assert formats == ["json_schema", "json_object", "json_object"]
 
 
 async def test_retries_invalid_json_in_the_same_conversation() -> None:
     endpoint = FakeEndpoint(_completion("Svaret är ja."), _completion(f"```json\n{json.dumps(ANSWER)}\n```"))
-    _, run = await _engine(endpoint).answer_question(NOTICE, DOCUMENT, "Krävs F-skatt?", [])
+    _, run = await _engine(endpoint).answer_question(NOTICE, DOCUMENTS, "Krävs F-skatt?", [])
     assert run.attempts == 2
     retry = endpoint.bodies[1]["messages"]
     assert [message["role"] for message in retry] == ["system", "user", "assistant", "user"]

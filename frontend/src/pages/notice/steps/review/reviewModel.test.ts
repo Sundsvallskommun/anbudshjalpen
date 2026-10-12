@@ -4,7 +4,7 @@ import { checklistView, reviewView } from "../../../../test/fixtures";
 import { attachmentCheckFor, attachedCount, attachmentVerdicts, questionAbout, reviewGroups, reviewVerdict } from "./reviewModel";
 
 function requirement(id: string, kind: Requirement["kind"], title: string): Requirement {
-  return { id, kind, title, plain_language: title, evidence: null, citation: { page: 5, quote: title, check: "verified", found_page: null } };
+  return { id, kind, title, plain_language: title, evidence: null, citation: { page: 5, quote: title, check: "verified", found_page: null, document: null, document_id: null } };
 }
 
 function check(requirementId: string, status: RequirementCheck["status"], comment = "Kommentar."): RequirementCheck {
@@ -93,7 +93,7 @@ describe("attachments", () => {
   });
 
   it("gives one verdict per attachment to hand in, named as step 1 names it, and none for the ones needed only sometimes", () => {
-    const cite = (quote: string) => ({ page: 7, quote, check: "verified" as const, found_page: null });
+    const cite = (quote: string) => ({ page: 7, quote, check: "verified" as const, found_page: null, document: null, document_id: null });
     const attachments = [
       { name: "Bilaga 3", description: null, citation: cite("Underteckna sanningsförsäkran (bilaga 3) och lämna den med anbudet.") },
       { name: "Intyg", description: null, citation: cite("Anbudsgivare som är etablerade i Sverige behöver därför inte bifoga intyg om detta.") },

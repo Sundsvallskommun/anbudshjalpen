@@ -22,6 +22,10 @@ export interface Citation {
   quote: string;
   check: CitationCheck | null;
   found_page: number | null;
+  /** The document's name as the model saw it, when the material had several documents. */
+  document: string | null;
+  /** Set by verification: the document where the quote was found. */
+  document_id: Uuid | null;
 }
 
 // --- contracts/tasks.py ------------------------------------------------------------------------
@@ -379,11 +383,20 @@ export interface QuestionRequest {
   history: QuestionTurnIn[];
 }
 
+/** What the engine was given for an answer (decision 0012), so the card can say so. */
+export interface ReadSummary {
+  documents_read: number;
+  documents_total: number;
+  pages_read: number;
+  pages_total: number;
+}
+
 export interface AnswerView {
   answer: Answer;
   engine: string;
-  /** The document that was read; the answer's page citations refer to it. */
+  /** The main document; a citation's own document_id says where its quote is. */
   document_id: Uuid;
+  read: ReadSummary;
   /** Frågestopp from the checklist, as the end of that day in Stockholm: a date, so show it as one. */
   question_deadline: IsoDateTime | null;
   /** Where to ask formally: the procurement in e-Avrop, else e-Avrop itself. */

@@ -73,6 +73,64 @@ class PagedDocument(ContractModel):
         return len(self.pages)
 
 
+class DocumentOutline(ContractModel):
+    """One document of a set: what it is and how much of it the engine was given."""
+
+    document_id: str | None = None
+    filename: str
+    page_count: int
+    pages_included: int
+
+
+class DocumentSet(ContractModel):
+    """The documents of a procurement as one piece of material, the main document first.
+
+    Built by `anbudsklar.documents.bundle`: every page when they fit the budget, otherwise a
+    choice, with the pages left out saying so in place. The outline lets the model see what
+    it did not read.
+    """
+
+    documents: list[PagedDocument]
+    outline: list[DocumentOutline]
+
+    @classmethod
+    def of(cls, documents: list[PagedDocument]) -> DocumentSet:
+        """A set with every page of every document, for engines and tests."""
+
+        return cls(
+            documents=documents,
+            outline=[
+                DocumentOutline(
+                    document_id=document.document_id,
+                    filename=document.filename,
+                    page_count=document.page_count,
+                    pages_included=document.page_count,
+                )
+                for document in documents
+            ],
+        )
+
+    @property
+    def is_complete(self) -> bool:
+        return all(item.pages_included == item.page_count for item in self.outline)
+
+    def render(self) -> str:
+        """The outline, then each document with its own DOKUMENT: line and page markers."""
+
+        count = len(self.documents)
+        lines = [
+            f"Underlaget består av {count} dokument. Det första är huvuddokumentet."
+            if count > 1
+            else "Underlaget består av ett dokument."
+        ]
+        if not self.is_complete:
+            lines.append('Sidor som inte är med står som "(sidan är inte med i urvalet)".')
+        for index, item in enumerate(self.outline, start=1):
+            included = "alla med" if item.pages_included == item.page_count else f"{item.pages_included} med"
+            lines.append(f"{index}. {item.filename} – {item.page_count} sidor, {included}")
+        return "\n".join(lines) + "\n\n" + "\n\n".join(document.render() for document in self.documents)
+
+
 class CompanyProfile(ContractModel):
     """A company's self-description, used for matching and CPV suggestions."""
 

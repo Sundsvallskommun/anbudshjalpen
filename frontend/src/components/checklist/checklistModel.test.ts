@@ -13,7 +13,7 @@ import {
   termPreview,
 } from "./checklistModel";
 
-const cite = (page: number, quote: string): Citation => ({ page, quote, check: "verified", found_page: null });
+const cite = (page: number, quote: string): Citation => ({ page, quote, check: "verified", found_page: null, document: null, document_id: null });
 
 function attachment(name: string, quote: string, page = 7, description: string | null = null): RequiredAttachment {
   return { name, description, citation: cite(page, quote) };

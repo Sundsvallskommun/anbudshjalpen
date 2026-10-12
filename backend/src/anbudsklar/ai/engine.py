@@ -29,6 +29,7 @@ from anbudsklar.contracts import (
     CompanyProfile,
     CpvCandidate,
     CpvSuggestions,
+    DocumentSet,
     MatchAssessment,
     NoticeContext,
     PagedDocument,
@@ -119,7 +120,7 @@ class AiEngine(Protocol):
     async def answer_question(
         self,
         notice: NoticeContext,
-        document: PagedDocument,
+        documents: DocumentSet,
         question: str,
         history: list[QuestionTurn],
     ) -> tuple[Answer, EngineRun]:

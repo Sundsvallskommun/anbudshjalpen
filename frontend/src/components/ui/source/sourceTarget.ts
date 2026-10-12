@@ -75,7 +75,7 @@ export function targetFromParams(params: URLSearchParams, notice: NoticeDetail):
     const known = knownCitations(notice).find(
       (citation) => citation.quote === quote && (citation.page === page || citation.found_page === page),
     );
-    const citation: Citation = known ?? { page, quote, check: null, found_page: null };
+    const citation: Citation = known ?? { page, quote, check: null, found_page: null, document: null, document_id: null };
     return { kind: "source", noticeId: notice.id, citation, claim: params.get(SOURCE_PARAMS.claim) ?? "" };
   }
   if (params.get(SOURCE_PARAMS.step) === "underlag") return { kind: "document", noticeId: notice.id, page };

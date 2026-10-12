@@ -253,7 +253,7 @@ export function nextRequirementId(requirements: readonly Requirement[]): string 
 
 /** An empty citation on a page, for a new item. */
 export function emptyCitation(page = 1): Citation {
-  return { page, quote: "", check: null, found_page: null };
+  return { page, quote: "", check: null, found_page: null, document: null, document_id: null };
 }
 
 /** A new, empty item of a list, its citation on `page` (the page the buyer is reading). */

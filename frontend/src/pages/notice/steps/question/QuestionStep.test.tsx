@@ -12,7 +12,7 @@ const answerInDocument: AnswerView = {
   answer: {
     answer: "Ni behöver en ansvarsförsäkring på minst 5 miljoner kronor. Försäkringsbeviset ska bifogas anbudet.",
     found_in_document: true,
-    citations: [{ page: 4, quote: "Leverantören ska ha en ansvarsförsäkring", check: "verified", found_page: null }],
+    citations: [{ page: 4, quote: "Leverantören ska ha en ansvarsförsäkring", check: "verified", found_page: null, document: null, document_id: null }],
     suggest_formal_question: false,
   },
 };

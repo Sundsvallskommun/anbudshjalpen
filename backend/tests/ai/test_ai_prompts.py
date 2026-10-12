@@ -16,6 +16,7 @@ from anbudsklar.contracts import (
     Citation,
     CompanyProfile,
     CpvCandidate,
+    DocumentSet,
     NoticeContext,
     PagedDocument,
     Requirement,
@@ -95,7 +96,7 @@ def test_question_message_puts_history_before_question() -> None:
     message = render_task_message(
         Task.ANSWER_QUESTION,
         notice=_notice(),
-        document=_document(),
+        documents=DocumentSet.of([_document()]),
         history=history,
         question="Krävs F-skatt?",
     )
@@ -105,7 +106,11 @@ def test_question_message_puts_history_before_question() -> None:
 
 def test_empty_optional_blocks_are_left_out() -> None:
     message = render_task_message(
-        Task.ANSWER_QUESTION, notice=_notice(), document=_document(), history=[], question="Krävs F-skatt?"
+        Task.ANSWER_QUESTION,
+        notice=_notice(),
+        documents=DocumentSet.of([_document()]),
+        history=[],
+        question="Krävs F-skatt?",
     )
     assert "<tidigare_fragor>" not in message
     rules = render_task_message(Task.ANSWER_RULES, context=[], question="Vad är ett skallkrav?")

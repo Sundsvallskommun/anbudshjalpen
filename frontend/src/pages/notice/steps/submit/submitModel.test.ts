@@ -42,7 +42,7 @@ describe("submitGroups", () => {
     const intyg = {
       name: "Intyg",
       description: null,
-      citation: { page: 7, quote: "Anbudsgivare som är etablerade i Sverige behöver därför inte bifoga intyg om detta.", check: "verified" as const, found_page: null },
+      citation: { page: 7, quote: "Anbudsgivare som är etablerade i Sverige behöver därför inte bifoga intyg om detta.", check: "verified" as const, found_page: null, document: null, document_id: null },
     };
     const checklist = { ...checklistView.checklist, attachments: [...checklistView.checklist.attachments, intyg] };
     const missing: ReviewView = { ...reviewView, result: { ...reviewView.result, attachments: [{ name: "Intyg", status: "saknas", comment: "" }] } };

@@ -54,6 +54,7 @@ from anbudsklar.contracts import (
     EvaluationCriterion,
     KeyDate,
     MatchAssessment,
+    PagedDocument,
     RequiredAttachment,
     Requirement,
     ReviewResult,
@@ -578,11 +579,48 @@ def verify_checklist(checklist: Checklist, pages: Sequence[str]) -> tuple[Checkl
     return verified, summarize(checklist_citations(verified))
 
 
-def verify_answer(answer: Answer, pages: Sequence[str]) -> Answer:
-    """Verify the citations of an answer to a question about the document."""
+def verify_answer(answer: Answer, documents: Sequence[PagedDocument]) -> Answer:
+    """Verify an answer's citations against the documents it was answered from.
 
-    index = PageIndex(pages)
-    return answer.model_copy(update={"citations": [_verify(c, index) for c in answer.citations]})
+    A citation names its document; the quote is looked for there first, then in the
+    others, the main document (the first) before the rest. Found elsewhere, it is marked
+    moved and points at the document and page that hold it, so the source link opens the
+    right file. `document_id` is always set, so the web app never has to guess.
+    """
+
+    indexes = [(document, PageIndex(document.pages)) for document in documents]
+    return answer.model_copy(
+        update={"citations": [_verify_in_documents(c, indexes) for c in answer.citations]}
+    )
+
+
+def _verify_in_documents(citation: Citation, indexes: Sequence[tuple[PagedDocument, PageIndex]]) -> Citation:
+    if not indexes:
+        return _unverified(citation)
+    name = (citation.document or "").casefold()
+    named = [pair for pair in indexes if name and pair[0].filename.casefold() == name]
+    elsewhere = [pair for pair in indexes if pair not in named]
+    for document, index in named:
+        match = match_quote(citation.quote, index, citation.page)
+        if match.check != "unverified":
+            return _located(citation, document, match.check, match.page)
+    for document, index in elsewhere:
+        match = match_quote(citation.quote, index, citation.page)
+        if match.check != "unverified":
+            # Found, but not where the model said: moved, whatever the page, when a document was named.
+            check = match.check if not named else "moved"
+            return _located(citation, document, check, match.page)
+    fallback = (named or indexes)[0][0]
+    return citation.model_copy(
+        update={"check": "unverified", "found_page": None, "document_id": fallback.document_id}
+    )
+
+
+def _located(citation: Citation, document: PagedDocument, check: CitationCheck, page: int | None) -> Citation:
+    found_page = page if check == "moved" else None
+    return citation.model_copy(
+        update={"check": check, "found_page": found_page, "document_id": document.document_id}
+    )
 
 
 def verify_match(assessment: MatchAssessment, pages: Sequence[str]) -> MatchAssessment:

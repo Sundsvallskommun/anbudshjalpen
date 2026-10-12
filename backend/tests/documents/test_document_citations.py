@@ -14,6 +14,7 @@ from anbudsklar.contracts import (
     KeyDate,
     MatchAssessment,
     MatchReason,
+    PagedDocument,
     RequiredAttachment,
     Requirement,
     RequirementCheck,
@@ -407,7 +408,9 @@ def test_verify_answer(tender_pages: list[str]) -> None:
         citations=[_citation(4, "Försäkringsbevis ska bifogas anbudet.")],
         suggest_formal_question=False,
     )
-    verified = verify_answer(answer, tender_pages)
+    verified = verify_answer(
+        answer, [PagedDocument(document_id="d1", filename="underlag.pdf", pages=tender_pages)]
+    )
     assert (verified.citations[0].check, verified.citations[0].found_page) == ("moved", 2)
 
 
@@ -569,3 +572,45 @@ def test_a_weight_its_quote_does_not_state_is_unverified(tender_pages: list[str]
         "verified",
     ]
     assert summary.citations_unverified == 1
+
+
+def test_verify_answer_across_documents(tender_pages: list[str]) -> None:
+    main = PagedDocument(document_id="main", filename="underlag.pdf", pages=tender_pages)
+    attachment = PagedDocument(
+        document_id="att",
+        filename="6.6 Krav.pdf",
+        pages=["Entreprenören ska ha ansvarsförsäkring om 10 mnkr."],
+    )
+
+    def answer_with(citation: Citation) -> Answer:
+        return Answer(
+            answer="Svar.", found_in_document=True, citations=[citation], suggest_formal_question=False
+        )
+
+    # Named and found there: verified, and the citation points at that document.
+    named = verify_answer(
+        answer_with(Citation(page=1, quote="ansvarsförsäkring om 10 mnkr", document="6.6 Krav.pdf")),
+        [main, attachment],
+    )
+    assert (named.citations[0].check, named.citations[0].document_id) == ("verified", "att")
+    # Named wrongly: found in another document counts as moved, pointing where it is.
+    wrong = verify_answer(
+        answer_with(Citation(page=1, quote="ansvarsförsäkring om 10 mnkr", document="underlag.pdf")),
+        [main, attachment],
+    )
+    assert (wrong.citations[0].check, wrong.citations[0].found_page, wrong.citations[0].document_id) == (
+        "moved",
+        1,
+        "att",
+    )
+    # Not named: the first document holding the quote is taken, the main document first.
+    unnamed = verify_answer(
+        answer_with(Citation(page=4, quote="Försäkringsbevis ska bifogas anbudet.")), [main, attachment]
+    )
+    assert (unnamed.citations[0].check, unnamed.citations[0].document_id) == ("moved", "main")
+    # Nowhere: unverified, still pointing at the named document so the link opens something sensible.
+    missing = verify_answer(
+        answer_with(Citation(page=1, quote="Något som inte står där.", document="6.6 Krav.pdf")),
+        [main, attachment],
+    )
+    assert (missing.citations[0].check, missing.citations[0].document_id) == ("unverified", "att")

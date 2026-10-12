@@ -35,7 +35,7 @@ function noticeWithCitation(citation: Citation): MockRoute {
 }
 
 function dated(kind: KeyDate["kind"], date: string, description: string): KeyDate {
-  return { kind, date, description, citation: { page: 2, quote: description, check: "verified", found_page: null } };
+  return { kind, date, description, citation: { page: 2, quote: description, check: "verified", found_page: null, document: null, document_id: null } };
 }
 
 function sectionButton(name: string | RegExp) {
@@ -412,7 +412,7 @@ describe("NoticePage source dialog", () => {
   });
 
   it("does not promise a mark when a verified quote's wording differs from the page", async () => {
-    const citation: Citation = { page: 4, quote: "Leverantören ska teckna en försäkring", check: "verified", found_page: null };
+    const citation: Citation = { page: 4, quote: "Leverantören ska teckna en försäkring", check: "verified", found_page: null, document: null, document_id: null };
     mockApi([...baseRoutes(null), noticeWithCitation(citation), pageRoute(4)]);
     renderApp(`/upphandlingar/${NOTICE_ID}`);
 
@@ -423,7 +423,7 @@ describe("NoticePage source dialog", () => {
   });
 
   it("opens page 1 when the AI cites a page past the end of the document", async () => {
-    const citation: Citation = { page: 40, quote: "Sanktioner vid försening", check: "unverified", found_page: null };
+    const citation: Citation = { page: 40, quote: "Sanktioner vid försening", check: "unverified", found_page: null, document: null, document_id: null };
     const calls = mockApi([...baseRoutes(null), noticeWithCitation(citation), pageRoute(1, "Förfrågningsunderlag")]);
     renderApp(`/upphandlingar/${NOTICE_ID}`);
 

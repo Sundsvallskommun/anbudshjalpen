@@ -18,7 +18,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 # Keys that only our code may set. They are removed from the schema shown to models.
-VERIFICATION_KEYS: frozenset[str] = frozenset({"check", "found_page", "draft_check"})
+VERIFICATION_KEYS: frozenset[str] = frozenset({"check", "found_page", "draft_check", "document_id"})
 
 CitationCheck = Literal["verified", "moved", "unverified"]
 
@@ -48,6 +48,13 @@ class Citation(ContractModel):
     )
     found_page: int | None = Field(
         default=None, description="Page where verification found the quote, when it differs."
+    )
+    document: str | None = Field(
+        default=None,
+        description="The document's name from its DOKUMENT: line, when the material has several documents.",
+    )
+    document_id: str | None = Field(
+        default=None, description="Set by citation verification: the document where the quote was found."
     )
 
 
