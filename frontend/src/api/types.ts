@@ -231,6 +231,8 @@ export interface AppConfig {
   gate_required: boolean;
   /** The login page offers "Prova med ditt eget företag" (decision 0010). */
   lab_enabled: boolean;
+  /** Inköp reviews checklists before companies see them (decisions 0011 and 0017). */
+  review_required: boolean;
 }
 
 // --- api/schemas.py: notices -------------------------------------------------------------------

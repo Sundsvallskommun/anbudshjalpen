@@ -26,6 +26,19 @@ async def test_review_is_required_by_default(client: httpx.AsyncClient, demo: De
     assert (await client.get("/api/admin/settings")).json() == {"review_required": True}
 
 
+async def test_the_app_config_tells_everyone_whether_inkop_reviews(
+    client: httpx.AsyncClient, demo: Demo
+) -> None:
+    """Companies never read the settings, but the words for a checklist follow the review (decision 0017)."""
+
+    assert (await client.get("/api/config")).json()["review_required"] is True
+    await login(client, "inkopare")
+    await client.put("/api/admin/settings", json={"review_required": False})
+    await client.post("/api/session/logout")
+
+    assert (await client.get("/api/config")).json()["review_required"] is False
+
+
 async def test_turning_the_review_off_publishes_what_waits_and_what_comes(
     client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
 ) -> None:

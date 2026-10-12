@@ -6,12 +6,13 @@ import { Text } from "@astryxdesign/core/Text";
 import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useId, useState } from "react";
+import { useReviewRequired } from "../../../api/queries";
 import type { Fit, MatchReason, MatchView } from "../../../api/types";
 import { withoutEnginePrefix } from "../../../components/checklist/checklistModel";
 import { AiProvenance } from "../../../components/ui/AiProvenance";
 import { requirementAnchor } from "../../../components/ui/RequirementRow";
 import { SourceLink } from "../../../components/ui/source/SourceLink";
-import { REASON_KIND } from "../../../lib/labels";
+import { noChecklistReason, REASON_KIND } from "../../../lib/labels";
 
 /** At most three reasons first (direction.md, section 6 "MatchCard"); the rest behind "Visa alla skäl (n)". */
 const SHOWN_REASONS = 3;
@@ -28,9 +29,6 @@ const REASON_ICON: Record<MatchReason["kind"], { icon: "success" | "error" | "wa
   hinder: { icon: "error", color: "error" },
   oklart: { icon: "warning", color: "warning" },
 };
-
-/** Said when there is no checklist to compare the profile with (direction.md, "Upphandling utan checklista"). */
-const WITHOUT_CHECKLIST = "Bedömt bara på CPV-kod och ord i annonsen. Det finns ingen granskad checklista att jämföra med.";
 
 function Reason({
   reason,
@@ -111,6 +109,7 @@ export function FitReasons({
 }) {
   const [showsAll, setShowsAll] = useState(false);
   const listId = useId();
+  const reviewRequired = useReviewRequired();
   const reasons = match.assessment.reasons;
   const shown = showsAll ? reasons : reasons.slice(0, SHOWN_REASONS);
   const origin = FIT_HEADING[match.fit];
@@ -135,7 +134,7 @@ export function FitReasons({
         {!hasChecklist && (
           <HStack as="li" gap={2} vAlign="start">
             <Icon icon="info" color="secondary" size="md" />
-            <Text color="secondary">{WITHOUT_CHECKLIST}</Text>
+            <Text color="secondary">{noChecklistReason(reviewRequired)}</Text>
           </HStack>
         )}
       </VStack>

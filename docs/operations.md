@@ -166,7 +166,7 @@ inköps kontomeny (`/inkop/installningar`, `GET` och `PUT /api/admin/settings`),
 
 | Inställning | Standard | Betyder |
 |---|---|---|
-| Inköp granskar checklistor innan de publiceras (`review_required`) | På | Av: en tolkning publiceras direkt, märkt "inte granskad av inköp", och de checklistor som väntar på granskning publiceras när inställningen slås av. Avvisade och tillbakadragna rörs inte |
+| Inköp granskar checklistor innan de publiceras (`review_required`) | På | Av: en tolkning publiceras direkt, märkt "inte granskad av inköp" i checklistan och bara "Checklista" i annonslistorna (beslut 0017), och de checklistor som väntar på granskning publiceras när inställningen slås av. Avvisade och tillbakadragna rörs inte |
 
 ## Loggar
 

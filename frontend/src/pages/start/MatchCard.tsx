@@ -9,6 +9,7 @@ import { StackItem } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useEffect, useId, useRef, useState, type ReactNode, type Ref } from "react";
+import { useReviewRequired } from "../../api/queries";
 import type { Fit, MatchReason, MatchView } from "../../api/types";
 import { noticeOrigin } from "../../components/NoticeRow";
 import { RowEnd } from "../../components/RowList";
@@ -17,7 +18,7 @@ import { AiProvenance } from "../../components/ui/AiProvenance";
 import { DeadlineBlock } from "../../components/ui/DeadlineBlock";
 import { ArrowRightIcon } from "../../components/ui/icons";
 import { SourceLink } from "../../components/ui/source/SourceLink";
-import { noticeDeadlineLabel, REASON_KIND } from "../../lib/labels";
+import { noChecklistReason, noticeDeadlineLabel, REASON_KIND } from "../../lib/labels";
 import { useIsPhone } from "../../lib/usePhone";
 import { withoutEngineLead } from "./start";
 
@@ -29,10 +30,6 @@ const REASONS_HEADING: Record<Fit, string> = {
   passar_delvis: "Därför passar den delvis",
   passar_inte: "Därför verkar den inte passa",
 };
-
-/** Without a published checklist the engine has only the notice to go on, and the reader should know. */
-export const NO_CHECKLIST_REASON =
-  "Bedömt bara på CPV-kod och ord i annonsen. Det finns ingen granskad checklista att jämföra med.";
 
 type ReasonIcon = "success" | "error" | "warning";
 
@@ -61,6 +58,7 @@ function Reasons({ match }: { match: MatchView }) {
   const [isAll, setIsAll] = useState(false);
   const headingId = useId();
   const listId = useId();
+  const reviewRequired = useReviewRequired();
   const { reasons } = match.assessment;
   const heading = REASONS_HEADING[match.fit];
   const shown = isAll ? reasons : reasons.slice(0, REASONS_SHOWN);
@@ -94,9 +92,10 @@ function Reasons({ match }: { match: MatchView }) {
             </ReasonLine>
           );
         })}
+        {/* Without a published checklist the engine has only the notice to go on, and the reader should know. */}
         {!hasChecklist && (
           <ReasonLine icon={<Icon icon="info" color="secondary" size="md" />}>
-            <Text color="secondary">{NO_CHECKLIST_REASON}</Text>
+            <Text color="secondary">{noChecklistReason(reviewRequired)}</Text>
           </ReasonLine>
         )}
       </VStack>

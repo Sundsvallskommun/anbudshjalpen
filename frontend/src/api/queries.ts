@@ -93,6 +93,14 @@ export function useConfig() {
   return useQuery({ queryKey: keys.config, queryFn: () => api.get<AppConfig>("/api/config"), staleTime: Infinity });
 }
 
+/**
+ * Whether inköp reviews checklists now (decision 0017). With the review off, "granskad" tells a company nothing, so
+ * the words leave it out. Until the config is here, the review counts as on: the words that were always shown.
+ */
+export function useReviewRequired(): boolean {
+  return useConfig().data?.review_required ?? true;
+}
+
 export function useSession() {
   return useQuery({ queryKey: keys.session, queryFn: () => api.get<SessionView>("/api/session") });
 }
@@ -474,6 +482,9 @@ export function useUpdateAppSettings() {
     mutationFn: (body: AppSettingsUpdate) => api.put<AppSettingsSaved>("/api/admin/settings", body),
     onSuccess: async (saved) => {
       client.setQueryData(keys.appSettings, { review_required: saved.review_required } satisfies AppSettingsView);
+      client.setQueryData<AppConfig>(keys.config, (config) =>
+        config ? { ...config, review_required: saved.review_required } : config,
+      );
       // Turning the review off publishes checklists, so every list that shows them is stale.
       await client.invalidateQueries({ predicate: (query) => query.queryKey[0] !== "config" });
     },

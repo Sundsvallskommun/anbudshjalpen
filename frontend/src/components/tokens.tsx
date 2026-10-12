@@ -1,7 +1,16 @@
 import { Icon } from "@astryxdesign/core/Icon";
 import { Token } from "@astryxdesign/core/Token";
+import { useReviewRequired } from "../api/queries";
 import type { CheckStatus, ChecklistStatus, Fit, NoticeStatus } from "../api/types";
-import { CHECK_STATUS, CHECKLIST_STATUS, FIT, NOTICE_STATUS, PUBLISHED_CHECKLIST, UNREVIEWED_CHECKLIST } from "../lib/labels";
+import {
+  CHECK_STATUS,
+  CHECKLIST,
+  CHECKLIST_STATUS,
+  FIT,
+  NOTICE_STATUS,
+  PUBLISHED_CHECKLIST,
+  UNREVIEWED_CHECKLIST,
+} from "../lib/labels";
 
 /**
  * The status tokens. Colour carries meaning (direction.md, section 5): green is good, yellow asks for attention, red
@@ -63,9 +72,15 @@ export function FictitiousToken({ size }: { size?: TokenSize }) {
 
 /**
  * A notice with a published checklist: the full help (krav, frågor, granskning). Green when inköp reviewed it;
- * grey and plainly worded when it was published without review (decision 0011).
+ * grey and plainly worded when it was published without review (decision 0011). While inköp does not review at all,
+ * every checklist is just "Checklista": the difference is no longer news (decision 0017), and the checklist itself
+ * still says whether inköp reviewed it.
  */
 export function PublishedChecklistToken({ size, reviewed = true }: { size?: TokenSize; reviewed?: boolean }) {
+  const reviewRequired = useReviewRequired();
+  if (!reviewRequired) {
+    return <StatusLook label={CHECKLIST} look={{ color: "gray", icon: "info" }} size={size} />;
+  }
   if (!reviewed) {
     return <StatusLook label={UNREVIEWED_CHECKLIST} look={{ color: "gray", icon: "info" }} size={size} />;
   }

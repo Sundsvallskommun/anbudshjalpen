@@ -34,6 +34,7 @@ export const config: AppConfig = {
   eavrop_url: "https://www.e-avrop.com/sundsvall",
   gate_required: false,
   lab_enabled: false,
+  review_required: true,
 };
 
 export const companyUser: UserView = {

@@ -90,3 +90,27 @@ export function ArrowRightIcon(props: IconSvgProps) {
     </StrokeIcon>
   );
 }
+
+/** Make a panel larger ("Förstora panelen" in Fråga AI). */
+export function ExpandIcon(props: IconSvgProps) {
+  return (
+    <StrokeIcon {...props}>
+      <path d="M14 4h6v6" />
+      <path d="M20 4l-7 7" />
+      <path d="M10 20H4v-6" />
+      <path d="M4 20l7-7" />
+    </StrokeIcon>
+  );
+}
+
+/** Make a panel smaller again ("Förminska panelen" in Fråga AI). */
+export function CollapseIcon(props: IconSvgProps) {
+  return (
+    <StrokeIcon {...props}>
+      <path d="M19 11h-6V5" />
+      <path d="M13 11l7-7" />
+      <path d="M5 13h6v6" />
+      <path d="M11 13l-7 7" />
+    </StrokeIcon>
+  );
+}

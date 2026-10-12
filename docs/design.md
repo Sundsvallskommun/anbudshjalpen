@@ -188,21 +188,27 @@ granskad checklista ännu" med skälet, knappen till annonsen, knappen till unde
 inläst här (till exempel "Underlaget i e-Avrop") och, när det finns ett underlag, "Fråga underlaget", som öppnar Fråga
 AI. Under kortet står inköps publicerade svar, när det finns några. "Påminn mig"
 står vid sista anbudsdag bland nyckeltalen, så kortet upprepar den inte. En stängd eller tilldelad upphandling lovas
-ingen checklista: kortet heter då "Ingen granskad checklista". Saknas underlaget kan inköparen ladda upp det där.
+ingen checklista: kortet heter då "Ingen granskad checklista". Saknas underlaget kan inköparen ladda upp det där. När
+inköp inte granskar checklistor står det "Ingen checklista ännu" och "Ingen checklista" ([beslut
+0017](decisions/0017-granskad-bara-nar-inkop-granskar.md)).
 
 ### Fråga AI
 
 AI-stödet är en panel som följer läsaren ([beslut 0014](decisions/0014-fraga-ai-panel.md)): knappen "Fråga AI" sist
 i vyn på varje sida bakom dörren, och panelen som en icke-modal Astryx `Popover` förankrad i knappen på bredare
 skärmar och ett högt `BottomSheet` utan skärm på telefon. Sidan går att läsa och använda medan panelen är öppen, och
-källdialogen öppnas ovanpå den. Överst "Fråga AI" med ämnet som underrubrik, och på en upphandlings sida valet
+källdialogen öppnas ovanpå den. Panelen öppnas kompakt, 420 px bred och högst 36 rem hög, så att det mesta av sidan
+syns bredvid, och knappen "Förstora panelen" gör den 720 px bred och högre för långa svar; storleken står kvar tills
+sidan laddas om. Huvudet är en rad: en liten rubrik "Fråga AI" (h2 i dokumentets disposition, i en panels storlek)
+med ämnet på en rad under, och tysta ikonknappar med verktygstips: "Spara som PDF" och "Rensa samtalet" när det finns
+ett samtal, förstora eller förminska (inte på telefon) och "Stäng". Under huvudet, på en upphandlings sida, valet
 Underlaget · Reglerna (`SegmentedControl`). Samtalet är en `ChatMessageList`: frågan i en bubbla ("Du") och svaret
 som ett kort med ursprungsrad, "Står i underlaget", en fet slutsats och citaten med sida, eller för reglerna
 paragraferna svaret bygger på, som på Regelhjälpen. När underlaget inte svarar har svaret den tonade rutan "Ger
 underlaget inget entydigt svar?" med "Påminn mig" och länken dit frågan ställs formellt, och annars raden "Oklart?
-Ställ frågan i e-Avrop senast 30 okt.". Tomt säger panelen vad svaren bygger på och när sista dag för frågor är.
-Exempelfrågor ovanför skrivfältet, som är Astryx `ChatComposer`, och under det raden att svaren är ett stöd. Med ett
-samtal finns "Spara som PDF", som öppnar utskriftsvyn, och "Rensa samtalet".
+Ställ frågan i e-Avrop senast 30 okt.". Tomt säger panelen på en dämpad rad vad svaren bygger på och när sista dag för frågor är.
+Exempelfrågor ovanför skrivfältet, som är Astryx `ChatComposer`, och under det raden att svaren är ett stöd. "Spara
+som PDF" öppnar utskriftsvyn.
 
 Samtalen sparas per ämne i webbläsarens sessionslagring, så de finns kvar mellan sidorna och efter en omladdning i
 samma flik. "Ställ en fråga" i steg 1, "Fråga om kravet" i Granska (med frågan ifylld, också via `?fraga=` i en ny
@@ -288,8 +294,10 @@ tillbaka till länken när dialogen stängs.
 - **Inställningar** (`/inkop/installningar`) har en strömbrytare per inställning med en förklaring under, och sparar
   direkt med en toast som säger vad som hände ("Inställningen är sparad. 12 checklistor som väntade på granskning
   publicerades."). Se [beslut 0011](decisions/0011-installningar-granskning-valfri.md). När granskningen är av märks
-  annonser "Checklista, inte granskad" i stället för "Granskad checklista", och ursprungsraden säger "Automatiskt
-  framtagen · inte granskad av inköp".
+  annonser med checklista bara "Checklista" (grå), eftersom "granskad" då inte skiljer ut någon annons ([beslut
+  0017](decisions/0017-granskad-bara-nar-inkop-granskar.md)), och checklistans ursprungsrad säger "Automatiskt
+  framtagen · inte granskad av inköp". Slås granskningen på igen märks en checklista som publicerades utan granskning
+  "Checklista, inte granskad".
 
 ## Delade komponenter
 
@@ -308,7 +316,7 @@ Byggstenarna som omgörningen lade till ligger i `frontend/src/components/ui/`. 
 | `ResultSummary` | Ett utlåtande: rubrik med siffran, framstegsstapel och statistikrutor som filtrerar raderna under |
 | `StatTile` | En siffra att agera på, med etikett och stödrad. Antingen en länk (ett ankare som öppnar sitt avsnitt) eller ett filter |
 | `StepNav` | Upphandlingens tre steg som en sticky flikrad, med steget i adressen (`?flik=`). Ett steg monteras första gången det öppnas och behålls sedan. `useStepNav().goTo` byter steg och flyttar fokus till steget |
-| `icons.tsx` | Appens egna ikoner där Astryx semantiska ikoner saknar en: dokument, papperskorg, pil framåt, `DownloadIcon` ("Ladda ned") och `UploadIcon` ("Granska en ny version" och "Ladda upp"). De ritas med `Icon` som alla andra |
+| `icons.tsx` | Appens egna ikoner där Astryx semantiska ikoner saknar en: dokument, papperskorg, pil framåt, `DownloadIcon` ("Ladda ned"), `UploadIcon` ("Granska en ny version" och "Ladda upp") och `ExpandIcon` och `CollapseIcon` (förstora och förminska Fråga AI). De ritas med `Icon` som alla andra |
 | `source/SourceLink` | Källan till ett påstående: "6.1 Upphandlingsföreskrifter.pdf, s. 5" som en diskret länk, med filnamnet där sidan känner till upphandlingens dokument (`SourceDocumentsProvider`, upphandlingens sida) och annars bara "s. 5" (Start). På upphandlingens sida står källan på en egen rad under texten, "Källa: …", i checklistans rader och under varje citat i ett svar. Bara avvikelser får en token: "…, s. 9 (AI angav 7)" i blått och "Hittades inte i underlaget" i gult. Namnet säger vad källan belägger: "Visa källan för ”Anbudet är skrivet på svenska”, 6.1 Upphandlingsföreskrifter.pdf, s. 5" |
 | `source/SourceDialog` och `SourceDialogProvider` | Appens enda källdialog, se [Källdialogen](#källdialogen). Den öppnas med `useSourceDialog()`, och `useSourceDeepLink` öppnar den från adressen |
 | `source/PageText` | En sida ur underlaget som papper: cirka 72 tecken per rad, numrerade avsnittsrubriker i semibold och citatet markerat och inskrollat. Används i källdialogen och i inköparens granskning |

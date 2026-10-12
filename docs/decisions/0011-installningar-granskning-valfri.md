@@ -1,6 +1,6 @@
 # 0011: Inköp styr inställningar i tjänsten, och granskningen före publicering går att slå av
 
-- **Status:** Accepterat
+- **Status:** Accepterat, för annonsernas märkning när granskningen är av ersatt av [0017](0017-granskad-bara-nar-inkop-granskar.md)
 - **Datum:** 2026-10-12
 - **Gäller:** var inställningar som verksamheten äger ligger, och om checklistor måste granskas innan företagen ser dem
 - **Ersätter:** delar av [0007](0007-poc-login-persona-picker.md): att inköparens godkännande alltid är spärren

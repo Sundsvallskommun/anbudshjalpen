@@ -1,6 +1,13 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { config } from "../test/fixtures";
+import { mockApi } from "../test/render";
 import { ChecklistStatusToken, FictitiousToken, FitToken, NoticeStatusToken, PublishedChecklistToken, StatusToken } from "./tokens";
+import { renderWithProviders } from "./ui/testing";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("status tokens", () => {
   it("words a fit as what the engine can say", () => {
@@ -34,7 +41,8 @@ describe("status tokens", () => {
   it("shows no token for the normal open state unless asked, and grey metadata otherwise", () => {
     const { container } = render(<NoticeStatusToken status="open" />);
     expect(container).toBeEmptyDOMElement();
-    render(
+    mockApi([{ method: "GET", path: "/api/config", body: config }]);
+    renderWithProviders(
       <>
         <NoticeStatusToken status="open" showOpen />
         <NoticeStatusToken status="closed" />
@@ -48,5 +56,22 @@ describe("status tokens", () => {
     expect(screen.getByText("Fiktiv").closest("[data-color]")).toHaveAttribute("data-color", "gray");
     expect(screen.getByText("Granskad checklista")).toBeInTheDocument();
     expect(screen.getByText("Utkast")).toBeInTheDocument();
+  });
+
+  it("says whether inköp reviewed a checklist only while inköp reviews checklists (decisions 0011 and 0017)", async () => {
+    mockApi([{ method: "GET", path: "/api/config", body: config }]);
+    const { unmount } = renderWithProviders(<PublishedChecklistToken reviewed={false} />);
+    expect(await screen.findByText("Checklista, inte granskad")).toBeInTheDocument();
+    unmount();
+
+    mockApi([{ method: "GET", path: "/api/config", body: { ...config, review_required: false } }]);
+    renderWithProviders(
+      <>
+        <PublishedChecklistToken reviewed={false} />
+        <PublishedChecklistToken />
+      </>,
+    );
+    expect(await screen.findAllByText("Checklista")).toHaveLength(2);
+    expect(screen.queryByText(/granskad/u)).not.toBeInTheDocument();
   });
 });

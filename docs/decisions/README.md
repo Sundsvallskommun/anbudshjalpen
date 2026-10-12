@@ -22,12 +22,13 @@ Hör ihop med: [Dokumentationsindex](../README.md), [Arkitektur](../architecture
 | [0008](0008-license-agpl-3.md) | Repot licensieras under AGPL-3.0, som Eneo | Accepterat | 2026-10-07 |
 | [0009](0009-eavrop-projekt-api.md) | e-Avrop hämtas via kommunens Projekt-API, med en vitlista | Accepterat | 2026-10-08 |
 | [0010](0010-labblage-egna-foretag.md) | En accesskod skyddar testmiljön, och labbläget låter deltagare prova med sitt eget företag | Accepterat | 2026-10-12 |
-| [0011](0011-installningar-granskning-valfri.md) | Inköp styr inställningar i tjänsten, och granskningen före publicering går att slå av | Accepterat | 2026-10-12 |
+| [0011](0011-installningar-granskning-valfri.md) | Inköp styr inställningar i tjänsten, och granskningen före publicering går att slå av | Accepterat, annonsernas märkning när granskningen är av ersatt av 0017 | 2026-10-12 |
 | [0012](0012-fragor-mot-alla-dokument.md) | Frågor besvaras mot alla dokument i upphandlingen, med ett urval över en budget | Accepterat | 2026-10-12 |
 | [0013](0013-fragor-och-svar-fran-eavrop.md) | Inköps publicerade svar på leverantörernas frågor hämtas från e-Avrops frågelogg | Accepterat | 2026-10-12 |
 | [0014](0014-fraga-ai-panel.md) | AI-stödet är en panel som följer läsaren, och samtalet går att spara som PDF | Accepterat | 2026-10-12 |
 | [0015](0015-namnet-anbudshjalpen.md) | Tjänsten heter Anbudshjälpen och får märket Toppen, och de tekniska namnen behåller anbudsklar | Accepterat, repots namn ersatt av 0016 | 2026-10-12 |
 | [0016](0016-repot-heter-anbudshjalpen.md) | Repot på GitHub heter anbudshjalpen | Accepterat | 2026-10-12 |
+| [0017](0017-granskad-bara-nar-inkop-granskar.md) | Ordet "granskad" i annonslistorna visas bara när inköp granskar checklistor | Accepterat | 2026-10-12 |
 
 ## Så skriver du ett beslut
 

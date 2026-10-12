@@ -9,6 +9,7 @@ import { Layout, LayoutContent, LayoutFooter, LayoutHeader } from "@astryxdesign
 import { Popover } from "@astryxdesign/core/Popover";
 import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Spinner } from "@astryxdesign/core/Spinner";
+import { StackItem } from "@astryxdesign/core/Stack";
 import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import { Fragment, useEffect, useId, useRef, useState } from "react";
@@ -19,16 +20,22 @@ import { AnswerCard } from "../../pages/notice/steps/question/AnswerCard";
 import { EXAMPLE_QUESTIONS as RULES_EXAMPLES } from "../../pages/rules/rulesAnswer";
 import { RulesAnswerCard } from "../../pages/rules/RulesAnswerCard";
 import { ErrorNotice } from "../states";
-import { ChatIcon, DownloadIcon } from "../ui/icons";
+import { ChatIcon, CollapseIcon, DownloadIcon, ExpandIcon, TrashIcon } from "../ui/icons";
 import styles from "./AskAiPanel.module.css";
 import { isPending as isTurnPending, noticeScope, questionProblem, RULES_SCOPE, scopeKey, type AskScope, type Turn } from "./askAiState";
 import { useAskAi, type AskAiApi } from "./AskAiProvider";
 
 export const ASK_AI_TITLE = "Fråga AI";
 const RULES_SUBJECT = "Reglerna för offentlig upphandling";
-/** The panel's height on wider screens: a tall column, but never the whole window, so the page stays in view. */
-const PANEL_HEIGHT = "min(72dvh, 44rem)";
-const PANEL_WIDTH = 600;
+/**
+ * The panel's sizes on wider screens. Compact by default, a column beside the page's content that leaves most of
+ * the page in view; expanded for reading long answers with their quotes. Never the whole window.
+ */
+const PANEL_SIZE = {
+  compact: { width: 420, height: "min(70dvh, 36rem)" },
+  expanded: { width: 720, height: "min(86dvh, 56rem)" },
+} as const;
+type PanelSize = keyof typeof PANEL_SIZE;
 
 /** Questions most companies have about a procurement's documents, to ask with one press. */
 export const NOTICE_EXAMPLES: readonly string[] = [
@@ -103,22 +110,27 @@ function Answer({ turn, ai }: { turn: Turn; ai: AskAiApi }) {
   return <AnswerCard view={turn.answer} question={turn.question} notice={ai.notice} />;
 }
 
-/** The conversation as the design system's message list: the reader's bubbles and the answers as cards. */
+/**
+ * The conversation as the design system's message list: the reader's bubbles and the answers as cards. Before the
+ * first question, only what the answers rest on, as a quiet line: the list's empty state centres it with room to spare.
+ */
 function Thread({ ai }: { ai: AskAiApi }) {
-  const intro = ai.scope.kind === "notice" && ai.notice ? questionIntro(ai.notice.question_deadline) : RULES_INTRO;
+  if (ai.turns.length === 0) {
+    const intro = ai.scope.kind === "notice" && ai.notice ? questionIntro(ai.notice.question_deadline) : RULES_INTRO;
+    return <Text type="supporting">{intro}</Text>;
+  }
   return (
-    <ChatMessageList align="top" density="compact" isStreaming={ai.turns.some(isTurnPending)} emptyState={<Text color="secondary">{intro}</Text>}>
+    <ChatMessageList align="top" density="compact" isStreaming={ai.turns.some(isTurnPending)}>
       {ai.turns.map((turn) => (
         <Fragment key={turn.id}>
           <ChatMessage sender="user">
             <ChatMessageBubble name="Du">{turn.question}</ChatMessageBubble>
           </ChatMessage>
+          {/* The answer card flush with the panel's edge, not in a bubble's text column: the panel is narrow. */}
           <ChatMessage sender="assistant">
-            <ChatMessageBubble variant="ghost" width="100%">
-              <VStack as="article" aria-label={`Svar på ”${turn.question}”`}>
-                <Answer turn={turn} ai={ai} />
-              </VStack>
-            </ChatMessageBubble>
+            <VStack as="article" aria-label={`Svar på ”${turn.question}”`} width="100%">
+              <Answer turn={turn} ai={ai} />
+            </VStack>
           </ChatMessage>
         </Fragment>
       ))}
@@ -149,14 +161,10 @@ function Suggestions({ ai }: { ai: AskAiApi }) {
   );
 }
 
-/**
- * The writing field and what goes with it: the design system's composer, the line that the answers are a support,
- * and the actions on the conversation, printing it (saving as PDF) and clearing it.
- */
+/** The writing field and what goes with it: the design system's composer and the line that the answers are a support. */
 function Writing({ ai }: { ai: AskAiApi }) {
   const [problem, setProblem] = useState<string | null>(null);
   const area = useRef<HTMLDivElement>(null);
-  const hasAnswers = ai.turns.some((turn) => turn.answer !== null || turn.rules !== null);
 
   // A question handed over with the panel goes straight to the field, so the reader can send or change it.
   useEffect(() => {
@@ -195,53 +203,98 @@ function Writing({ ai }: { ai: AskAiApi }) {
         status={problem ? { type: "error", message: problem } : undefined}
       />
       <Text type="supporting">{note}</Text>
-      {ai.turns.length > 0 && (
-        <HStack gap={2} hAlign="between" vAlign="center" wrap="wrap">
-          {hasAnswers ? (
-            <Button label="Spara som PDF" variant="secondary" size="sm" href={exportHref(ai.scope)} icon={<Icon icon={DownloadIcon} />} />
-          ) : (
-            <span />
-          )}
-          <Button label="Rensa samtalet" variant="ghost" size="sm" onClick={ai.clear} />
-        </HStack>
-      )}
     </VStack>
   );
 }
 
-/** The title and the subject under it. On a phone the sheet has no heading of its own, so the focus moves here (WCAG 3.2.4). */
-function PanelHeading({ ai, subtitle, takesFocus }: { ai: AskAiApi; subtitle: string; takesFocus: boolean }) {
+/**
+ * The panel's header: a small title with the subject on one line under it, and the actions on the conversation as
+ * quiet icon buttons with tooltips: save as PDF and clear once there is something to save or clear, make the panel
+ * larger or smaller on wider screens, and close. The title is an h2 in the outline but set at a panel's size. On a
+ * phone the sheet has no heading of its own, so the focus moves here (WCAG 3.2.4).
+ */
+function PanelHeader({
+  ai,
+  subtitle,
+  takesFocus,
+  size,
+  onSizeChange,
+}: {
+  ai: AskAiApi;
+  subtitle: string;
+  takesFocus: boolean;
+  size?: PanelSize;
+  onSizeChange?: (size: PanelSize) => void;
+}) {
   const ref = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (takesFocus && ai.isOpen) ref.current?.focus();
   }, [takesFocus, ai.isOpen]);
+  const hasAnswers = ai.turns.some((turn) => turn.answer !== null || turn.rules !== null);
+  const isExpanded = size === "expanded";
   return (
-    <HStack gap={3} hAlign="between" vAlign="start">
-      <VStack gap={0.5}>
-        <Heading level={2} ref={ref} tabIndex={takesFocus ? -1 : undefined}>
-          {ASK_AI_TITLE}
-        </Heading>
-        <Text type="supporting">{subtitle}</Text>
-      </VStack>
-      <Button label="Stäng" variant="ghost" size="sm" onClick={ai.close} />
+    <HStack gap={2} vAlign="center">
+      <HStack aria-hidden="true">
+        <Icon icon={ChatIcon} color="accent" size="md" />
+      </HStack>
+      <StackItem size="fill">
+        <VStack gap={0}>
+          <Heading level={5} accessibilityLevel={2} ref={ref} tabIndex={takesFocus ? -1 : undefined}>
+            {ASK_AI_TITLE}
+          </Heading>
+          <Text type="supporting" maxLines={1}>
+            {subtitle}
+          </Text>
+        </VStack>
+      </StackItem>
+      <HStack gap={0.5} vAlign="center">
+        {hasAnswers && (
+          <Button label="Spara som PDF" tooltip="Spara som PDF" variant="ghost" size="sm" isIconOnly href={exportHref(ai.scope)} icon={<Icon icon={DownloadIcon} />} />
+        )}
+        {ai.turns.length > 0 && (
+          <Button label="Rensa samtalet" tooltip="Rensa samtalet" variant="ghost" size="sm" isIconOnly onClick={ai.clear} icon={<Icon icon={TrashIcon} />} />
+        )}
+        {size && onSizeChange && (
+          <Button
+            label={isExpanded ? "Förminska panelen" : "Förstora panelen"}
+            tooltip={isExpanded ? "Förminska" : "Förstora"}
+            variant="ghost"
+            size="sm"
+            isIconOnly
+            onClick={() => onSizeChange(isExpanded ? "compact" : "expanded")}
+            icon={<Icon icon={isExpanded ? CollapseIcon : ExpandIcon} />}
+          />
+        )}
+        <Button label="Stäng" tooltip="Stäng" variant="ghost" size="sm" isIconOnly onClick={ai.close} icon={<Icon icon="close" />} />
+      </HStack>
     </HStack>
   );
 }
 
-/** The panel on wider screens: a fixed-height column whose conversation scrolls between the heading and the field. */
-function DockedPanel({ ai, subtitle }: { ai: AskAiApi; subtitle: string }) {
+/** The panel on wider screens: a fixed-height column whose conversation scrolls between the header and the field. */
+function DockedPanel({
+  ai,
+  subtitle,
+  size,
+  onSizeChange,
+}: {
+  ai: AskAiApi;
+  subtitle: string;
+  size: PanelSize;
+  onSizeChange: (size: PanelSize) => void;
+}) {
   return (
-    <VStack height={PANEL_HEIGHT} width="100%">
+    <VStack height={PANEL_SIZE[size].height} width="100%">
       <Layout
         height="fill"
         header={
-          <LayoutHeader padding={4}>
-            <PanelHeading ai={ai} subtitle={subtitle} takesFocus={false} />
+          <LayoutHeader padding={3}>
+            <PanelHeader ai={ai} subtitle={subtitle} takesFocus={false} size={size} onSizeChange={onSizeChange} />
           </LayoutHeader>
         }
         content={
-          <LayoutContent padding={4}>
-            <VStack gap={4}>
+          <LayoutContent padding={3}>
+            <VStack gap={3}>
               <Subject ai={ai} />
               <Thread ai={ai} />
               <Suggestions ai={ai} />
@@ -249,7 +302,7 @@ function DockedPanel({ ai, subtitle }: { ai: AskAiApi; subtitle: string }) {
           </LayoutContent>
         }
         footer={
-          <LayoutFooter padding={4}>
+          <LayoutFooter padding={3}>
             <Writing ai={ai} />
           </LayoutFooter>
         }
@@ -263,12 +316,15 @@ function DockedPanel({ ai, subtitle }: { ai: AskAiApi; subtitle: string }) {
  * On wider screens the panel is a non-modal Astryx Popover anchored to the button, so the page stays readable and
  * usable while it is open and the source dialog can open above it; on a phone a tall bottom sheet without a scrim.
  * Both hold the same content: the subject, the conversation as a message list, example questions and the composer.
+ * The popover opens compact and can be made larger for long answers.
  * Rendered once by AppFrame; open it from anywhere with useAskAi().
  */
 export function AskAiWidget() {
   const ai = useAskAi();
   const isPhone = useIsPhone();
   const subtitle = subjectOf(ai.scope, ai.notice);
+  // Kept while the panel is closed, so it opens at the size the reader chose.
+  const [size, setSize] = useState<PanelSize>("compact");
   const onOpenChange = (open: boolean) => {
     if (open) ai.open();
     else ai.close();
@@ -282,7 +338,7 @@ export function AskAiWidget() {
         </HStack>
         <BottomSheet isOpen={ai.isOpen} onOpenChange={onOpenChange} label={ASK_AI_TITLE} height="tall" hasScrim={false} finalFocusRef={ai.openerRef}>
           <VStack gap={4} padding={4}>
-            <PanelHeading ai={ai} subtitle={subtitle} takesFocus />
+            <PanelHeader ai={ai} subtitle={subtitle} takesFocus />
             <Subject ai={ai} />
             <Thread ai={ai} />
             <Suggestions ai={ai} />
@@ -302,10 +358,10 @@ export function AskAiWidget() {
         hasEscapeDismiss
         placement="above"
         alignment="end"
-        width={PANEL_WIDTH}
+        width={PANEL_SIZE[size].width}
         label={ASK_AI_TITLE}
         closeButtonLabel="Stäng panelen"
-        content={<DockedPanel ai={ai} subtitle={subtitle} />}
+        content={<DockedPanel ai={ai} subtitle={subtitle} size={size} onSizeChange={setSize} />}
       >
         <Button label={ASK_AI_TITLE} variant="primary" icon={<Icon icon={ChatIcon} />} />
       </Popover>
