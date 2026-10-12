@@ -17,7 +17,8 @@ import { NoticeSteps } from "./steps/NoticeSteps";
 
 const BREADCRUMBS = [{ label: "Upphandlingar", href: "/upphandlingar" }] as const;
 
-function NoticeView({ notice }: { notice: NoticeDetail }) {
+/** `checkedAt` is when the notice was last fetched: the card for a checklist on its way shows it (decision 0019). */
+function NoticeView({ notice, checkedAt }: { notice: NoticeDetail; checkedAt: number }) {
   const session = useSession();
   const user = session.data?.user ?? null;
   useRegisterNotice(notice);
@@ -28,7 +29,7 @@ function NoticeView({ notice }: { notice: NoticeDetail }) {
         {notice.checklist ? (
           <NoticeSteps notice={notice} view={notice.checklist} user={user} />
         ) : (
-          <NoChecklist notice={notice} user={user} />
+          <NoChecklist notice={notice} user={user} checkedAt={checkedAt} />
         )}
       </Page>
     </SourceDocumentsProvider>
@@ -72,5 +73,5 @@ export default function NoticePage() {
       </Page>
     );
   }
-  return <NoticeView notice={notice.data} />;
+  return <NoticeView notice={notice.data} checkedAt={notice.dataUpdatedAt} />;
 }

@@ -102,7 +102,7 @@ function Pending() {
 /** The answer to one turn, by what the conversation is about; a failed turn says so and offers to ask again. */
 function Answer({ turn, ai }: { turn: Turn; ai: AskAiApi }) {
   if (turn.error !== null) {
-    return <ErrorNotice title="Frågan kunde inte besvaras" error={new Error(turn.error)} onRetry={ai.isPending ? undefined : () => ai.retry(turn.id)} />;
+    return <ErrorNotice title="Frågan kunde inte besvaras" error={turn.error} onRetry={ai.isPending ? undefined : () => ai.retry(turn.id)} />;
   }
   if (ai.scope.kind === "rules") return <RulesAnswerCard question={turn.question} view={turn.rules} />;
   if (!turn.answer) return <Pending />;
@@ -113,6 +113,8 @@ function Answer({ turn, ai }: { turn: Turn; ai: AskAiApi }) {
 /**
  * The conversation as the design system's message list: the reader's bubbles and the answers as cards. Before the
  * first question, only what the answers rest on, as a quiet line: the list's empty state centres it with room to spare.
+ * The reader's bubble carries no name: it sits to the right in its own colour, and a name over it only crowded the
+ * question; the design system names the message for screen readers.
  */
 function Thread({ ai }: { ai: AskAiApi }) {
   if (ai.turns.length === 0) {
@@ -124,7 +126,7 @@ function Thread({ ai }: { ai: AskAiApi }) {
       {ai.turns.map((turn) => (
         <Fragment key={turn.id}>
           <ChatMessage sender="user">
-            <ChatMessageBubble name="Du">{turn.question}</ChatMessageBubble>
+            <ChatMessageBubble>{turn.question}</ChatMessageBubble>
           </ChatMessage>
           {/* The answer card flush with the panel's edge, not in a bubble's text column: the panel is narrow. */}
           <ChatMessage sender="assistant">
@@ -138,20 +140,21 @@ function Thread({ ai }: { ai: AskAiApi }) {
   );
 }
 
-/** Questions to ask with one press; one that has been asked is not offered again. */
+/**
+ * Questions to ask with one press, offered until the first question is asked: a reader with a conversation going
+ * knows what to ask, and the examples only pushed the answers up.
+ */
 function Suggestions({ ai }: { ai: AskAiApi }) {
   const labelId = useId();
+  if (ai.turns.length > 0) return null;
   const examples = ai.scope.kind === "notice" ? NOTICE_EXAMPLES : RULES_EXAMPLES;
-  const asked = ai.turns.map((turn) => turn.question);
-  const left = examples.filter((example) => !asked.includes(example));
-  if (left.length === 0) return null;
   return (
     <VStack gap={2}>
       <Text type="supporting" weight="semibold" id={labelId}>
-        {asked.length > 0 ? "Fler frågor du kan ställa" : "Exempel på frågor"}
+        Exempel på frågor
       </Text>
       <HStack as="ul" role="list" aria-labelledby={labelId} gap={2} wrap="wrap">
-        {left.map((example) => (
+        {examples.map((example) => (
           <li key={example}>
             <Button label={example} size="sm" variant="secondary" onClick={() => !ai.isPending && ai.ask(example)} />
           </li>
@@ -197,7 +200,7 @@ function Writing({ ai }: { ai: AskAiApi }) {
           if (problem) setProblem(null);
         }}
         onSubmit={submit}
-        placeholder={ai.scope.kind === "notice" ? "Till exempel: Hur många referensuppdrag behövs?" : "Till exempel: Vad är ett tilldelningsbeslut?"}
+        placeholder="Skriv din fråga här"
         density="compact"
         elevation="none"
         status={problem ? { type: "error", message: problem } : undefined}

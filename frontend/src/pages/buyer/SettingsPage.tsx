@@ -13,8 +13,7 @@ import { RequireRole } from "../../shell/RequireRole";
 export const REVIEW_LABEL = "Inköp granskar checklistor innan de publiceras";
 const REVIEW_DESCRIPTION =
   "På: företagen ser en checklista först när inköp har godkänt och publicerat den. " +
-  "Av: en checklista publiceras direkt när den har tolkats, märkt ”inte granskad av inköp”, och de som väntar på " +
-  "granskning publiceras nu.";
+  "Av: en checklista publiceras direkt när den har tolkats, och de som väntar på granskning publiceras nu.";
 
 /** What the toast says after a save: how many waiting checklists the change published, if any. */
 export function savedMessage(saved: AppSettingsSaved): string {
