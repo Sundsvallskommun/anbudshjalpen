@@ -78,7 +78,7 @@ function KeyDateRow({
         </HStack>
       }
       description={row.detail ?? undefined}
-      endContent={
+      source={
         <SourceLink
           noticeId={noticeId}
           citation={row.citation}

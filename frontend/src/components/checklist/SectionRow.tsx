@@ -1,5 +1,6 @@
 import { Heading } from "@astryxdesign/core/Heading";
 import { Item } from "@astryxdesign/core/Item";
+import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import type { ReactNode } from "react";
 import styles from "./SectionRow.module.css";
@@ -25,31 +26,50 @@ export function wrapping(text: ReactNode): ReactNode {
   return text ? <>{text}</> : undefined;
 }
 
+/** The line that says where a row's claim stands: "Källa: 6.1 Upphandlingsföreskrifter.pdf, s. 5". */
+export function SourceLine({ children }: { children: ReactNode }) {
+  return (
+    <Text type="supporting">
+      Källa: {children}
+    </Text>
+  );
+}
+
 /**
- * One row of a section card: what the row is about and, at the end, its source. Neither the label nor the
+ * One row of a section card: what the row is about and, under it, its source. Neither the label nor the
  * description is ever cut off, so a long attachment name, date text or explanation wraps.
  */
 export function SectionRow({
   label,
   description,
+  source,
   startContent,
   endContent,
   isFlush = false,
 }: {
   label: ReactNode;
   description?: ReactNode;
+  /** The row's source link, shown as "Källa: …" under the description. */
+  source?: ReactNode;
   startContent?: ReactNode;
   endContent?: ReactNode;
   /** In a list that already sits on the card's inset, the row adds none of its own. */
   isFlush?: boolean;
 }) {
+  const body =
+    source || description ? (
+      <VStack gap={1}>
+        {wrapping(description)}
+        {source && <SourceLine>{source}</SourceLine>}
+      </VStack>
+    ) : undefined;
   return (
     <Item
       as="li"
       align="start"
       className={isFlush ? `${styles.row} ${styles.flush}` : styles.row}
       label={wrapping(label)}
-      description={wrapping(description)}
+      description={body}
       startContent={startContent}
       endContent={endContent}
     />

@@ -5,6 +5,7 @@ import type { MouseEvent } from "react";
 import type { Citation } from "../../../api/types";
 import { citationPage } from "../../../lib/labels";
 import { useOptionalSourceDialog } from "./SourceDialogProvider";
+import { useSourceDocumentName } from "./SourceDocuments";
 import styles from "./SourceLink.module.css";
 import { sourceHref } from "./sourceTarget";
 
@@ -19,7 +20,7 @@ export interface SourceLinkProps {
   documentId?: string;
   /** In running text the link needs no enlarged hit area (WCAG 2.5.8 exempts inline targets). */
   isInline?: boolean;
-  /** The document's name, said before the page when the material has several documents ("6.6 Krav.pdf, s. 8"). */
+  /** The file's name before the page ("6.6 Krav.pdf, s. 8"); taken from the page's documents when left out. */
   documentName?: string;
 }
 
@@ -29,9 +30,10 @@ function isPlainClick(event: MouseEvent): boolean {
 }
 
 /**
- * A claim's source: "s. 5" as a quiet link (13 px accent, no icon). Only deviations get a token and words: a quote
- * found on another page reads "s. 9 (AI angav 7)" on blue, one that was not found "Hittades inte i underlaget" on
- * yellow. It always opens the source dialog; its address (`?citat=…`) opens the same dialog on the notice page from
+ * A claim's source: "6.1 Upphandlingsföreskrifter.pdf, s. 5" as a quiet link (13 px accent, no icon), naming the
+ * file wherever the page knows its documents (`SourceDocumentsProvider`), else just "s. 5". Only deviations get a
+ * token and more words: a quote found on another page reads "…, s. 9 (AI angav 7)" on blue, one that was not found
+ * "Hittades inte i underlaget" on yellow. It always opens the source dialog; its address (`?citat=…`) opens the same dialog on the notice page from
  * anywhere else. The name says what the source backs: "Visa källan för ”Anbudet är skrivet på svenska”, s. 5".
  */
 export function SourceLink({
@@ -45,6 +47,8 @@ export function SourceLink({
 }: SourceLinkProps) {
   const dialog = useOptionalSourceDialog();
   const page = citationPage(citation);
+  const pageDocumentName = useSourceDocumentName(documentId ?? citation.document_id);
+  const fileName = documentName ?? pageDocumentName;
 
   const onClick = (event: MouseEvent) => {
     if (!dialog || !isPlainClick(event)) return;
@@ -52,7 +56,7 @@ export function SourceLink({
     dialog.openSource({ noticeId, citation, claim, origin, documentId });
   };
 
-  const where = documentName ? `${documentName}, s. ${page}` : `s. ${page}`;
+  const where = fileName ? `${fileName}, s. ${page}` : `s. ${page}`;
   const visibleWords =
     citation.check === "moved"
       ? `${where} (AI angav ${citation.page})`

@@ -108,7 +108,7 @@ describe("NoticePage header", () => {
     expect(within(panel).getByText("Kontrollera själv:")).toBeInTheDocument();
     expect(
       within(panel).getByRole("link", {
-        name: "Visa källan för ”Ni har angett en försäkring i profilen. Kontrollera att den räcker för kravet.”, s. 4",
+        name: "Visa källan för ”Ni har angett en försäkring i profilen. Kontrollera att den räcker för kravet.”, Förfrågningsunderlag Solbacken.pdf, s. 4",
       }),
     ).toBeInTheDocument();
     expect(within(panel).queryByText(extra.text)).not.toBeInTheDocument();
@@ -213,10 +213,10 @@ describe("NoticePage step 1 Krav", () => {
     expect(sectionButton("Viktiga datum")).toHaveAttribute("aria-expanded", "true");
     expect(sectionButton("Ord och begrepp, 1 ord")).toHaveAttribute("aria-expanded", "false");
 
-    expect(screen.getByRole("link", { name: "Visa källan för ”Ansvarsförsäkring om minst 5 miljoner kronor”, s. 4" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Visa källan för ”Ansvarsförsäkring om minst 5 miljoner kronor”, Förfrågningsunderlag Solbacken.pdf, s. 4" })).toBeInTheDocument();
     // The quote was found on page 6, not the page 5 the AI gave: the link opens page 6 and says so.
     expect(screen.getByRole("link", { name: /s\. 6 \(AI angav 5\)$/u })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Visa källan för ”Sista dag för frågor, 16 oktober 2026”, s. 2" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Visa källan för ”Sista dag för frågor, 16 oktober 2026”, Förfrågningsunderlag Solbacken.pdf, s. 2" })).toBeInTheDocument();
 
     await userEvent.click(sectionButton("Bilagor att lämna in, 1 bilaga"));
     expect(screen.getByRole("link", { name: "Visa källan för ”Prisbilaga”, Hittades inte i underlaget" })).toBeInTheDocument();
@@ -400,7 +400,7 @@ describe("NoticePage source dialog", () => {
     mockApi([...baseRoutes(null), noticeRoute, pageRoute(4)]);
     renderApp(`/upphandlingar/${NOTICE_ID}`);
 
-    await userEvent.click(await screen.findByRole("link", { name: /Ansvarsförsäkring om minst 5 miljoner kronor”, s\. 4$/u }));
+    await userEvent.click(await screen.findByRole("link", { name: /Ansvarsförsäkring om minst 5 miljoner kronor”, .*, s\. 4$/u }));
     const dialog = await screen.findByRole("dialog", { name: "Källan i underlaget" });
     // The page's lines are joined into paragraphs, so the quote that ran over a line break reads as one line.
     const mark = await within(dialog).findByText(
@@ -416,7 +416,7 @@ describe("NoticePage source dialog", () => {
     mockApi([...baseRoutes(null), noticeWithCitation(citation), pageRoute(4)]);
     renderApp(`/upphandlingar/${NOTICE_ID}`);
 
-    await userEvent.click(await screen.findByRole("link", { name: /Ansvarsförsäkring om minst 5 miljoner kronor”, s\. 4$/u }));
+    await userEvent.click(await screen.findByRole("link", { name: /Ansvarsförsäkring om minst 5 miljoner kronor”, .*, s\. 4$/u }));
     const dialog = await screen.findByRole("dialog", { name: "Källan i underlaget" });
     expect(await within(dialog).findByText(/lite andra ord, så det går inte att markera/u)).toBeInTheDocument();
     expect(dialog.querySelector("mark")).toBeNull();

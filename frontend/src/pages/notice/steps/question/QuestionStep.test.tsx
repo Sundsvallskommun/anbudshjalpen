@@ -78,7 +78,7 @@ describe("Step 2 Fråga", () => {
     expect(within(answer).getByText("Försäkringsbeviset ska bifogas anbudet.")).toBeInTheDocument();
     expect(within(answer).getByText("Står i underlaget")).toBeInTheDocument();
     const quotes = within(answer).getByRole("list", { name: "Det här står i underlaget:" });
-    expect(within(quotes).getByRole("link", { name: "Visa källan för ”Leverantören ska ha en ansvarsförsäkring”, s. 4" })).toBeInTheDocument();
+    expect(within(quotes).getByRole("link", { name: "Visa källan för ”Leverantören ska ha en ansvarsförsäkring”, Förfrågningsunderlag Solbacken.pdf, s. 4" })).toBeInTheDocument();
     expect(within(quotes).getByText(/^Källa:/)).toBeInTheDocument();
     // The document settles it, so only the short line about the formal question.
     expect(within(answer).getByText("Oklart? Ställ frågan i e-Avrop senast 16 okt.")).toBeInTheDocument();

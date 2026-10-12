@@ -6,6 +6,7 @@ import { TermText } from "../TermText";
 import { CollapsibleSection } from "../ui/CollapsibleSection";
 import { SourceLink } from "../ui/source/SourceLink";
 import { criterionDetail, criterionHeading, evaluationShares } from "./checklistModel";
+import { SourceLine } from "./SectionRow";
 import styles from "./Evaluation.module.css";
 
 /** The anchor of the evaluation section, for the statistic tile and the outline. */
@@ -57,6 +58,9 @@ export function Evaluation({
                     )}
                     <Text weight="semibold">{heading}</Text>
                   </HStack>
+                </HStack>
+                {detail && <TermText text={detail} terms={terms} />}
+                <SourceLine>
                   <SourceLink
                     noticeId={noticeId}
                     citation={criterion.citation}
@@ -64,8 +68,7 @@ export function Evaluation({
                     origin={EVALUATION_TITLE}
                     documentId={documentId}
                   />
-                </HStack>
-                {detail && <TermText text={detail} terms={terms} />}
+                </SourceLine>
               </VStack>
             );
           })}

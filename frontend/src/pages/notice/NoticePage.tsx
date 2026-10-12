@@ -8,6 +8,7 @@ import { useNotice, useSession } from "../../api/queries";
 import type { NoticeDetail } from "../../api/types";
 import { ErrorNotice, Loading } from "../../components/states";
 import { useSourceDeepLink } from "../../components/ui/source/SourceDialogProvider";
+import { SourceDocumentsProvider } from "../../components/ui/source/SourceDocuments";
 import { Page } from "../../shell/Page";
 import { NoticeHeader, NoticeIntro } from "./header/NoticeHeader";
 import { NoChecklist } from "./NoChecklist";
@@ -19,14 +20,16 @@ function NoticeView({ notice }: { notice: NoticeDetail }) {
   const session = useSession();
   const user = session.data?.user ?? null;
   return (
-    <Page title={notice.title} breadcrumbs={BREADCRUMBS} intro={<NoticeIntro notice={notice} />}>
-      <NoticeHeader notice={notice} user={user} />
-      {notice.checklist ? (
-        <NoticeSteps notice={notice} view={notice.checklist} user={user} />
-      ) : (
-        <NoChecklist notice={notice} user={user} />
-      )}
-    </Page>
+    <SourceDocumentsProvider documents={notice.documents}>
+      <Page title={notice.title} breadcrumbs={BREADCRUMBS} intro={<NoticeIntro notice={notice} />}>
+        <NoticeHeader notice={notice} user={user} />
+        {notice.checklist ? (
+          <NoticeSteps notice={notice} view={notice.checklist} user={user} />
+        ) : (
+          <NoChecklist notice={notice} user={user} />
+        )}
+      </Page>
+    </SourceDocumentsProvider>
   );
 }
 
