@@ -22,7 +22,7 @@ export function NoticeIntro({ notice }: { notice: NoticeDetail }) {
         <NoticeStatusToken status={notice.status} size="sm" />
         {notice.is_fictitious && <FictitiousToken size="sm" />}
         {notice.fit && <FitToken fit={notice.fit} size="sm" />}
-        {publishedChecklist(notice) && <PublishedChecklistToken size="sm" />}
+        {publishedChecklist(notice) && <PublishedChecklistToken size="sm" reviewed={publishedChecklist(notice)?.reviewed} />}
       </HStack>
     </HStack>
   );

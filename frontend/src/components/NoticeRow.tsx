@@ -60,7 +60,7 @@ function NoticeTokens({ notice, isStatusShown }: { notice: NoticeSummary; isStat
     <>
       {isStatusShown && <NoticeStatusToken status={notice.status} size="sm" />}
       {notice.fit && <FitToken fit={notice.fit} size="sm" />}
-      {notice.checklist_status === "published" && <PublishedChecklistToken size="sm" />}
+      {notice.checklist_status === "published" && <PublishedChecklistToken size="sm" reviewed={notice.checklist_reviewed} />}
       {notice.is_fictitious && <FictitiousToken size="sm" />}
     </>
   );

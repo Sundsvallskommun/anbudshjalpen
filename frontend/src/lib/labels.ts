@@ -45,6 +45,8 @@ export const FIT: Record<Fit, string> = {
 
 /** The token on a notice with a published checklist ("Checklista finns" before the redesign). */
 export const PUBLISHED_CHECKLIST = "Granskad checklista";
+/** The same token when the checklist was published without inköp's review (decision 0011). */
+export const UNREVIEWED_CHECKLIST = "Checklista, inte granskad";
 
 export const REQUIREMENT_KINDS: { kind: RequirementKind; label: string; description: string }[] = [
   {

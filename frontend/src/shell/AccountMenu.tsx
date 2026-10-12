@@ -31,7 +31,10 @@ export function accountLinks(user: UserView): MenuLink[] {
       { label: "Påminnelser", href: "/paminnelser" },
     ];
   }
-  return [{ label: "Drift", href: "/inkop/drift" }];
+  return [
+    { label: "Inställningar", href: "/inkop/installningar" },
+    { label: "Drift", href: "/inkop/drift" },
+  ];
 }
 
 function MenuContent({ user, onClose }: { user: UserView; onClose: () => void }) {
