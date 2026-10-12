@@ -164,7 +164,10 @@ function Suggestions({ ai }: { ai: AskAiApi }) {
   );
 }
 
-/** The writing field and what goes with it: the design system's composer and the line that the answers are a support. */
+/**
+ * The writing field and what goes with it: the design system's composer, on one row with its send button
+ * (`styles.composer`), and the line that the answers are a support.
+ */
 function Writing({ ai }: { ai: AskAiApi }) {
   const [problem, setProblem] = useState<string | null>(null);
   const area = useRef<HTMLDivElement>(null);
@@ -194,6 +197,7 @@ function Writing({ ai }: { ai: AskAiApi }) {
   return (
     <VStack gap={2} ref={area}>
       <ChatComposer
+        className={styles.composer}
         value={ai.draft}
         onChange={(value) => {
           ai.setDraft(value);

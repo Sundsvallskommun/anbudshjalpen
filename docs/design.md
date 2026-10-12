@@ -215,8 +215,8 @@ svar), en fet slutsats, inköps svar med frågan de besvarar och länken till po
 paragraferna svaret bygger på, som på Regelhjälpen. När underlaget inte svarar har svaret den tonade rutan "Ger
 underlaget inget entydigt svar?" med "Påminn mig" och länken dit frågan ställs formellt, och annars raden "Oklart?
 Ställ frågan i e-Avrop senast 30 okt.". Tomt säger panelen på en dämpad rad vad svaren bygger på och när sista dag för frågor är.
-Exempelfrågor ovanför skrivfältet tills den första frågan är ställd, skrivfältet som är Astryx `ChatComposer`, och
-under det raden att svaren är ett stöd. "Spara
+Exempelfrågor ovanför skrivfältet tills den första frågan är ställd, skrivfältet som är Astryx `ChatComposer` på en rad med
+skicka-knappen bredvid (fältet växer uppåt med frågan), och under det raden att svaren är ett stöd. "Spara
 som PDF" öppnar utskriftsvyn.
 
 Samtalen sparas per ämne i webbläsarens sessionslagring, så de finns kvar mellan sidorna och efter en omladdning i

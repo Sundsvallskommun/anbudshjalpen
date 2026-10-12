@@ -27,3 +27,26 @@ html:has([data-ask-ai-button]) {
     display: none;
   }
 }
+
+/* The writing field and its send button share one row, as in a chat app, and the field grows upward as the question
+   gets longer while the button stays at its foot. ChatComposer puts the send button on a footer row under the field,
+   which made an empty field 82 px high in a narrow panel; here it is 48. The design system has no inline variant, so
+   this reaches its parts through the input's stable class. Unlayered, so it wins over the layered component styles. */
+.composer > :has(> * > :global(.astryx-chat-composer-input)) {
+  flex-direction: row;
+  align-items: flex-end;
+}
+
+.composer > :has(> * > :global(.astryx-chat-composer-input)) > :first-child {
+  flex: 1;
+  min-width: 0;
+  align-self: center;
+}
+
+.composer > :has(> * > :global(.astryx-chat-composer-input)) > :last-child {
+  flex: none;
+}
+
+.composer > :has(> * > :global(.astryx-chat-composer-input)) > :last-child > :empty {
+  display: none;
+}
