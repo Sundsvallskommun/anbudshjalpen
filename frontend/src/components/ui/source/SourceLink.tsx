@@ -19,6 +19,8 @@ export interface SourceLinkProps {
   documentId?: string;
   /** In running text the link needs no enlarged hit area (WCAG 2.5.8 exempts inline targets). */
   isInline?: boolean;
+  /** The document's name, said before the page when the material has several documents ("6.6 Krav.pdf, s. 8"). */
+  documentName?: string;
 }
 
 /** A plain click opens the dialog in place; a click that asks for a new tab or window keeps the address. */
@@ -32,7 +34,15 @@ function isPlainClick(event: MouseEvent): boolean {
  * yellow. It always opens the source dialog; its address (`?citat=…`) opens the same dialog on the notice page from
  * anywhere else. The name says what the source backs: "Visa källan för ”Anbudet är skrivet på svenska”, s. 5".
  */
-export function SourceLink({ noticeId, citation, claim, origin, documentId, isInline = false }: SourceLinkProps) {
+export function SourceLink({
+  noticeId,
+  citation,
+  claim,
+  origin,
+  documentId,
+  isInline = false,
+  documentName,
+}: SourceLinkProps) {
   const dialog = useOptionalSourceDialog();
   const page = citationPage(citation);
 
@@ -42,12 +52,13 @@ export function SourceLink({ noticeId, citation, claim, origin, documentId, isIn
     dialog.openSource({ noticeId, citation, claim, origin, documentId });
   };
 
+  const where = documentName ? `${documentName}, s. ${page}` : `s. ${page}`;
   const visibleWords =
     citation.check === "moved"
-      ? `s. ${page} (AI angav ${citation.page})`
+      ? `${where} (AI angav ${citation.page})`
       : citation.check === "unverified"
         ? "Hittades inte i underlaget"
-        : `s. ${page}`;
+        : where;
   // The name starts with what the source backs and ends with the visible words (WCAG 2.4.4 and 2.5.3).
   const name = claim ? `Visa källan för ”${claim}”, ${visibleWords}` : `Visa källan, ${visibleWords}`;
   const visible =
@@ -61,7 +72,7 @@ export function SourceLink({ noticeId, citation, claim, origin, documentId, isIn
 
   return (
     <Link
-      href={sourceHref(noticeId, citation, claim)}
+      href={sourceHref(noticeId, citation, claim, documentId)}
       label={name}
       onClick={onClick}
       size="sm"

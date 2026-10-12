@@ -40,6 +40,31 @@ afterEach(() => {
 });
 
 describe("Step 2 Fråga", () => {
+  it("names the file under a quote when the procurement has several documents", async () => {
+    const attachment = { id: "9a9a9a9a-0000-4000-8000-000000000002", filename: "6.6 Krav på Entreprenör.pdf", page_count: 8, is_fictitious: true };
+    const answer = {
+      ...answerInDocument,
+      read: { documents_read: 2, documents_total: 2, pages_read: 24, pages_total: 24 },
+      answer: {
+        ...answerInDocument.answer,
+        citations: [{ ...answerInDocument.answer.citations[0]!, document: attachment.filename, document_id: attachment.id }],
+      },
+    };
+    mockApi([
+      ...baseRoutes(companyUser),
+      noticeWith({ documents: [...noticeDetail.documents, attachment] }),
+      { method: "POST", path: QUESTIONS, body: answer },
+    ]);
+    renderApp(`/upphandlingar/${NOTICE_ID}?flik=fraga`);
+
+    await ask("Vilka försäkringar måste vi ha?");
+    const card = await answerTo("Vilka försäkringar måste vi ha?");
+
+    const link = await within(card).findByRole("link", { name: /6\.6 Krav på Entreprenör\.pdf, s\. 4$/u });
+    expect(link).toHaveAttribute("href", expect.stringContaining(`dokument=${attachment.id}`));
+    expect(within(card).getByText("Svaret bygger på alla 2 dokument i underlaget.")).toBeInTheDocument();
+  });
+
   it("answers in a thread: the question as the reader's bubble, then the lead and each quote with its page", async () => {
     const calls = mockApi([...baseRoutes(companyUser), noticeWith(), { method: "POST", path: QUESTIONS, body: answerInDocument }]);
     renderApp(`/upphandlingar/${NOTICE_ID}?flik=fraga`);
@@ -54,6 +79,7 @@ describe("Step 2 Fråga", () => {
     expect(within(answer).getByText("Står i underlaget")).toBeInTheDocument();
     const quotes = within(answer).getByRole("list", { name: "Det här står i underlaget:" });
     expect(within(quotes).getByRole("link", { name: "Visa källan för ”Leverantören ska ha en ansvarsförsäkring”, s. 4" })).toBeInTheDocument();
+    expect(within(quotes).getByText(/^Källa:/)).toBeInTheDocument();
     // The document settles it, so only the short line about the formal question.
     expect(within(answer).getByText("Oklart? Ställ frågan i e-Avrop senast 16 okt.")).toBeInTheDocument();
     expect(within(answer).queryByText("Ger underlaget inget entydigt svar?")).not.toBeInTheDocument();

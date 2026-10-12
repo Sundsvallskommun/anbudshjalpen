@@ -15,14 +15,20 @@ import { formalQuestionLink, procurementLink } from "../../../../lib/links";
 import { answerDocumentId } from "../../noticeData";
 import { answerParts, QUOTES_LEAD, quoteClaim } from "./answerText";
 
+/** The file a citation's quote is in, named only when the procurement has several documents. */
+function documentNameFor(citation: Citation, notice: NoticeDetail): string | undefined {
+  if (notice.documents.length <= 1) return undefined;
+  return notice.documents.find((document) => document.id === citation.document_id)?.filename ?? citation.document ?? undefined;
+}
+
 function Quotes({
   citations,
-  noticeId,
+  notice,
   documentId,
   question,
 }: {
   citations: readonly Citation[];
-  noticeId: string;
+  notice: NoticeDetail;
   documentId?: string;
   question: string;
 }) {
@@ -32,20 +38,25 @@ function Quotes({
       <Text type="supporting" id={labelId}>
         {QUOTES_LEAD}
       </Text>
-      <VStack as="ul" role="list" aria-labelledby={labelId} gap={2}>
+      <VStack as="ul" role="list" aria-labelledby={labelId} gap={3}>
         {citations.map((citation, index) => (
           <li key={index}>
-            <Blockquote>
-              {citation.quote}{" "}
-              <SourceLink
-                noticeId={noticeId}
-                citation={citation}
-                claim={quoteClaim(citation.quote)}
-                origin={`Svar på ”${question}”`}
-                documentId={citation.document_id ?? documentId}
-                isInline
-              />
-            </Blockquote>
+            <VStack gap={1}>
+              <Blockquote>{citation.quote}</Blockquote>
+              {/* "Källa: 6.6 Krav på Entreprenör.pdf, s. 8": the file is named when there are several (decision 0012). */}
+              <Text type="supporting">
+                Källa:{" "}
+                <SourceLink
+                  noticeId={notice.id}
+                  citation={citation}
+                  claim={quoteClaim(citation.quote)}
+                  origin={`Svar på ”${question}”`}
+                  documentId={citation.document_id ?? documentId}
+                  documentName={documentNameFor(citation, notice)}
+                  isInline
+                />
+              </Text>
+            </VStack>
           </li>
         ))}
       </VStack>
@@ -108,7 +119,7 @@ export function AnswerCard({ view, question, notice }: { view: AnswerView; quest
           </Text>
         ))}
         {answer.citations.length > 0 && (
-          <Quotes citations={answer.citations} noticeId={notice.id} documentId={documentId} question={question} />
+          <Quotes citations={answer.citations} notice={notice} documentId={documentId} question={question} />
         )}
         <Text type="supporting">{readLine(view.read)}</Text>
         {needsFormalQuestion ? (

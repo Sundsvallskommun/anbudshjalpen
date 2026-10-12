@@ -243,7 +243,10 @@ exempel "sex dagar före sista anbudsdag", blir därför okontrollerat. Ett datu
 månad stämmer.
 
 **I webbappen** har varje påstående en diskret länk till sin sida, "s. 5". Bara avvikelser får ord: ett citat på en
-annan sida visas som "s. 9 (AI angav 7)" och ett okontrollerat som "Hittades inte i underlaget". Kontrollen sammanfattas
+annan sida visas som "s. 9 (AI angav 7)" och ett okontrollerat som "Hittades inte i underlaget". Under ett svar på en
+fråga står källan på en egen rad, "Källa: s. 5", och har upphandlingen flera dokument namnges filen: "Källa: 6.6 Krav
+på Entreprenör.pdf, s. 8". Länkens adress bär då också dokumentet (`?dokument=…`), så att den öppnar rätt fil även i
+en ny flik. Kontrollen sammanfattas
 en gång per vy i ursprungsraden, till exempel "Alla 86 källhänvisningar hittades i underlaget" eller "84 av 86
 källhänvisningar hittades i underlaget · 2 hittades inte och behöver kontrolleras". Inköparen ser antalen under Inköp ›
 Att granska och innan checklistan publiceras. Länken öppnar källdialogen ([Design](design.md#källdialogen)), som
