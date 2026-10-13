@@ -42,6 +42,7 @@ async def test_schedule_matches_the_plan() -> None:
         "ingest_lou",
         "close_expired",
         "interpret_pending",
+        "reextract_outdated",
         "match_all",
         "purge_lab",
         "send_reminders",

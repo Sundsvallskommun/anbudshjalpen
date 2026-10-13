@@ -55,7 +55,7 @@ async def test_heuristic_baseline_finds_every_facit_item(fixtures: Path, tmp_pat
 
 
 class FailingEngine(HeuristicEngine):
-    async def interpret_document(self, notice, document):  # type: ignore[override]
+    async def interpret_document(self, notice, documents, answers=()):  # type: ignore[override]
         raise EngineError("Språkmodellen svarar inte just nu.")
 
 

@@ -86,7 +86,9 @@ Varje sida visas i ramen `AppFrame` i `frontend/src/shell/`:
   texten "Påhittade företag och upphandlingar är märkta Fiktiv. AI kan ha fel – kontrollera alltid mot underlaget." och
   länken "Om demon och AI". På telefon står "Fiktiva uppgifter · AI kan ha fel" och "Mer". Länken öppnar en dialog med
   operatörens demotext och AI-upplysning (`GET /api/config`), vilken motor demon använder och varför riktiga anbud inte
-  ska laddas upp.
+  ska laddas upp. Sist i dialogen står växeln "Visa hur underlaget lästes", för den som visar demon: den sparas i
+  webbläsaren som utseendevalet (`frontend/src/shell/readingTrace.ts`) och lägger till "Så lästes underlaget" på varje
+  upphandlings sida.
 - **Toppnaven** (`FrameHeader`, `MainNav`, `AccountMenu` och `Brand`) är 64 px hög på bredare skärmar och följer
   sidbehållarens bredd. Vald menypunkt har accentfärgad text i semibold och en accentlinje på 2 px under. Logomärket är
   Toppen: två vinklar i varandra som bildar ett A och pekar uppåt, den yttre vit och den inre klarblå (#4C82FF), på en
@@ -169,7 +171,21 @@ stället för sista anbudsdag, med en påminnelse om den), uppskattat värde och
 beloppsgränser"). Därefter de stängda knapparna "Därför verkar den passa (n skäl)" och "Om upphandlingen", och
 "Underlaget · 17 sidor", som öppnar källdialogen på sida 1, med "Ladda ned". Ett skäl som gäller ett krav har länken
 "Visa kravet", som öppnar steg 1 vid kravet. På telefon är knapparna rader i ett kort, och underlaget ligger under "Om
-upphandlingen och underlaget". För en tilldelad upphandling förklaras beslutet och avtalsspärren.
+upphandlingen och underlaget". Ett dokument med sidor utan läsbar text säger det bredvid sidantalet ("3 sidor utan
+läsbar text"), och filer hos köparen som inte kunde läsas in står under "Finns hos köparen men inte här" med skälet,
+så att dokumenten här aldrig tas för hela underlaget ([beslut 0020](decisions/0020-checklistan-lases-ur-alla-dokument.md)).
+För en tilldelad upphandling förklaras beslutet och avtalsspärren.
+
+**Så lästes underlaget.** Med växeln "Visa hur underlaget lästes" påslagen (dialogen "Om demon och AI") står en tredje
+knapp, "Så lästes underlaget", som visar steg för steg vad som hände med varje fil: "Upphandlingen" (annonsen hämtad
+från e-Avrop eller TED, eller inlagd som demodata), sedan varje fil äldst först med tid, format och storlek, texten
+uttagen med sidor, tecken och textuttagets version, en export ur e-Avrop igenkänd, sidor utan läsbar text, en version
+som källan ersatt, om filen är huvuddokument eller bilaga och om den rymdes i en tolkning, därefter "Filer som inte
+lästes in" med skälet och sist "Checklistan": tolkad till utkast (med motorn och vad tolkningen läste), hur
+källhänvisningarna höll, granskad, publicerad, och inköps publicerade svar. Steg som AI:n inte såg har varningsikon,
+kontroller som gick bra en bock. Allt kommer från det som redan sparas (`GET /api/notices/{id}/reading` och
+upphandlingen själv), inget loggas för panelen; koden ligger i `frontend/src/pages/notice/reading/`. Panelen är en
+bekvämlighet för demon och syns för alla som slår på växeln i sin webbläsare.
 
 **Stegraden** är sticky: ① Krav · ② Granska · ③ Lämna in. Valt steg har accentfylld siffra och accentlinje.
 På telefon står de tre korta etiketterna utan siffror i lika breda celler. Frågorna till AI-stödet, förut steg 2,
@@ -352,7 +368,7 @@ Andra delade delar ligger i `frontend/src/components/`, `frontend/src/shell/` oc
 | `ask/` | Fråga AI ([beslut 0014](decisions/0014-fraga-ai-panel.md)): `AskAiProvider` äger panelen och samtalen (`askAiState.ts`, sessionslagringen), `AskAiPanel` är panelen och `AskAiButton` knappen som följer läsaren. `useAskAi().open({ question })` öppnar panelen varifrån som helst, och `useAskDeepLink` öppnar den från adressen |
 | `FormalQuestionAdvice` | Rutan om likabehandling, tonad och infälld i svaret: "Ger underlaget inget entydigt svar?" Ställ frågan i e-Avrop före sista dag för frågor, med "Påminn mig" och länken dit frågan ställs, eller för en påhittad upphandling utan egen sida att den inte finns i e-Avrop |
 | `states.tsx` | `Loading` och `ErrorNotice`, med vad som misslyckades och "Försök igen" när det kan hjälpa |
-| `shell/` | Ramen: `AppFrame`, `ModuleShell` (Astryx `AppShell` med foten efter `main`), `PhaseStrip`, `FrameHeader`, `Brand`, `MainNav`, `AccountMenu`, `AboutDemo` (dialogen "Om demon och AI"), `appearance.tsx` (temat i besökarens utseende) och `AppearanceControl` (valet Utseende), `Page`, `SiteFooter`, `RequireRole` och reglerna i `navigation.ts` och `redirects.tsx` |
+| `shell/` | Ramen: `AppFrame`, `ModuleShell` (Astryx `AppShell` med foten efter `main`), `PhaseStrip`, `FrameHeader`, `Brand`, `MainNav`, `AccountMenu`, `AboutDemo` (dialogen "Om demon och AI"), `readingTrace.ts` (växeln "Visa hur underlaget lästes", sparad i webbläsaren), `appearance.tsx` (temat i besökarens utseende) och `AppearanceControl` (valet Utseende), `Page`, `SiteFooter`, `RequireRole` och reglerna i `navigation.ts` och `redirects.tsx` |
 
 Orden till statusarna och motorerna står på ett ställe, `frontend/src/lib/labels.ts`, och datum och belopp formateras i
 `frontend/src/lib/format.ts`.

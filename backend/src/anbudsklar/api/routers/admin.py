@@ -144,7 +144,11 @@ async def upload_document(
     session_factory: SessionFactoryDep,
     user: BuyerDep,
 ) -> DocumentInfo:
-    """Store the document and interpret it right after the response has been sent."""
+    """Store the document and, when it is the notice's main document, interpret it right after the response.
+
+    An attachment waits for the worker, which interprets the notice again with every document
+    (decision 0020).
+    """
 
     upload = await read_upload(
         request,
@@ -154,7 +158,7 @@ async def upload_document(
     document = await notices.attach_document(
         session, notice_id, filename=upload.filename, data=upload.data, uploaded_by=user.id
     )
-    needs_checklist = not await checklists.has_checklist(session, document.id)
+    needs_checklist = document.auto_interpret and not await checklists.has_checklist(session, document.id)
     await session.commit()
     if needs_checklist:
         background.add_task(interpret_in_background, session_factory, engine, document.id)

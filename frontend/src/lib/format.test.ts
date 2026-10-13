@@ -4,6 +4,7 @@ import {
   calendarDaysUntil,
   daysInWords,
   daysUntil,
+  formatBytes,
   formatCalendarDate,
   formatClock,
   formatLongDate,
@@ -69,6 +70,13 @@ describe("dates in Swedish time", () => {
 });
 
 describe("text helpers", () => {
+  it("says a file's size in the reader's words", () => {
+    expect(formatBytes(900)).toBe("900 B");
+    expect(formatBytes(348_160)).toBe("340 kB");
+    expect(formatBytes(1_258_291)).toBe("1,2 MB");
+    expect(formatBytes(52_428_800)).toBe("50 MB");
+  });
+
   it("pluralises with Swedish number formatting", () => {
     expect(plural(1, "upphandling", "upphandlingar")).toBe("1 upphandling");
     // sv-SE groups thousands with a no-break space.

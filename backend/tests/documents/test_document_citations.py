@@ -249,6 +249,18 @@ def test_a_quote_starting_after_a_negation_is_unverified() -> None:
     )
 
 
+def test_a_new_sentence_starting_with_a_negation_on_the_next_line_does_not_count() -> None:
+    """e-Avrop's forms put "Ingen fil bifogad" right under a requirement that has no final full stop."""
+
+    page = "1.3.3.2 Leverantören ska redovisa vilka personer som sitter styrelsen\nIngen fil bifogad"
+    assert locate_quote("Leverantören ska redovisa vilka personer som sitter styrelsen", [page], 1) == (
+        "verified",
+        1,
+    )
+    wrapped = "Alternativa anbud godtas\ninte. Varje anbudsgivare får lämna ett anbud."
+    assert locate_quote("Alternativa anbud godtas", [wrapped], 1) == ("unverified", None)
+
+
 def test_a_negation_after_punctuation_does_not_count() -> None:
     assert locate_quote("Anbudet ska vara skrivet på svenska,", NEGATION_PAGES, 3) == ("verified", 3)
     assert locate_quote("Varje anbudsgivare får lämna ett anbud.", NEGATION_PAGES, 1) == ("verified", 1)
@@ -399,6 +411,7 @@ def test_verify_checklist_checks_every_citation_and_counts(tender_pages: list[st
         "citations_verified": 4,
         "citations_moved": 1,
         "citations_unverified": 1,
+        "read": None,
     }
     assert checklist.requirements[0].citation.check is None  # the input is not mutated
 
@@ -721,3 +734,60 @@ def test_a_quote_never_runs_from_one_answer_into_the_next() -> None:
     quote = "Ja, det minskar med 25% per poäng. Hur många medarbetare räknar ni med"
     verified = verify_answer(_answer_with(AnswerCitation(answer=1, quote=quote)), [], PUBLISHED)
     assert verified.answer_citations[0].check == "unverified"
+
+
+def test_verify_checklist_across_documents(tender_pages: list[str]) -> None:
+    """A checklist's citations may point into an attachment (decision 0020)."""
+
+    main = PagedDocument(document_id="main", filename="underlag.pdf", pages=tender_pages)
+    attachment = PagedDocument(
+        document_id="att",
+        filename="6.6 Krav.pdf",
+        pages=["Entreprenören ska ha ansvarsförsäkring om 10 mnkr."],
+    )
+
+    def requirement(citation: Citation) -> Requirement:
+        return Requirement(
+            id="K1", kind="kvalificeringskrav", title="t", plain_language="p", citation=citation
+        )
+
+    checklist = Checklist(
+        summary="s",
+        requirements=[
+            requirement(Citation(page=1, quote="ansvarsförsäkring om 10 mnkr", document="6.6 Krav.pdf")),
+            requirement(Citation(page=1, quote="ansvarsförsäkring om 10 mnkr", document="underlag.pdf")),
+            requirement(Citation(page=4, quote="Försäkringsbevis ska bifogas anbudet.")),
+        ],
+        dates=[
+            KeyDate(
+                kind="sista_anbudsdag",
+                date=dt.date(2026, 11, 14),
+                description="d",
+                citation=Citation(page=1, quote="Sista anbudsdag är 2026-11-14.", document="underlag.pdf"),
+            )
+        ],
+    )
+    verified, summary = verify_checklist(checklist, [main, attachment])
+    named, wrong, unnamed = verified.requirements
+    assert (named.citation.check, named.citation.document_id) == ("verified", "att")
+    assert (wrong.citation.check, wrong.citation.found_page, wrong.citation.document_id) == (
+        "moved",
+        1,
+        "att",
+    )
+    assert (unnamed.citation.check, unnamed.citation.document_id) == ("moved", "main")
+    assert (verified.dates[0].citation.check, verified.dates[0].citation.document_id) == ("verified", "main")
+    assert (summary.citations_verified, summary.citations_moved, summary.citations_unverified) == (2, 2, 0)
+
+    assessment = MatchAssessment(
+        fit="passar",
+        summary="s",
+        reasons=[
+            MatchReason(kind="styrka", text="t", citation=named.citation.model_copy(update={"check": None}))
+        ],
+    )
+    reason = verify_match(assessment, [main, attachment]).reasons[0]
+    assert reason.citation is not None and (reason.citation.check, reason.citation.document_id) == (
+        "verified",
+        "att",
+    )

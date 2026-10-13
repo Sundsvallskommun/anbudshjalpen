@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.cpv import CPV_CODE, cpv_digits, cpv_prefix
 from anbudsklar.documents.citations import HIGHLIGHT, PageIndex, QuoteMatch, excerpt, match_quote
+from anbudsklar.documents.store import is_current
 from anbudsklar.models import CpvCode, Document, DocumentPage, LouSection, Notice, PublishedAnswer
 from anbudsklar.search.types import BuyerCount, NoticeOrder, PageHit, PageText, QuoteCheck
 from anbudsklar.visibility import shown_notices
@@ -494,7 +495,8 @@ def _page_scope(
     first_page: int | None,
     last_page: int | None,
 ) -> list[ColumnElement[bool]]:
-    conditions: list[ColumnElement[bool]] = [Document.notice_id == notice_id]
+    # Only the notice's current documents: a file the source replaced is never searched.
+    conditions: list[ColumnElement[bool]] = [Document.notice_id == notice_id, is_current()]
     if sections:
         conditions.append(DocumentPage.section.in_(list(sections)))
     if first_page is not None:
@@ -609,7 +611,7 @@ async def search_document(
 async def _notice_document(
     session: AsyncSession, notice_id: uuid.UUID, document_id: uuid.UUID | None
 ) -> Document | None:
-    stmt = select(Document).where(Document.notice_id == notice_id)
+    stmt = select(Document).where(Document.notice_id == notice_id, is_current())
     if document_id is not None:
         stmt = stmt.where(Document.id == document_id)
     stmt = stmt.order_by(Document.created_at, Document.filename, Document.id).limit(1)
@@ -654,7 +656,7 @@ async def _notice_document_pages(session: AsyncSession, notice_id: uuid.UUID) ->
     rows = await session.execute(
         select(Document.id, Document.filename, DocumentPage.page_no, DocumentPage.text)
         .join(DocumentPage, DocumentPage.document_id == Document.id)
-        .where(Document.notice_id == notice_id)
+        .where(Document.notice_id == notice_id, is_current())
         .order_by(Document.created_at, Document.filename, Document.id, DocumentPage.page_no)
     )
     grouped: dict[uuid.UUID, tuple[str, dict[int, str]]] = {}

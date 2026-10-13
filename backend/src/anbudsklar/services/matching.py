@@ -33,10 +33,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from anbudsklar.ai.engine import AiEngine, EngineError
 from anbudsklar.api.schemas import MatchView
 from anbudsklar.config import Settings
-from anbudsklar.contracts import Task, deadline_kind
+from anbudsklar.contracts import PagedDocument, Task, deadline_kind
 from anbudsklar.cpv import CPV_DIGITS, MIN_GROUP_DIGITS, best_cpv_overlap
 from anbudsklar.documents.citations import verify_match
-from anbudsklar.documents.store import load_paged_document
+from anbudsklar.documents.store import current_documents, load_paged_documents
 from anbudsklar.models import ChecklistRecord, Company, MatchNotification, MatchRecord, Notice, User
 from anbudsklar.search.queries import cpv_labels
 from anbudsklar.services.access import ROLE_COMPANY, Viewer
@@ -91,14 +91,18 @@ class MatchStats:
 
 @dataclass
 class PageCache:
-    """Document pages loaded once per run, since many companies match the same notice."""
+    """A notice's documents loaded once per run, since many companies match the same notice."""
 
-    pages: dict[uuid.UUID, list[str]] = field(default_factory=dict)
+    documents: dict[uuid.UUID, list[PagedDocument]] = field(default_factory=dict)
 
-    async def get(self, session: AsyncSession, document_id: uuid.UUID) -> list[str]:
-        if document_id not in self.pages:
-            self.pages[document_id] = (await load_paged_document(session, document_id)).pages
-        return self.pages[document_id]
+    async def get(self, session: AsyncSession, notice_id: uuid.UUID) -> list[PagedDocument]:
+        """The notice's current documents, the checklist's citations may point into any of them."""
+
+        if notice_id not in self.documents:
+            self.documents[notice_id] = await load_paged_documents(
+                session, await current_documents(session, notice_id)
+            )
+        return self.documents[notice_id]
 
 
 def prefilter_score(
@@ -469,8 +473,8 @@ async def _assess(
         company_profile(company, labels), notice_context(notice, labels), contract
     )
     await record_call(session, Task.ASSESS_MATCH, run, notice_id=notice.id)
-    pages = await cache.get(session, checklist.document_id) if checklist else []
-    verified = verify_match(assessment, pages)
+    documents = await cache.get(session, notice.id) if checklist else []
+    verified = verify_match(assessment, documents)
     if record is None:
         record = MatchRecord(company_id=company.id, notice_id=notice.id)
         session.add(record)

@@ -14,7 +14,7 @@ from anbudsklar.ai.engine import EngineError, EngineOutputError, EngineRun
 from anbudsklar.ai.heuristic import HeuristicEngine
 from anbudsklar.api.schemas import ChecklistUpdate
 from anbudsklar.config import Settings
-from anbudsklar.contracts import Checklist, NoticeContext, PagedDocument, PublishedAnswerInput
+from anbudsklar.contracts import Checklist, DocumentSet, NoticeContext, PublishedAnswerInput
 from anbudsklar.ingest.common import IngestError
 from anbudsklar.models import AppSetting, ChecklistRecord, Document, JobRun, Notice, PublishedAnswer
 from anbudsklar.services.background import interpret_in_background
@@ -22,7 +22,7 @@ from anbudsklar.services.checklists import (
     MAX_INTERPRET_ATTEMPTS,
     SUPERSEDED_NOTE,
     checklist_payload,
-    interpret_answered,
+    interpret_changed,
     interpret_document,
     interpret_pending,
     list_interpretations,
@@ -96,16 +96,17 @@ class FlakyEngine(HeuristicEngine):
     async def interpret_document(
         self,
         notice: NoticeContext,
-        document: PagedDocument,
+        documents: DocumentSet,
         answers: Sequence[PublishedAnswerInput] = (),
     ) -> tuple[Checklist, EngineRun]:
-        if "trasig" in document.filename:
+        filename = documents.documents[0].filename  # the main document decides
+        if "trasig" in filename:
             raise EngineError("Språkmodellen svarar inte just nu.")
-        if "kontrakt" in document.filename:
+        if "kontrakt" in filename:
             raise EngineOutputError("Svaret följde inte kontraktet.")
-        if "stor" in document.filename:
+        if "stor" in filename:
             raise EngineError("Underlaget är för stort för språkmodellen i Eneo.", retryable=False)
-        return await super().interpret_document(notice, document, answers)
+        return await super().interpret_document(notice, documents, answers)
 
 
 PAGES = ["Kvalificering\nAnbudsgivaren ska ha F-skattsedel. Anbudsgivaren ska bifoga referenser."]
@@ -267,23 +268,23 @@ async def test_a_checklist_follows_new_changed_and_withdrawn_answers(db_session:
     first.status, first.published_at = "published", datetime.now(UTC)
     await db_session.flush()
     # Nothing changed: no answers then, none now.
-    assert await interpret_answered(db_session, FlakyEngine()) == {
+    assert await interpret_changed(db_session, FlakyEngine()) == {
         "reinterpreted": 0,
         "reinterpret_failed": 0,
     }
 
     answer = await _answer(db_session, notice, "a", "Ja.")
-    assert (await interpret_answered(db_session, FlakyEngine()))["reinterpreted"] == 1
+    assert (await interpret_changed(db_session, FlakyEngine()))["reinterpreted"] == 1
     records = await _records(db_session, notice)
     assert len(records) == 2 and records[1].answers_digest is not None
     # Inköp reviews by default, so the successor is a draft and companies keep the published one.
     assert (records[0].status, records[1].status) == ("published", "draft")
-    assert (await interpret_answered(db_session, FlakyEngine()))["reinterpreted"] == 0
+    assert (await interpret_changed(db_session, FlakyEngine()))["reinterpreted"] == 0
 
     # The untouched draft is replaced when the answer is edited, and marked so.
     answer.answer = "Ja, F-skattsedel ska bifogas."
     await db_session.flush()
-    assert (await interpret_answered(db_session, FlakyEngine()))["reinterpreted"] == 1
+    assert (await interpret_changed(db_session, FlakyEngine()))["reinterpreted"] == 1
     records = await _records(db_session, notice)
     assert [record.status for record in records] == ["published", "rejected", "draft"]
     assert records[1].reviewer_note == SUPERSEDED_NOTE
@@ -291,7 +292,7 @@ async def test_a_checklist_follows_new_changed_and_withdrawn_answers(db_session:
     # A withdrawn answer counts as a change too.
     await db_session.delete(answer)
     await db_session.flush()
-    assert (await interpret_answered(db_session, FlakyEngine()))["reinterpreted"] == 1
+    assert (await interpret_changed(db_session, FlakyEngine()))["reinterpreted"] == 1
     assert (await _records(db_session, notice))[-1].answers_digest is None
 
 
@@ -311,7 +312,7 @@ async def test_inkops_own_work_and_closed_notices_are_left_alone(db_session: Asy
     for notice in (commented, approved_notice, closed):
         await _answer(db_session, notice, "b", "Nej.")
 
-    assert await interpret_answered(db_session, FlakyEngine()) == {
+    assert await interpret_changed(db_session, FlakyEngine()) == {
         "reinterpreted": 0,
         "reinterpret_failed": 0,
     }
@@ -340,20 +341,20 @@ async def test_a_failed_reinterpretation_backs_off_and_gives_up_like_a_new_docum
         )
         await _answer(db_session, notice, "c", "Ja.")
 
-    assert await interpret_answered(db_session, FlakyEngine()) == {
+    assert await interpret_changed(db_session, FlakyEngine()) == {
         "reinterpreted": 0,
         "reinterpret_failed": 2,
     }
     assert flaky_document.interpret_attempts == 1 and flaky_document.interpret_retry_at is not None
     assert large_document.interpret_retry_at is None  # too large for the model: given up at once
     # The next run waits for the retry time and never tries the one it gave up on.
-    assert await interpret_answered(db_session, FlakyEngine()) == {
+    assert await interpret_changed(db_session, FlakyEngine()) == {
         "reinterpreted": 0,
         "reinterpret_failed": 0,
     }
     flaky_document.interpret_retry_at = datetime.now(UTC) - timedelta(minutes=1)
     await db_session.flush()
-    assert await interpret_answered(db_session, FlakyEngine()) == {
+    assert await interpret_changed(db_session, FlakyEngine()) == {
         "reinterpreted": 0,
         "reinterpret_failed": 1,
     }
@@ -373,7 +374,7 @@ async def test_with_the_review_off_the_successor_is_published_and_a_saved_draft_
     assert first.status == "published"
     await _answer(db_session, notice, "d", "Ja.")
 
-    assert (await interpret_answered(db_session, FlakyEngine()))["reinterpreted"] == 1
+    assert (await interpret_changed(db_session, FlakyEngine()))["reinterpreted"] == 1
     records = await _records(db_session, notice)
     assert [record.status for record in records] == ["published", "published"]
     assert records[1].approved_at is None and records[1].published_at is not None
@@ -388,5 +389,111 @@ async def test_with_the_review_off_the_successor_is_published_and_a_saved_draft_
         db_session, draft.id, ChecklistUpdate(checklist=checklist_payload(draft), reviewer_note=None)
     )
     await _answer(db_session, saved, "e", "Nej.")
-    assert (await interpret_answered(db_session, FlakyEngine()))["reinterpreted"] == 0
+    assert (await interpret_changed(db_session, FlakyEngine()))["reinterpreted"] == 0
     assert [record.status for record in await _records(db_session, saved)] == ["draft"]
+
+
+ATTACHMENT_PAGES = ["Krav på entreprenören\nEntreprenören ska vara certifierad enligt ISO 14001."]
+
+
+async def test_an_interpretation_reads_every_current_document_and_says_so(db_session: AsyncSession) -> None:
+    """Requirements in an attachment reach the checklist, named and verified (decision 0020)."""
+
+    notice = await add_notice(db_session)
+    main = await add_document(db_session, notice, PAGES, filename="underlag.txt")
+    attachment = await add_document(db_session, notice, ATTACHMENT_PAGES, filename="6.6 Krav.txt")
+    old = await add_document(db_session, notice, ["Gammal text som ska bort."], filename="gammal.txt")
+    old.superseded_by = main.id
+    await db_session.flush()
+
+    record = await interpret_document(db_session, FlakyEngine(), main.id)
+
+    checklist = checklist_payload(record)
+    iso = next(r for r in checklist.requirements if "ISO 14001" in r.citation.quote)
+    assert (iso.citation.document, iso.citation.document_id, iso.citation.check) == (
+        "6.6 Krav.txt",
+        str(attachment.id),
+        "verified",
+    )
+    assert not any("Gammal text" in r.citation.quote for r in checklist.requirements)
+    assert record.verification["read"] == {
+        "documents_read": 2,
+        "documents_total": 2,
+        "pages_read": 2,
+        "pages_total": 2,
+    }
+    assert record.documents_digest is not None
+
+
+async def test_a_checklist_follows_added_documents_and_a_new_extraction(db_session: AsyncSession) -> None:
+    notice = await add_notice(db_session)
+    main = await add_document(db_session, notice, PAGES)
+    first = await interpret_document(db_session, FlakyEngine(), main.id)
+    first.status, first.published_at = "published", datetime.now(UTC)
+    await db_session.flush()
+    assert (await interpret_changed(db_session, FlakyEngine()))["reinterpreted"] == 0
+
+    # The buyer attaches the requirement specification later: the checklist must cover it.
+    await add_document(db_session, notice, ATTACHMENT_PAGES, filename="6.6 Krav.txt")
+    assert (await interpret_changed(db_session, FlakyEngine()))["reinterpreted"] == 1
+    records = await _records(db_session, notice)
+    assert [record.status for record in records] == ["published", "draft"]
+    assert any("ISO 14001" in r.citation.quote for r in checklist_payload(records[1]).requirements)
+    assert (await interpret_changed(db_session, FlakyEngine()))["reinterpreted"] == 0
+
+    # An improved extraction read the main document again: the pages may say more now.
+    main.extraction_version += 1
+    await db_session.flush()
+    assert (await interpret_changed(db_session, FlakyEngine()))["reinterpreted"] == 1
+    assert [record.status for record in await _records(db_session, notice)] == [
+        "published",
+        "rejected",
+        "draft",
+    ]
+
+
+async def test_a_checklist_from_before_the_decision_is_outdated_only_when_more_documents_exist(
+    db_session: AsyncSession,
+) -> None:
+    alone = await add_notice(db_session, title="Ett dokument", external_id="TEST-A")
+    alone_document = await add_document(db_session, alone, PAGES)
+    several = await add_notice(db_session, title="Flera dokument", external_id="TEST-F")
+    several_main = await add_document(db_session, several, PAGES)
+    await add_document(db_session, several, ATTACHMENT_PAGES, filename="6.6 Krav.txt")
+    for notice_, document in ((alone, alone_document), (several, several_main)):
+        db_session.add(
+            ChecklistRecord(
+                notice_id=notice_.id,
+                document_id=document.id,
+                status="published",
+                published_at=datetime.now(UTC),
+                engine="heuristic",
+                contract_version="test",
+                payload=Checklist(summary="x", requirements=[]).model_dump(mode="json"),
+                documents_digest=None,
+            )
+        )
+    await db_session.flush()
+
+    assert (await interpret_changed(db_session, FlakyEngine()))["reinterpreted"] == 1
+    assert len(await _records(db_session, alone)) == 1
+    assert len(await _records(db_session, several)) == 2
+
+
+async def test_a_main_document_too_large_for_one_call_is_refused_for_good(
+    db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from anbudsklar.services import checklists
+
+    monkeypatch.setattr(checklists, "build_document_set", lambda paged, **kw: _cut(paged, kw))
+    notice = await add_notice(db_session)
+    document = await add_document(db_session, notice, PAGES)
+    stats = await interpret_pending(db_session, FlakyEngine())
+    assert stats == {"pending": 1, "interpreted": 0, "failed": 1, "gave_up": 1}
+    assert "för stort" in (document.interpret_error or "")
+
+
+def _cut(paged: list, options: dict) -> object:
+    from anbudsklar.documents.bundle import build_document_set
+
+    return build_document_set(paged, budget_chars=10, **options)

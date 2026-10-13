@@ -6,25 +6,24 @@ import uuid
 from collections.abc import Sequence
 from datetime import datetime
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.ai.engine import AiEngine, QuestionTurn
 from anbudsklar.api.schemas import AnswerView, QuestionRequest, QuestionTurnIn, ReadSummary
-from anbudsklar.contracts import Checklist, DocumentSet, PagedDocument, Task
+from anbudsklar.contracts import Checklist, DocumentSet, Task
 from anbudsklar.documents.bundle import PageRef, build_document_set
 from anbudsklar.documents.citations import verify_answer
-from anbudsklar.documents.store import load_paged_document
+from anbudsklar.documents.store import current_documents, load_paged_documents
 from anbudsklar.models import Document, Notice, QuestionLog
 from anbudsklar.search.queries import search_document
 from anbudsklar.services.access import Viewer
 from anbudsklar.services.ai_usage import TokenPrices, record_call, usage_view
 from anbudsklar.services.answers import answer_inputs
-from anbudsklar.services.checklists import checklist_payload, key_date, tender_deadline, visible_checklist
-from anbudsklar.services.contexts import notice_context
-from anbudsklar.services.dates import end_of_local_day, utcnow
+from anbudsklar.services.checklists import checklist_payload, tender_deadline, visible_checklist
+from anbudsklar.services.contexts import notice_context, unread_filenames
+from anbudsklar.services.dates import utcnow
 from anbudsklar.services.errors import ConflictError
-from anbudsklar.services.notices import first_document, formal_question_url, get_notice
+from anbudsklar.services.notices import first_document, formal_question_url, get_notice, question_deadline
 
 # Earlier turns sent to the engine, newest first, until this many characters. The model
 # needs the recent context of the conversation, not every word of it, and an anonymous
@@ -61,10 +60,12 @@ async def ask_question(
     ) or await first_document(session, notice.id)
     if main is None:
         raise ConflictError("Det finns inget underlag att ställa frågor om för den här upphandlingen ännu.")
-    documents = await _paged_documents(session, notice.id, main)
+    documents = await load_paged_documents(session, await current_documents(session, notice.id, main=main))
     hits = await search_document(session, notice.id, request.question, limit=MAX_SEARCH_HITS)
     document_set = build_document_set(
-        documents, hits=[PageRef(str(hit.document_id), hit.page_no) for hit in hits]
+        documents,
+        hits=[PageRef(str(hit.document_id), hit.page_no) for hit in hits],
+        unread_files=unread_filenames(notice),
     )
 
     answers = await answer_inputs(session, notice.id)
@@ -87,30 +88,15 @@ async def ask_question(
         )
         await session.flush()
 
-    deadline = key_date(payload, "fragestopp") if payload else None
     return AnswerView(
         answer=verified,
         engine=run.engine,
         usage=usage_view(run, prices),
         document_id=main.id,
         read=read_summary(document_set),
-        question_deadline=end_of_local_day(deadline) if deadline else None,
+        question_deadline=question_deadline(notice, payload),
         formal_question_url=formal_question_url(notice, eavrop_url),
     )
-
-
-async def _paged_documents(
-    session: AsyncSession, notice_id: uuid.UUID, main: Document
-) -> list[PagedDocument]:
-    """The notice's readable documents as the engine sees them, the main document first."""
-
-    others = await session.scalars(
-        select(Document)
-        .where(Document.notice_id == notice_id, Document.id != main.id, Document.page_count > 0)
-        .order_by(Document.created_at, Document.filename, Document.id)
-    )
-    ordered = [main, *others]
-    return [await load_paged_document(session, document.id) for document in ordered]
 
 
 def read_summary(document_set: DocumentSet) -> ReadSummary:

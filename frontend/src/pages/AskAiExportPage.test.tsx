@@ -75,8 +75,8 @@ describe("The conversation as a document (decision 0014)", () => {
     expect(citationLine({ ...base, check: "moved", found_page: 6 })).toBe("s. 6 (AI angav 5)");
     expect(citationLine({ ...base, check: "unverified" })).toBe("s. 5, hittades inte i underlaget");
     const documents = [
-      { id: "a", filename: "Föreskrifter.pdf", page_count: 10, is_fictitious: true },
-      { id: "b", filename: "Bilaga 6.6 Krav.pdf", page_count: 3, is_fictitious: true },
+      { id: "a", filename: "Föreskrifter.pdf", page_count: 10, empty_pages: 0, is_fictitious: true },
+      { id: "b", filename: "Bilaga 6.6 Krav.pdf", page_count: 3, empty_pages: 0, is_fictitious: true },
     ];
     expect(citationLine({ ...base, check: "verified", document_id: "b" }, documents)).toBe("s. 5 · Bilaga 6.6 Krav.pdf");
   });

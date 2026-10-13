@@ -25,6 +25,7 @@ dependencies = [
     "mcp>=1.30,<2",  # FastMCP API, same major as Eneo (mcp>=1.2,<2)
     "typer>=0.19",
     "tzdata>=2025.2",
+    "openpyxl>=3.1",
 ]
 
 [project.scripts]

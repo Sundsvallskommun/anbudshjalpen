@@ -281,8 +281,8 @@ export interface NoticeSummary {
   deadline_at: IsoDateTime | null;
   deadline_kind: NoticeDeadlineKind;
   /**
-   * Frågestopp from the published checklist, as the end of that day in Swedish time (like
-   * AnswerView.question_deadline): a date, so show it as one. Null without a published checklist that names it.
+   * Frågestopp as the end of that day in Swedish time (like AnswerView.question_deadline): the source's own date
+   * (e-Avrop) when it gives one, else the published checklist's. A date, so show it as one. Null when neither names it.
    */
   question_deadline: IsoDateTime | null;
   cpv_codes: string[];
@@ -330,7 +330,77 @@ export interface DocumentInfo {
   id: Uuid;
   filename: string;
   page_count: number;
+  /** Pages without readable text (scans, images): what the AI never saw, so the reader checks those in the file. */
+  empty_pages: number;
   is_fictitious: boolean;
+}
+
+/**
+ * A file the source lists for the procurement that Anbudshjälpen could not read in (decision 0020): the reader is
+ * told it exists and why it is missing here, so the documents shown are never taken for the whole set.
+ */
+export interface UnreadFile {
+  filename: string;
+  /** Swedish, as the ingestion wrote it: the format, the size or an unreadable file. */
+  reason: string;
+}
+
+/** How a stored file got here: fetched from e-Avrop, uploaded by inköp, unpacked from an archive, demo data, or by hand. */
+export type DocumentOrigin = "eavrop" | "upload" | "archive" | "fixture" | "manual";
+
+/**
+ * How one stored file was read in, for "Så lästes underlaget" (the demo's trace). Every value is something the app
+ * already keeps about the file; nothing is logged for the trace. Replaced versions are included.
+ */
+export interface DocumentReading {
+  id: Uuid;
+  filename: string;
+  origin: DocumentOrigin;
+  /** The archive the file was unpacked from, when origin is "archive". */
+  archive: string | null;
+  mimetype: string;
+  size_bytes: number;
+  /** When the file was fetched, uploaded or unpacked. */
+  stored_at: IsoDateTime;
+  page_count: number;
+  empty_pages: number;
+  /** The text of all pages: what the engines and the search read. */
+  characters: number;
+  /** "eavrop" for an export from e-Avrop's forms, whose footer was stripped (decision 0020); null otherwise. */
+  layout: string | null;
+  /** The text extraction that made the pages. */
+  extraction_version: number;
+  /** The document the worker interprets to a checklist on its own. */
+  is_main: boolean;
+  /** The newer file that took over, when the source replaced it. */
+  superseded_by: Uuid | null;
+  /** When that newer file was stored. */
+  superseded_at: IsoDateTime | null;
+}
+
+/** What happened to a notice's files, as the demo panel "Så lästes underlaget" shows it. */
+export interface ReadingReport {
+  notice_id: Uuid;
+  source: string;
+  /** When the notice was first stored. */
+  fetched_at: IsoDateTime;
+  /** When the source last changed it. */
+  updated_at: IsoDateTime;
+  /** Every stored file, oldest first, replaced ones included. */
+  documents: DocumentReading[];
+  unread_files: UnreadFile[];
+  /** What one interpretation or answer may be given at most (decision 0012). */
+  budget_chars: number;
+  /** The extraction the app runs now; an older document is read again. */
+  extraction_version: number;
+}
+
+/** What the engine was given (decision 0012), so the app can say so. */
+export interface ReadSummary {
+  documents_read: number;
+  documents_total: number;
+  pages_read: number;
+  pages_total: number;
 }
 
 export interface VerificationSummary {
@@ -338,6 +408,8 @@ export interface VerificationSummary {
   citations_verified: number;
   citations_moved: number;
   citations_unverified: number;
+  /** What the interpretation read (decision 0020); null on checklists made before it. */
+  read?: ReadSummary | null;
 }
 
 export interface ChecklistView {
@@ -409,7 +481,10 @@ export interface NoticeDetail extends NoticeSummary {
   estimated_value_sek: number | null;
   /** CPV code -> Swedish label, for the codes in `cpv_codes` that are in the CPV list. */
   cpv_labels: Record<string, string>;
+  /** The current documents; a file the source replaced is left out. */
   documents: DocumentInfo[];
+  /** Files the source lists that were not read in, so the list above is never taken for all of them. */
+  unread_files: UnreadFile[];
   checklist: ChecklistView | null;
   /** Where a checklist on its way is; null when none is coming, so the page never promises one (decision 0019). */
   checklist_progress: ChecklistProgress | null;
@@ -437,14 +512,6 @@ export interface QuestionRequest {
   history: QuestionTurnIn[];
 }
 
-/** What the engine was given for an answer (decision 0012), so the card can say so. */
-export interface ReadSummary {
-  documents_read: number;
-  documents_total: number;
-  pages_read: number;
-  pages_total: number;
-}
-
 /**
  * What one answer cost: tokens as the model provider counted them, and money when a price is set. Null on a view
  * when the engine reported no counts (the rule-based engine has no model; Eneo's counts are not read yet).
@@ -464,7 +531,7 @@ export interface AnswerView {
   /** The main document; a citation's own document_id says where its quote is. */
   document_id: Uuid;
   read: ReadSummary;
-  /** Frågestopp from the checklist, as the end of that day in Stockholm: a date, so show it as one. */
+  /** Frågestopp as the end of that day in Stockholm: the source's date, else the published checklist's. A date. */
   question_deadline: IsoDateTime | null;
   /** Where to ask formally: the procurement in e-Avrop, else e-Avrop itself. */
   formal_question_url: string;
@@ -740,6 +807,7 @@ export type JobName =
   | "ingest_lou"
   | "close_expired"
   | "interpret_pending"
+  | "reextract_outdated"
   | "match_all"
   | "send_reminders"
   | "notify_matches"

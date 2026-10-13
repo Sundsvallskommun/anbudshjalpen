@@ -132,14 +132,14 @@ async def test_usage_is_unknown_when_the_endpoint_sends_no_count() -> None:
 async def test_maps_authentication_errors_to_swedish() -> None:
     endpoint = FakeEndpoint(httpx2.Response(401, json={"error": {"message": "no"}}))
     with pytest.raises(EngineConfigError, match="OPENAI_API_KEY"):
-        await _engine(endpoint).interpret_document(NOTICE, DOCUMENT)
+        await _engine(endpoint).interpret_document(NOTICE, DOCUMENTS)
 
 
 async def test_a_request_rejected_in_every_format_is_permanent() -> None:
     rejected = {"error": {"message": "maximum context length exceeded"}}
     endpoint = FakeEndpoint(*(httpx2.Response(400, json=rejected) for _ in range(3)))
     with pytest.raises(EngineError, match="avvisade förfrågan") as raised:
-        await _engine(endpoint).interpret_document(NOTICE, DOCUMENT)
+        await _engine(endpoint).interpret_document(NOTICE, DOCUMENTS)
     assert raised.value.retryable is False
     assert len(endpoint.bodies) == 3  # json_schema, json_object, plain
 
@@ -147,7 +147,7 @@ async def test_a_request_rejected_in_every_format_is_permanent() -> None:
 async def test_server_errors_stay_retryable() -> None:
     endpoint = FakeEndpoint(httpx2.Response(500, json={"error": {"message": "boom"}}))
     with pytest.raises(EngineError, match="fel 500") as raised:
-        await _engine(endpoint).interpret_document(NOTICE, DOCUMENT)
+        await _engine(endpoint).interpret_document(NOTICE, DOCUMENTS)
     assert raised.value.retryable is True
 
 
@@ -175,3 +175,15 @@ def test_requires_configuration() -> None:
     settings = Settings(_env_file=None, ai_engine="heuristic")
     with pytest.raises(EngineError, match="OPENAI_BASE_URL"):
         OpenAICompatEngine(settings)
+
+
+async def test_a_cut_off_answer_is_a_permanent_error_without_retries() -> None:
+    """A JSON the model could not finish would be cut off again; the retries are not spent on it."""
+
+    body = json.loads(_completion('{"summary": "Allt som ryms').content)
+    body["choices"][0]["finish_reason"] = "length"
+    endpoint = FakeEndpoint(httpx2.Response(200, json=body))
+    with pytest.raises(EngineError, match="höggs av") as raised:
+        await _engine(endpoint).interpret_document(NOTICE, DOCUMENTS)
+    assert raised.value.retryable is False
+    assert len(endpoint.bodies) == 1

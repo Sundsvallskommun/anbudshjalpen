@@ -13,7 +13,7 @@ import respx
 from anbudsklar.ai.eneo import EneoEngine, clean_answer, load_assistant_ids, rule_sources
 from anbudsklar.ai.engine import EngineConfigError, EngineError, EngineOutputError
 from anbudsklar.config import Settings
-from anbudsklar.contracts import NoticeContext, PagedDocument, Task
+from anbudsklar.contracts import DocumentSet, NoticeContext, PagedDocument, Task
 
 BASE_URL = "https://eneo.test"
 ASSISTANT = "a-tolka"
@@ -25,6 +25,7 @@ R2 = "7c1d2e3f-4a5b-4c6d-8e9f-0a1b2c3d4e52"
 GONE = "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d"
 NOTICE = NoticeContext(notice_id="n1", title="Ommålning (fiktiv)")
 DOCUMENT = PagedDocument(filename="u.pdf", pages=["Leverantören ska ha F-skatt."])
+DOCUMENTS = DocumentSet.of([DOCUMENT])
 CHECKLIST = {
     "summary": "Kort sammanfattning.",
     "requirements": [
@@ -72,7 +73,7 @@ async def test_interpret_sends_document_in_question_and_deletes_session(engine: 
     with respx.mock(base_url=BASE_URL, assert_all_called=False) as router:
         ask = router.post(SESSIONS).mock(return_value=_ask(fenced))
         delete = router.delete(f"{SESSIONS}{S1}/").mock(return_value=httpx.Response(200, json={}))
-        checklist, run = await engine.interpret_document(NOTICE, DOCUMENT)
+        checklist, run = await engine.interpret_document(NOTICE, DOCUMENTS)
     request = ask.calls[0].request
     body = json.loads(request.content)
     assert request.url.params["version"] == "2"
@@ -90,7 +91,7 @@ async def test_invalid_json_is_retried_as_a_follow_up(engine: EneoEngine) -> Non
         router.post(SESSIONS).mock(return_value=_ask("Här kommer listan."))
         follow_up = router.post(f"{SESSIONS}{S1}/").mock(return_value=_ask(json.dumps(CHECKLIST)))
         delete = router.delete(f"{SESSIONS}{S1}/").mock(return_value=httpx.Response(200, json={}))
-        _, run = await engine.interpret_document(NOTICE, DOCUMENT)
+        _, run = await engine.interpret_document(NOTICE, DOCUMENTS)
     assert run.attempts == 2
     assert json.loads(follow_up.calls[0].request.content)["question"].startswith("Ditt förra svar")
     assert delete.call_count == 1
@@ -102,7 +103,7 @@ async def test_session_is_deleted_when_the_output_stays_invalid(engine: EneoEngi
         router.post(f"{SESSIONS}{S1}/").mock(return_value=_ask("{}"))
         delete = router.delete(f"{SESSIONS}{S1}/").mock(return_value=httpx.Response(500))
         with pytest.raises(EngineOutputError):
-            await engine.interpret_document(NOTICE, DOCUMENT)
+            await engine.interpret_document(NOTICE, DOCUMENTS)
     assert delete.call_count == 1  # a failed delete is logged, not raised
 
 
@@ -141,7 +142,7 @@ async def test_eneo_errors_become_swedish_engine_errors(
         router.post(SESSIONS).mock(return_value=httpx.Response(status, json=body, headers=headers))
         delete = router.delete(url__regex=r".*/sessions/.*")
         with pytest.raises(EngineError, match=message) as raised:
-            await engine.interpret_document(NOTICE, DOCUMENT)
+            await engine.interpret_document(NOTICE, DOCUMENTS)
     assert delete.call_count == 0  # no session was created
     # Permanent errors make the worker give up at once; configuration errors wait for an operator.
     assert raised.value.retryable is retryable
@@ -154,7 +155,7 @@ async def test_short_retry_after_is_honoured_once(engine: EneoEngine) -> None:
             side_effect=[httpx.Response(429, headers={"Retry-After": "0"}), _ask(json.dumps(CHECKLIST))]
         )
         router.delete(f"{SESSIONS}{S1}/").mock(return_value=httpx.Response(200, json={}))
-        await engine.interpret_document(NOTICE, DOCUMENT)
+        await engine.interpret_document(NOTICE, DOCUMENTS)
     assert ask.call_count == 2
 
 
@@ -214,7 +215,7 @@ async def test_unreachable_eneo_does_not_reveal_its_address(engine: EneoEngine) 
     with respx.mock(base_url=BASE_URL, assert_all_called=False) as router:
         router.post(SESSIONS).mock(side_effect=httpx.ConnectError("refused"))
         with pytest.raises(EngineError) as raised:
-            await engine.interpret_document(NOTICE, DOCUMENT)
+            await engine.interpret_document(NOTICE, DOCUMENTS)
     assert "eneo.test" not in str(raised.value)
 
 

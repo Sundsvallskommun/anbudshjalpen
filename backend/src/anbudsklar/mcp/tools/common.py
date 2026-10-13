@@ -166,7 +166,10 @@ async def require_notice(session: AsyncSession, upphandling_id: str) -> Notice:
 
 
 def document_line(document: Document) -> str:
-    return f"- dokument_id: {document.id} | {document.filename} | {document.page_count} sidor"
+    line = f"- dokument_id: {document.id} | {document.filename} | {document.page_count} sidor"
+    if document.empty_pages:
+        line += f" | {document.empty_pages} sidor utan läsbar text (bilder eller inskannade sidor)"
+    return line
 
 
 def notice_label(notice: Notice) -> str:

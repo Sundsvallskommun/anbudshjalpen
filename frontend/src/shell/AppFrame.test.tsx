@@ -6,6 +6,7 @@ import { baseRoutes, mockApi, renderApp, type MockRoute } from "../test/render";
 import { PHONE_QUERY } from "../lib/usePhone";
 import { FALLBACK_AI_DISCLOSURE, FALLBACK_DEMO_NOTICE } from "./AboutDemo";
 import { STRIP_TEXT, STRIP_TEXT_PHONE } from "./PhaseStrip";
+import { READING_TRACE_KEY } from "./readingTrace";
 
 const noticesRoute: MockRoute = { method: "GET", path: "/api/notices", body: noticeList };
 const noticeRoute: MockRoute = { method: "GET", path: `/api/notices/${NOTICE_ID}`, body: noticeDetail };
@@ -29,6 +30,7 @@ function asPhone() {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  localStorage.clear();
 });
 
 describe("AppFrame demo strip", () => {
@@ -49,6 +51,23 @@ describe("AppFrame demo strip", () => {
     expect(within(dialog).getByText(/Motorn i demon just nu är regelbaserad/)).toBeInTheDocument();
     // The text is a named box that joins the tab order when it has to scroll (a small screen); here it fits.
     expect(within(dialog).getByRole("group", { name: "Texten om demon och AI" })).not.toHaveAttribute("tabindex");
+  });
+
+  it("offers the demo's trace of the files as a switch kept in this browser", async () => {
+    mockApi([...baseRoutes(null), noticesRoute]);
+    renderApp("/upphandlingar");
+
+    const [stripLink] = await screen.findAllByRole("button", { name: "Om demon och AI" });
+    await userEvent.click(stripLink!);
+    const dialog = await screen.findByRole("dialog", { name: "Om demon och AI" });
+    expect(await within(dialog).findByRole("heading", { name: "Så lästes underlaget" })).toBeInTheDocument();
+    const toggle = within(dialog).getByRole("switch", { name: "Visa hur underlaget lästes" });
+    expect(toggle).not.toBeChecked();
+    await userEvent.click(toggle);
+    expect(toggle).toBeChecked();
+    expect(localStorage.getItem(READING_TRACE_KEY)).toBe("1");
+    await userEvent.click(toggle);
+    expect(localStorage.getItem(READING_TRACE_KEY)).toBeNull();
   });
 
   it("keeps the disclosure when the configuration cannot load", async () => {

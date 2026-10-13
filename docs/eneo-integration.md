@@ -111,6 +111,11 @@ instruktion, ett kontrakt eller ett MCP-verktyg.
 > träffar ([Drift](operations.md#uppdatera)). De nya fälten `cpv_labels` i motorernas indata och `excerpt` i
 > Regelhjälpens källor sätts av appen vid varje anrop och kräver ingen ny körning.
 
+> **Kör det igen efter ändringen 2026-10-13.** Instruktionen för `tolka_underlag` säger nu att underlaget kan bestå
+> av flera dokument och att listan i början kan nämna filer som inte kunde läsas in
+> ([beslut 0020](decisions/0020-checklistan-lases-ur-alla-dokument.md)). Förteckningen, sidor utan text och annonsens
+> sista dag för frågor sätts av appen vid varje anrop och kräver ingen ny körning.
+
 > **Kör det igen efter ändringen 2026-10-07.** Instruktionen för `tolka_underlag` säger nu att sista dag för
 > anbudsansökan i ett selektivt förfarande är `annat` och inte `sista_anbudsdag`. Fältet `deadline_kind` i
 > `NoticeContext` sätts av appen vid varje anrop: annonsblocket heter då "Sista dag för anbudsansökan" i stället för

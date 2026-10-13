@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 from pydantic import TypeAdapter, ValidationError
 
 from anbudsklar.ai.engine import AiEngine, EngineError, build_engine
-from anbudsklar.contracts import NoticeContext, PagedDocument
+from anbudsklar.contracts import DocumentSet, NoticeContext, PagedDocument
 from anbudsklar.documents.citations import verify_checklist
 from anbudsklar.documents.extract import DocumentError, extract_pages
 from anbudsklar.eval.report import DocumentReport, EvalReport, ExtraRequirement, ItemReport, write_report
@@ -111,7 +111,7 @@ async def evaluate_fixture(engine: AiEngine, fixture: Fixture) -> DocumentReport
     document = PagedDocument(filename=fixture.document.name, pages=pages)
     started = time.perf_counter()
     try:
-        checklist, run = await engine.interpret_document(notice, document)
+        checklist, run = await engine.interpret_document(notice, DocumentSet.of([document]))
     except EngineError as error:
         report.seconds = round(time.perf_counter() - started, 2)
         report.error = str(error)
@@ -119,7 +119,7 @@ async def evaluate_fixture(engine: AiEngine, fixture: Fixture) -> DocumentReport
     report.seconds = round(time.perf_counter() - started, 2)
     report.model, report.attempts = run.model, run.attempts
 
-    verified, verification = verify_checklist(checklist, pages)
+    verified, verification = verify_checklist(checklist, [document])
     matches = match_requirements(fixture.items, verified.requirements)
     report.scores = score_document(matches, verified.requirements, verification)
     report.items = [ItemReport.from_match(match) for match in matches]

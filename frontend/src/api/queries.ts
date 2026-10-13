@@ -38,6 +38,7 @@ import type {
   NoticeStatus,
   PageView,
   ProfileSaved,
+  ReadingReport,
   QuestionRequest,
   RejectRequest,
   ReminderRequest,
@@ -76,6 +77,7 @@ export const keys = {
   noticeBuyers: (filters: BuyerFilters) => ["notices", "buyers", filters] as const,
   notice: (id: string) => ["notice", id] as const,
   page: (noticeId: string, documentId: string, page: number) => ["page", noticeId, documentId, page] as const,
+  reading: (noticeId: string) => ["notice", noticeId, "reading"] as const,
   matches: ["matches"] as const,
   upcoming: (months: number) => ["upcoming", months] as const,
   profile: ["profile"] as const,
@@ -202,6 +204,15 @@ export function useNotice(id: string) {
     enabled: id !== "",
     // Asked again now and then while a checklist is on its way, so the steps appear without the reader doing anything.
     refetchInterval: (query) => (isChecklistComing(query.state.data) ? CHECKLIST_POLL_MS : false),
+  });
+}
+
+/** The demo's trace of a notice's files ("Så lästes underlaget"); asked for only while the switch is on. */
+export function useReadingReport(noticeId: string) {
+  return useQuery({
+    queryKey: keys.reading(noticeId),
+    queryFn: () => api.get<ReadingReport>(`/api/notices/${noticeId}/reading`),
+    enabled: noticeId !== "",
   });
 }
 

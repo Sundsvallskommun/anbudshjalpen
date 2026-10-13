@@ -43,6 +43,7 @@ def schedule() -> list[tuple[str, BaseTrigger]]:
         ("ingest_lou", CronTrigger(day_of_week="mon", hour=5, minute=0, timezone=STOCKHOLM)),
         ("close_expired", IntervalTrigger(minutes=15, timezone=STOCKHOLM)),
         (INTERPRET_JOB, IntervalTrigger(seconds=int(INTERPRET_INTERVAL.total_seconds()), timezone=STOCKHOLM)),
+        ("reextract_outdated", IntervalTrigger(minutes=10, timezone=STOCKHOLM)),
         ("match_all", IntervalTrigger(minutes=30, timezone=STOCKHOLM)),
         ("send_reminders", IntervalTrigger(minutes=1, timezone=STOCKHOLM)),
         ("notify_matches", IntervalTrigger(minutes=10, timezone=STOCKHOLM)),

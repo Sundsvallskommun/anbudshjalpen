@@ -15,6 +15,8 @@ by itself; a buyer can then ask for a new interpretation.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import uuid
 from collections.abc import Sequence
@@ -34,17 +36,19 @@ from anbudsklar.api.schemas import (
     ChecklistView,
     InterpretationState,
     InterpretationView,
+    ReadSummary,
     VerificationSummary,
 )
-from anbudsklar.contracts import CONTRACT_VERSION, Checklist, Task, deadline_kind
+from anbudsklar.contracts import CONTRACT_VERSION, Checklist, DocumentSet, PagedDocument, Task, deadline_kind
+from anbudsklar.documents.bundle import build_document_set
 from anbudsklar.documents.citations import verify_checklist
-from anbudsklar.documents.store import load_paged_document
-from anbudsklar.models import ChecklistRecord, Document, JobRun, Notice, PublishedAnswer
+from anbudsklar.documents.store import current_documents, is_current, load_paged_documents
+from anbudsklar.models import ChecklistRecord, Document, JobRun, Notice
 from anbudsklar.services.access import Viewer
 from anbudsklar.services.ai_usage import record_call
 from anbudsklar.services.answers import answer_inputs, answers_digest
 from anbudsklar.services.app_settings import review_required
-from anbudsklar.services.contexts import notice_context
+from anbudsklar.services.contexts import notice_context, unread_filenames
 from anbudsklar.services.dates import end_of_local_day, utcnow
 from anbudsklar.services.errors import ConflictError, InvalidInputError, NotFoundError
 from anbudsklar.visibility import shown_notices
@@ -177,6 +181,7 @@ async def checklist_progress(session: AsyncSession, notice_id: uuid.UUID) -> Che
         .where(
             Document.notice_id == notice_id,
             ~has_checklist,
+            is_current(),
             Document.page_count > 0,
             Document.auto_interpret,
             waiting,
@@ -238,15 +243,68 @@ async def checklist_statuses(
 # --- Interpreting -------------------------------------------------------------------
 
 
+class _Material(NamedTuple):
+    """What an interpretation reads: the notice's current documents, the main one first."""
+
+    documents: list[Document]
+    paged: list[PagedDocument]
+    document_set: DocumentSet
+
+
+async def _material(session: AsyncSession, notice: Notice, main: Document) -> _Material:
+    """Every current document of the notice as the engine gets it (decision 0020).
+
+    The bundle keeps the main document whole and adds the attachments while the budget
+    lasts. A main document that does not fit on its own is refused: half a checklist from
+    half a document must not be published, so inköp is told to split it instead.
+    """
+
+    documents = await current_documents(session, notice.id, main=main)
+    paged = await load_paged_documents(session, documents)
+    if not paged or not any(page.strip() for page in paged[0].pages):
+        raise InvalidInputError("Dokumentet innehåller ingen läsbar text att tolka.")
+    document_set = build_document_set(paged, unread_files=unread_filenames(notice))
+    outline = document_set.outline[0]
+    if outline.pages_included < outline.page_count:
+        chars = f"{sum(len(page) for page in paged[0].pages):,}".replace(",", " ")
+        raise InvalidInputError(
+            f"Huvuddokumentet är för stort för en tolkning i ett anrop ({outline.page_count} sidor, "
+            f"{chars} tecken). Dela upp det och ladda upp delarna."
+        )
+    return _Material(documents, paged, document_set)
+
+
+def documents_digest(documents: Sequence[Document]) -> str:
+    """A fingerprint of which documents, in which extraction, a checklist was made from.
+
+    A file the source adds or replaces, and a page text an improved extraction changes,
+    both show up here, so that `interpret_changed` interprets the notice again.
+    """
+
+    content = sorted((str(document.id), document.extraction_version) for document in documents)
+    return hashlib.sha256(json.dumps(content).encode()).hexdigest()
+
+
+def read_summary(document_set: DocumentSet) -> ReadSummary:
+    outline = document_set.outline
+    return ReadSummary(
+        documents_read=sum(1 for item in outline if item.pages_included > 0),
+        documents_total=len(outline),
+        pages_read=sum(item.pages_included for item in outline),
+        pages_total=sum(item.page_count for item in outline),
+    )
+
+
 async def interpret_document(
     session: AsyncSession, engine: AiEngine, document_id: uuid.UUID
 ) -> ChecklistRecord:
-    """Run tolka_underlag on one document and store the verified result.
+    """Run tolka_underlag on a notice's documents, `document_id` first, and store the verified result.
 
     A draft for inköp to review, or, when the review is turned off (decision 0011), a
     published checklist at once, with no `approved_at`, so the app says nobody reviewed it.
-    The buyer's published answers go with the document (decision 0018), and the record
-    keeps their digest, so that `interpret_answered` sees when they change.
+    Every current document of the notice goes with the main one (decision 0020), and the
+    buyer's published answers too (decision 0018); the record keeps a digest of both, so
+    that `interpret_changed` sees when they change.
     """
 
     document = await session.get(Document, document_id)
@@ -255,14 +313,13 @@ async def interpret_document(
     notice = await session.get(Notice, document.notice_id)
     if notice is None:
         raise NotFoundError("Upphandlingen finns inte.")
-    paged = await load_paged_document(session, document_id)
-    if not any(page.strip() for page in paged.pages):
-        raise InvalidInputError("Dokumentet innehåller ingen läsbar text att tolka.")
+    material = await _material(session, notice, document)
 
     answers = await answer_inputs(session, notice.id)
-    checklist, run = await engine.interpret_document(notice_context(notice), paged, answers)
+    checklist, run = await engine.interpret_document(notice_context(notice), material.document_set, answers)
     await record_call(session, Task.INTERPRET_DOCUMENT, run, notice_id=notice.id)
-    verified, summary = verify_checklist(checklist, paged.pages, answers)
+    verified, summary = verify_checklist(checklist, material.paged, answers)
+    summary.read = read_summary(material.document_set)
     document.interpret_attempts = 0
     document.interpret_error = None
     document.interpret_retry_at = None
@@ -278,6 +335,7 @@ async def interpret_document(
         payload=verified.model_dump(mode="json"),
         verification=summary.model_dump(),
         answers_digest=answers_digest(answers),
+        documents_digest=documents_digest(material.documents),
         # Wall-clock time, not the transaction's: several drafts made in one transaction stay ordered.
         created_at=utcnow(),
     )
@@ -295,7 +353,9 @@ async def interpret_notice(
 
     document_ids = list(
         await session.scalars(
-            select(Document.id).where(Document.notice_id == notice_id).order_by(Document.created_at)
+            select(Document.id)
+            .where(Document.notice_id == notice_id, is_current())
+            .order_by(Document.created_at)
         )
     )
     if not document_ids:
@@ -319,7 +379,7 @@ async def interpret_pending(
     document_ids = list(
         await session.scalars(
             select(Document.id)
-            .where(~has_checklist, Document.page_count > 0, Document.auto_interpret, due)
+            .where(~has_checklist, is_current(), Document.page_count > 0, Document.auto_interpret, due)
             .order_by(Document.interpret_attempts, Document.created_at, Document.id)
             .limit(limit)
         )
@@ -341,34 +401,34 @@ async def interpret_pending(
     return {"pending": len(document_ids), "interpreted": interpreted, "failed": failed, "gave_up": gave_up}
 
 
-# Set on a draft that a new interpretation replaced because the answers changed.
-SUPERSEDED_NOTE = "Ersatt av en ny tolkning som tar hänsyn till inköps senaste svar i e-Avrop."
+# Set on a draft that a new interpretation replaced because the documents or the answers changed.
+SUPERSEDED_NOTE = (
+    "Ersatt av en ny tolkning: underlaget eller inköps publicerade svar i e-Avrop har ändrats "
+    "sedan den förra."
+)
 
 
-async def interpret_answered(
+async def interpret_changed(
     session: AsyncSession, engine: AiEngine, *, limit: int = PENDING_BATCH_SIZE
 ) -> dict[str, int]:
-    """Interpret open notices again whose published answers changed since their checklist (decision 0018).
+    """Interpret open notices again whose documents or published answers changed since their checklist.
 
-    An answer can settle an open question or change a requirement, and it reaches every
-    supplier, so the checklist must follow it. The notice's latest checklist decides: a
-    published one gets a successor (a draft for inköp, or published at once with the review
-    off), and a draft nobody has saved or commented on is replaced and marked so. A draft
-    inköp has worked on, an approved checklist and a rejected one are left to inköp. A
-    failure backs off and gives up as `interpret_pending` does, on the checklist's document,
-    so a document that cannot succeed is not sent to the model every run. A few per run,
-    each committed.
+    An answer can settle an open question or change a requirement (decision 0018), and a
+    file the source added, replaced or an improved extraction re-read changes what the
+    checklist should cover (decision 0020); both reach every supplier, so the checklist
+    must follow. The notice's latest checklist decides: a published one gets a successor
+    (a draft for inköp, or published at once with the review off), and a draft nobody has
+    saved or commented on is replaced and marked so. A draft inköp has worked on, an
+    approved checklist and a rejected one are left to inköp. A failure backs off and gives
+    up as `interpret_pending` does, on the checklist's document, so a document that cannot
+    succeed is not sent to the model every run. A few per run, each committed.
     """
 
     now = utcnow()
-    has_answers = exists().where(PublishedAnswer.notice_id == Notice.id)
-    had_answers = exists().where(
-        ChecklistRecord.notice_id == Notice.id, ChecklistRecord.answers_digest.is_not(None)
-    )
     notice_ids = list(
         await session.scalars(
             select(Notice.id)
-            .where(Notice.status == "open", shown_notices(), or_(has_answers, had_answers))
+            .where(Notice.status == "open", shown_notices(), exists().where(Document.notice_id == Notice.id))
             .order_by(Notice.deadline_at.asc().nulls_last(), Notice.id)
         )
     )
@@ -379,17 +439,19 @@ async def interpret_answered(
         latest = await latest_checklist(session, notice_id)
         if latest is None or not _follows_answers(latest):
             continue
-        if answers_digest(await answer_inputs(session, notice_id)) == latest.answers_digest:
+        main = await session.get(Document, latest.document_id)
+        if main is None or not await _changed_since(session, latest, main):
             continue
-        document = await session.get(Document, latest.document_id)
-        if document is None or not _may_try(document, now):
+        if main.superseded_by is not None:
+            main = await _successor(session, main) or main
+        if not _may_try(main, now):
             continue
         try:
-            await interpret_document(session, engine, latest.document_id)
+            await interpret_document(session, engine, main.id)
         except (EngineError, InvalidInputError) as error:
             # The engine fails before anything is written, so only the failure needs storing.
-            logger.warning("Interpreting notice %s again after new answers failed", notice_id, exc_info=True)
-            await record_interpret_failure(session, latest.document_id, error, utcnow())
+            logger.warning("Interpreting notice %s again after changes failed", notice_id, exc_info=True)
+            await record_interpret_failure(session, main.id, error, utcnow())
             await session.commit()
             failed += 1
             continue
@@ -399,6 +461,36 @@ async def interpret_answered(
         await session.commit()
         interpreted += 1
     return {"reinterpreted": interpreted, "reinterpret_failed": failed}
+
+
+async def _changed_since(session: AsyncSession, record: ChecklistRecord, main: Document) -> bool:
+    """Whether the answers or the documents differ from what the checklist was made from.
+
+    A checklist without a documents digest was made from one document before decision 0020:
+    it is outdated when the notice has more current documents than that one, and stays
+    when that one document is all there is.
+    """
+
+    if answers_digest(await answer_inputs(session, record.notice_id)) != record.answers_digest:
+        return True
+    documents = await current_documents(session, record.notice_id, main=main)
+    if record.documents_digest is None:
+        return any(document.id != main.id for document in documents) or main.superseded_by is not None
+    return documents_digest(documents) != record.documents_digest
+
+
+async def _successor(session: AsyncSession, document: Document) -> Document | None:
+    """The current version of a replaced main document, following the chain of replacements."""
+
+    current = document
+    seen = {current.id}
+    while current.superseded_by is not None and current.superseded_by not in seen:
+        seen.add(current.superseded_by)
+        following = await session.get(Document, current.superseded_by)
+        if following is None:
+            return None
+        current = following
+    return current if current.superseded_by is None else None
 
 
 def _follows_answers(record: ChecklistRecord) -> bool:
@@ -484,7 +576,7 @@ async def list_interpretations(session: AsyncSession) -> list[InterpretationView
     rows = await session.execute(
         select(Document, Notice.title)
         .join(Notice, Notice.id == Document.notice_id)
-        .where(or_(waiting, reinterpreting), Document.page_count > 0, shown_notices())
+        .where(or_(waiting, reinterpreting), is_current(), Document.page_count > 0, shown_notices())
         .order_by(Document.created_at.desc())
     )
     return [interpretation_view(document, title) for document, title in rows]
@@ -564,9 +656,14 @@ async def update_checklist(
         raise ConflictError(
             "En publicerad checklista kan inte ändras. Tolka underlaget på nytt för att få ett nytt utkast."
         )
-    paged = await load_paged_document(session, record.document_id)
+    main = await session.get(Document, record.document_id)
+    if main is None:
+        raise NotFoundError("Dokumentet finns inte.")
+    paged = await load_paged_documents(session, await current_documents(session, record.notice_id, main=main))
     answers = await answer_inputs(session, record.notice_id)
-    verified, summary = verify_checklist(update.checklist, paged.pages, answers)
+    verified, summary = verify_checklist(update.checklist, paged or [], answers)
+    previous = VerificationSummary.model_validate(record.verification or {})
+    summary.read = previous.read  # what the interpretation read does not change with an edit
     record.payload = verified.model_dump(mode="json")
     record.verification = summary.model_dump()
     record.reviewer_note = update.reviewer_note

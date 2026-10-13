@@ -362,3 +362,15 @@ async def test_change_notice_replaces_the_earlier_version(
     assert (await ingest_ted(db_session, client, settings, now=RECORDED_AT))["unchanged"] == 1
     await db_session.refresh(stored)
     assert stored.external_id == "690001-2026"
+
+
+def test_every_lots_description_is_kept_when_the_procedure_has_none(page: dict[str, Any]) -> None:
+    """A notice with several lots describes each; only the first would lose the others."""
+
+    raw = dict(notice(page, "684405-2026"))
+    raw.pop("description-proc", None)
+    raw["description-lot"] = {
+        "swe": ["Delområde syd: snöröjning.", "Delområde nord: sandning.", "Delområde syd: snöröjning."]
+    }
+    values = map_ted_notice(raw, now=RECORDED_AT).values
+    assert values.description == "Delområde syd: snöröjning.\n\nDelområde nord: sandning."

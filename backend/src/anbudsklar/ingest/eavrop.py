@@ -39,8 +39,14 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.config import Settings
-from anbudsklar.documents.extract import DocumentError
-from anbudsklar.documents.store import safe_filename, store_document
+from anbudsklar.documents.archives import (
+    list_members,
+    member_prefix,
+    read_member,
+    unread_summary,
+)
+from anbudsklar.documents.extract import SUPPORTED_SUFFIXES, DocumentError
+from anbudsklar.documents.store import safe_filename, store_document, supersede
 from anbudsklar.ingest.common import IngestError, IngestStats
 from anbudsklar.ingest.eavrop_qa import (
     MAX_LOG_BYTES,
@@ -70,15 +76,17 @@ SOURCE = "eavrop"
 # Pause between calls: about 300 projects a run, which a buyer's API handles without strain.
 REQUEST_INTERVAL_SECONDS = 0.5
 MAX_DOCUMENT_BYTES = 50 * 1024 * 1024
-# Formats the document extraction reads; other files (xlsx, images, video) are not fetched.
-SUPPORTED_SUFFIXES = frozenset({".pdf", ".docx", ".txt", ".md"})
+ARCHIVE_SUFFIX = ".zip"
+# Other files (images, video, drawings) are not fetched; the notice names them as unread,
+# so nobody takes the documents here for the whole set.
+UNSUPPORTED_FORMAT = "Filformatet {suffix} stöds inte"
 # The only API paths a token is sent to, below `EAVROP_API_URL`.
 DETAIL_PATHS = ("/v1/procurements/", "/v1/simple-procurements/")
 DOCUMENT_PATH = "/v1/announcement-documents/"
 # Words that mark the document a supplier reads first. The first word that matches any file
-# wins, and a PDF beats a Word file with the same words. A notice with a single readable file
-# has that as its main document. Otherwise, without a match, nothing is interpreted on its
-# own: a wrong guess costs a model call and a draft for inköp to reject.
+# wins, and a PDF beats a Word file with the same words. Without a match the first PDF, else
+# the first readable file, is the main document: the interpretation reads every document
+# of the notice anyway (decision 0020), so the choice only decides which comes first.
 MAIN_DOCUMENT_WORDS = (
     "administrativa föreskrifter",
     "upphandlingsföreskrifter",
@@ -310,24 +318,25 @@ def map_procurement(
         deadline_at=procurement.deadline,
         # The first stage of a two-step procedure closes with requests to participate, not tenders.
         deadline_kind="request" if procurement.stage == "application" else "tender",
+        question_deadline_at=procurement.question_deadline,
         url=url,
         documents_url=url,
     )
 
 
 def main_document(documents: Sequence[PublicDocument]) -> str | None:
-    """The filename of the document to interpret on its own, if one is clearly the main one."""
+    """The filename of the document the interpretation starts from; None without readable files."""
 
     candidates = [
         document.filename for document in documents if _suffix(document.filename) in SUPPORTED_SUFFIXES
     ]
-    if len(candidates) == 1:
-        return candidates[0]
+    if not candidates:
+        return None
     for word in MAIN_DOCUMENT_WORDS:
         matches = [name for name in candidates if word in name.lower()]
         if matches:
             return min(matches, key=lambda name: (_suffix(name) != ".pdf", candidates.index(name)))
-    return None
+    return min(candidates, key=lambda name: (_suffix(name) != ".pdf", candidates.index(name)))
 
 
 def _suffix(filename: str) -> str:
@@ -468,26 +477,41 @@ def _needs_download(
 async def _sync_documents(
     session: AsyncSession, api: _Api, notice: Notice, procurement: PublicProcurement, stats: EavropStats
 ) -> None:
+    """Fetch the announcement's files the extraction reads, and name the ones it does not.
+
+    A file the buyer re-published under the same name becomes a new document and the old
+    one is marked superseded, so that only the current version reaches the engines. The
+    notice's `unread_files` is rewritten from this run: every file that is not readable
+    here, with the reason, which the pages and the engines show.
+    """
+
     existing = await session.scalars(
-        select(Document).where(Document.notice_id == notice.id).order_by(Document.created_at.desc())
+        select(Document)
+        .where(Document.notice_id == notice.id)
+        .order_by(Document.superseded_by.is_(None).desc(), Document.created_at.desc())
     )
-    by_name: dict[str, Document] = {}
+    by_name: dict[str, Document] = {}  # the current version of each file name
     for document in existing:
         by_name.setdefault(document.filename, document)
     main = main_document(procurement.documents)
+    unread: list[dict[str, str]] = []
     # The main document first, so that it is the notice's first document (questions use it).
     ordered = sorted(procurement.documents, key=lambda document: document.filename != main)
     for document in ordered:
-        if _suffix(document.filename) not in SUPPORTED_SUFFIXES:
+        suffix = _suffix(document.filename)
+        if suffix == ARCHIVE_SUFFIX:
+            await _sync_archive(session, api, notice, document, procurement, by_name, unread, stats)
+            continue
+        if suffix not in SUPPORTED_SUFFIXES:
+            unread.append(_unread(document, UNSUPPORTED_FORMAT.format(suffix=suffix or "?")))
             stats.documents_skipped += 1
             continue
-        if not _needs_download(
-            document, by_name.get(safe_filename(document.filename)), procurement.request_updated
-        ):
+        stored = by_name.get(safe_filename(document.filename))
+        if not _needs_download(document, stored, procurement.request_updated):
             continue
         try:
             data, content_type = await api.download(document.url)
-            await store_document(
+            current = await store_document(
                 session,
                 notice_id=notice.id,
                 filename=document.filename,
@@ -497,9 +521,83 @@ async def _sync_documents(
             )
         except DocumentError as error:
             log.warning("e-Avrop document %r for %s skipped: %s", document.filename, notice.id, error)
+            unread.append(_unread(document, str(error)))
             stats.documents_skipped += 1
             continue
+        if stored is not None and stored.id != current.id:
+            supersede(stored, current)
+            by_name[safe_filename(document.filename)] = current
         stats.documents_stored += 1
+    if (notice.unread_files or []) != unread:
+        notice.unread_files = unread
+
+
+def _unread(document: PublicDocument, reason: str) -> dict[str, str]:
+    return {"filename": safe_filename(document.filename), "reason": reason.rstrip(".")}
+
+
+def _archive_documents(by_name: Mapping[str, Document], archive: str) -> list[Document]:
+    prefix = member_prefix(archive)
+    return [document for name, document in by_name.items() if name.startswith(prefix)]
+
+
+async def _sync_archive(
+    session: AsyncSession,
+    api: _Api,
+    notice: Notice,
+    document: PublicDocument,
+    procurement: PublicProcurement,
+    by_name: dict[str, Document],
+    unread: list[dict[str, str]],
+    stats: EavropStats,
+) -> None:
+    """Fetch an archive and store its readable members as documents of their own.
+
+    Each member is named after the archive ("11.4 Ritningar.zip › plan.pdf"), never
+    interpreted on its own, and fetched again only when the archive has changed. What the
+    archive holds that cannot be read is said in one line on the notice.
+    """
+
+    archive = safe_filename(document.filename)
+    stored = _archive_documents(by_name, archive)
+    newest = max(stored, key=lambda item: item.created_at) if stored else None
+    if not _needs_download(document, newest, procurement.request_updated):
+        return
+    try:
+        data, _ = await api.download(document.url)
+        members = list_members(data)
+    except (DocumentError, IngestError) as error:
+        log.warning("e-Avrop archive %r for %s skipped: %s", document.filename, notice.id, error)
+        unread.append(_unread(document, str(error)))
+        stats.documents_skipped += 1
+        return
+    failed = 0
+    for member in members:
+        if not member.readable:
+            continue
+        name = member.document_name(archive)
+        try:
+            current = await store_document(
+                session,
+                notice_id=notice.id,
+                filename=name,
+                mimetype="application/octet-stream",  # resolved from the member's name and bytes
+                data=read_member(data, member),
+                auto_interpret=False,
+            )
+        except DocumentError as error:
+            log.warning("Member %r of e-Avrop archive %r skipped: %s", member.path, archive, error)
+            failed += 1
+            continue
+        earlier = by_name.get(name)
+        if earlier is not None and earlier.id != current.id:
+            supersede(earlier, current)
+        by_name[name] = current
+        stats.documents_stored += 1
+    summary = unread_summary(members, failed)
+    if summary:
+        unread.append(_unread(document, summary))
+    stats.documents_skipped += sum(1 for member in members if not member.readable) + failed
 
 
 async def _sync_answers(

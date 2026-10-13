@@ -36,6 +36,8 @@ Kontaktpersoners namn, e-post och telefonnummer i annonser sparas inte.
   och motorernas annonsblock kallar den "Sista dag för anbudsansökan". Sista anbudsdag kommer först i inbjudan till de
   utvalda och finns bara om en publicerad checklista anger den. Kontrollerat 2026-10-07 på annonsen 680702-2026
   (Hedbergska skolan, Sundsvalls kommun).
+- **Beskrivning:** förfarandets beskrivning (`description-proc`), annars alla delområdenas (`description-lot`)
+  efter varandra, så att ett delområde aldrig faller bort ur sökningen, matchningen och det modellen läser.
 - **Status:** en sista dag i framtiden ger `open`, tilldelning ger `awarded`, förhandsannons ger `planned` och resten
   blir `closed`. Hela svaret från TED sparas i `raw`. När sista dagen passerar sparar jobbet `close_expired` `closed`
   på annonsen inom en kvart, för annonser från alla källor, och API:t visar den som stängd redan från den dagen. Det
@@ -72,6 +74,10 @@ Anbudshjälpen läser kommunens upphandlingar via e-Avrops Projekt-API med kommu
 
 - Nyckeln läser allt i kommunens projekt. Insamlaren sparar bara publicerade upphandlingar och fälten i en vitlista
   ([beslut 0009](decisions/0009-eavrop-projekt-api.md)).
+- Underlagets filer hämtas i PDF, Word, Excel och text, och zip-arkiv packas upp. Andra filer står med namn och skäl
+  på annonsen, och en fil som e-Avrop publicerat på nytt ersätter den gamla
+  ([beslut 0020](decisions/0020-checklistan-lases-ur-alla-dokument.md)). De flesta av kommunens dokument är exporter
+  ur e-Avrop, som tjänsten känner igen, se [e-Avrops egna dokument](eavrop.md#e-avrops-egna-dokument).
 - Inköps publicerade svar på leverantörernas frågor läses ur annonsens frågelogg, bara besvarade frågor och aldrig
   vem som frågade ([beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md)). De visas i steg 1 Krav och via
   MCP-verktyget `hamta_fragor_svar`, och Fråga AI och tolkningen läser dem ([beslut 0018](decisions/0018-publicerade-svar-i-ai-uppgifterna.md)).

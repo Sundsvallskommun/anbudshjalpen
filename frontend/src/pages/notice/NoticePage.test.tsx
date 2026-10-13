@@ -13,10 +13,12 @@ import {
   NOTICE_ID,
   noticeDetail,
   pageFour,
+  readingReport,
   reminder,
 } from "../../test/fixtures";
 import { baseRoutes, mockApi, renderApp, type MockRoute } from "../../test/render";
 import { PHONE_QUERY } from "../../lib/usePhone";
+import { READING_TRACE_KEY } from "../../shell/readingTrace";
 
 const noticeRoute: MockRoute = { method: "GET", path: `/api/notices/${NOTICE_ID}`, body: noticeDetail };
 const pageRoute = (page: number, text = pageFour.text): MockRoute => ({
@@ -51,6 +53,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  localStorage.clear();
 });
 
 describe("NoticePage header", () => {
@@ -142,6 +145,46 @@ describe("NoticePage header", () => {
     expect(within(panel).getByText("Målning")).toBeInTheDocument();
     expect(within(panel).getByText("21 sep 2026")).toBeInTheDocument();
     expect(within(panel).getByRole("link", { name: /Öppna annonsen/u })).toHaveAttribute("href", noticeDetail.url);
+  });
+
+  it("names the files the source has that were not read in, behind Om upphandlingen", async () => {
+    const unread = [{ filename: "Bilaga 2 Ritningar.zip", reason: "Filformatet .zip stöds inte" }];
+    const scanned = { ...noticeDetail.documents[0]!, empty_pages: 3 };
+    mockApi([...baseRoutes(null), noticeWith({ unread_files: unread, documents: [scanned, { ...scanned, id: "d2" }] })]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    const toggle = await screen.findByRole("button", { name: "Om upphandlingen" });
+    await userEvent.click(toggle);
+    const panel = document.getElementById(toggle.getAttribute("aria-controls")!)!;
+    expect(within(panel).getByText("Finns hos köparen men inte här")).toBeInTheDocument();
+    const list = within(panel).getByRole("list", { name: "Filer som inte lästs in" });
+    expect(within(list).getByText("Bilaga 2 Ritningar.zip · Filformatet .zip stöds inte")).toBeInTheDocument();
+    // Pages without text are said next to the page count, so the reader checks them in the file.
+    expect(within(panel).getAllByText("16 sidor · 3 sidor utan läsbar text · Fiktiv").length).toBeGreaterThan(0);
+  });
+
+  it("traces what happened to the files, step by step, while the demo switch is on", async () => {
+    const readingRoute: MockRoute = { method: "GET", path: `/api/notices/${NOTICE_ID}/reading`, body: readingReport };
+    mockApi([...baseRoutes(null), noticeRoute, readingRoute]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+    await screen.findByRole("button", { name: "Om upphandlingen" });
+    // Off by default: the panel is a demo convenience, not part of the page.
+    expect(screen.queryByRole("button", { name: "Så lästes underlaget" })).not.toBeInTheDocument();
+
+    localStorage.setItem(READING_TRACE_KEY, "1");
+    window.dispatchEvent(new StorageEvent("storage", { key: READING_TRACE_KEY, newValue: "1" }));
+    const toggle = await screen.findByRole("button", { name: "Så lästes underlaget" });
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    const panel = document.getElementById(toggle.getAttribute("aria-controls")!)!;
+    expect(await within(panel).findByText("Förfrågningsunderlag Solbacken.pdf")).toBeInTheDocument();
+    expect(within(panel).getByText("Huvuddokument")).toBeInTheDocument();
+    const file = within(panel).getByRole("list", { name: "Steg för Förfrågningsunderlag Solbacken.pdf" });
+    expect(within(file).getByText("Lades in som demodata · PDF, 1,2 MB")).toBeInTheDocument();
+    expect(within(file).getAllByText("21 sep kl. 06:30").length).toBeGreaterThan(0);
+    const checklist = within(panel).getByRole("list", { name: "Steg för Checklistan" });
+    expect(within(checklist).getByText("Granskades och godkändes av inköp")).toBeInTheDocument();
+    expect(within(checklist).getByText("23 sep kl. 10:00")).toBeInTheDocument();
   });
 
   it("puts the disclosures and the document in one card on a phone, and the steps without numbers", async () => {
