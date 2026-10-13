@@ -1,0 +1,6 @@
+/* Astryx's stacked MetadataList is a one-column grid of `1fr`, whose rows keep the min-content width of what they hold.
+   The activity tokens never wrap, so one long CPV label stretched the card's list past its edge. The rows may shrink
+   to the card instead, and each token cuts its own label off with an ellipsis. */
+.list dl > * {
+  min-width: 0;
+}

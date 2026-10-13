@@ -10,6 +10,7 @@ import type { CompanyView } from "../../api/types";
 import { ErrorNotice, Loading } from "../../components/states";
 import { keepNumbersTogether } from "../../lib/text";
 import { CardHeading } from "./CardHeading";
+import styles from "./ProfileCard.module.css";
 
 /** A field the company has not filled in says so, quietly. Long free text is cut off; the profile has it all. */
 function Value({ text, maxLines }: { text: string | null; maxLines?: number }) {
@@ -40,7 +41,7 @@ export function ProfileCard() {
           <ErrorNotice title="Profilen kunde inte hämtas" error={profile.error} onRetry={() => profile.refetch()} />
         )}
         {profile.data && (
-          <MetadataList label={{ position: "top" }}>
+          <MetadataList label={{ position: "top" }} className={styles.list}>
             <MetadataListItem label="Vad ni gör">
               {labels.length > 0 ? (
                 <HStack gap={1.5} wrap="wrap">
