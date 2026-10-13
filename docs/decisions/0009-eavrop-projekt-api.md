@@ -1,6 +1,7 @@
 # 0009: e-Avrop hämtas via kommunens Projekt-API, med en vitlista
 
-- **Status:** Accepterat
+- **Status:** Accepterat, vilken annons som blir kvar när upphandlingen också finns i TED ersatt av
+  [0021](0021-eavrop-gar-fore-ted.md)
 - **Datum:** 2026-10-08
 - **Gäller:** insamlingen från e-Avrop, vilka uppgifter som får lämna e-Avrop och vilka underlag som tolkas automatiskt
 

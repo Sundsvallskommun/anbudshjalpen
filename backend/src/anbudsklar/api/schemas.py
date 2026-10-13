@@ -327,6 +327,8 @@ class NoticeDetail(NoticeSummary):
     procedure: str | None
     url: str | None
     documents_url: str | None
+    # TED's notice of a procurement stored from e-Avrop, which also went to TED (decision 0021).
+    ted_url: str | None = None
     place: str | None
     estimated_value_sek: int | None
     cpv_labels: dict[str, str] = Field(default_factory=dict)  # code -> Swedish label, for known codes

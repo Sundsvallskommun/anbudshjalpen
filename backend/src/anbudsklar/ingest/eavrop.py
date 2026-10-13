@@ -19,9 +19,12 @@ module therefore reads by allowlist:
   questions suppliers asked and the answers the buyer published (decision 0013, see
   `anbudsklar.ingest.eavrop_qa`). The log files next to it hold who asked and are never read.
 
-A procurement that e-Avrop also sent to TED is the same procurement: its documents are added
-to the TED notice instead of creating a second notice. The other way round, the TED job does
-not create a notice for a procurement already stored from e-Avrop.
+A procurement that e-Avrop also sent to TED is the same procurement, and e-Avrop's notice is
+the one kept, since it has the documents, the question deadline and the answers (decision 0021).
+A TED notice stored first becomes e-Avrop's notice: the same row, so what hangs on it (documents,
+checklists, matches, reminders) stays, and TED's buyer, value and place are kept with TED's
+link (`anbudsklar.ingest.ted.ted_facts`). The other way round, the TED job adds those to the
+notice already stored from e-Avrop instead of creating a second one.
 """
 
 from __future__ import annotations
@@ -67,7 +70,7 @@ from anbudsklar.ingest.notices import (
     status_from_deadline,
     unique,
 )
-from anbudsklar.ingest.ted import LOOKBACK_MONTHS, months_before
+from anbudsklar.ingest.ted import LOOKBACK_MONTHS, months_before, ted_facts
 from anbudsklar.models import Document, Notice
 
 log = logging.getLogger(__name__)
@@ -286,10 +289,15 @@ def map_procurement(
     now: datetime,
     list_url: str | None = None,
     list_updated: str | None = None,
+    ted: Mapping[str, Any] | None = None,
 ) -> NoticeValues:
-    """The notice columns. `raw` holds only the public facts the columns do not."""
+    """The notice columns. `raw` holds only the public facts the columns do not.
+
+    `ted` is what TED's notice of the same procurement adds (`ted_facts`), kept on every update.
+    """
 
     url = notice_url(settings, procurement.procurement_id)
+    ted_raw = {"ted": dict(ted)} if ted else {}
     return NoticeValues(
         source=SOURCE,
         external_id=procurement.procurement_id,
@@ -306,11 +314,12 @@ def map_procurement(
             "question_deadline": _iso(procurement.question_deadline),
             "request_updated": _iso(procurement.request_updated),
             "documents": [document.filename for document in procurement.documents],
-        },
+        }
+        | ted_raw,
         description=procurement.description,
         # The API names no buyer. The client is the municipality's procurement unit, which
         # also buys for others; TED names those buyers when the procurement is there too.
-        buyer=settings.organization_name,
+        buyer=(ted or {}).get("buyer") or settings.organization_name,
         reference_number=procurement.diary_number,
         cpv_codes=list(procurement.cpv_codes),
         procedure=PROCEDURE_LABELS.get(procurement.procedure_type or ""),
@@ -319,6 +328,9 @@ def map_procurement(
         # The first stage of a two-step procedure closes with requests to participate, not tenders.
         deadline_kind="request" if procurement.stage == "application" else "tender",
         question_deadline_at=procurement.question_deadline,
+        # A value and place only TED publishes; e-Avrop's own value may be an internal estimate.
+        estimated_value_sek=(ted or {}).get("estimated_value_sek"),
+        place=(ted or {}).get("place"),
         url=url,
         documents_url=url,
     )
@@ -422,7 +434,7 @@ async def _list(api: _Api, client_id: int, since: datetime) -> list[Mapping[str,
 @dataclass
 class EavropStats(IngestStats):
     not_public: int = 0  # projects that are not announced, or only sent to invited suppliers
-    linked: int = 0  # procurements stored as a TED notice, which got the documents
+    linked: int = 0  # TED notices of the same procurement that became e-Avrop's notice
     documents_stored: int = 0
     documents_skipped: int = 0  # formats we cannot read, too large or unreadable
     # Published questions and answers from the question log (decision 0013).
@@ -446,10 +458,15 @@ class EavropStats(IngestStats):
 
 
 async def _ted_twins(session: AsyncSession) -> dict[str, Notice]:
-    """TED notices by the e-Avrop procurement id in their document link."""
+    """TED contract notices by the e-Avrop procurement id in their document link.
+
+    A prior information notice can carry the same link; it stays TED's own notice.
+    """
 
     rows = await session.scalars(
-        select(Notice).where(Notice.source == "ted", Notice.documents_url.is_not(None))
+        select(Notice).where(
+            Notice.source == "ted", Notice.notice_type == "contract", Notice.documents_url.is_not(None)
+        )
     )
     twins: dict[str, Notice] = {}
     for notice in rows:
@@ -791,19 +808,27 @@ async def _store_procurement(
     by_procurement: dict[str, Notice],
     stats: EavropStats,
 ) -> Notice:
-    """The notice the procurement's documents belong to: its TED twin, or our own row."""
+    """The procurement's notice, made from its TED twin when TED's notice came first (decision 0021).
+
+    The twin's row becomes e-Avrop's notice rather than being replaced, so its id, and the
+    documents, checklists, matches and reminders on it, stay.
+    """
 
     existing = by_procurement.get(procurement.procurement_id)
+    known = existing.raw.get("ted") if existing is not None else None
+    ted = known if isinstance(known, Mapping) else None
     twin = twins.get(procurement.procurement_id)
     if existing is None and twin is not None:
+        existing, ted = twin, ted_facts(twin)
         stats.linked += 1
-        return twin
-    values = map_procurement(procurement, settings, now=now, list_url=list_url, list_updated=list_updated)
+    values = map_procurement(
+        procurement, settings, now=now, list_url=list_url, list_updated=list_updated, ted=ted
+    )
     stats.record(save_notice(session, existing, values))
     await session.flush()
     if existing is None:
         existing = (await notices_by_external_id(session, SOURCE, [values.external_id]))[values.external_id]
-        by_procurement[values.external_id] = existing
+    by_procurement[values.external_id] = existing
     return existing
 
 

@@ -13,8 +13,9 @@ import { DocumentList, outsideDocumentsText, UnreadFiles } from "./Documents";
 
 /**
  * The rest of the notice, behind "Om upphandlingen" (direction.md, section 4): the description, what is bought in the
- * CPV list's words, when it was published, where, and the notice's own page. `showsDocuments` adds the documents (the
- * phone, where the header has no document link; or when there are several). A buyer can add a document here.
+ * CPV list's words, when it was published, where, and the notice's own page, with TED's when it went there too.
+ * `showsDocuments` adds the documents (the phone, where the header has no document link; or when there are several). A
+ * buyer can add a document here.
  */
 export function AboutNotice({
   notice,
@@ -28,6 +29,7 @@ export function AboutNotice({
   const cpv = cpvNames(notice);
   const page = externalLink(notice.url);
   const documentsPage = externalLink(notice.documents_url);
+  const tedPage = externalLink(notice.ted_url);
   const hasFacts = cpv.length > 0 || notice.published_at !== null || notice.place !== null;
   return (
     <VStack gap={4}>
@@ -46,7 +48,7 @@ export function AboutNotice({
           {notice.place && <MetadataListItem label="Plats">{notice.place}</MetadataListItem>}
         </MetadataList>
       )}
-      {(page || documentsPage) && (
+      {(page || documentsPage || tedPage) && (
         <HStack gap={4} vAlign="center" wrap="wrap">
           {page && (
             <Link href={page.href} isExternalLink isStandalone>
@@ -56,6 +58,11 @@ export function AboutNotice({
           {documentsPage && documentsPage.href !== page?.href && (
             <Link href={documentsPage.href} isExternalLink isStandalone>
               {outsideDocumentsText(documentsPage.site)}
+            </Link>
+          )}
+          {tedPage && tedPage.href !== page?.href && (
+            <Link href={tedPage.href} isExternalLink isStandalone>
+              {noticeLinkText(tedPage.site)}
             </Link>
           )}
         </HStack>

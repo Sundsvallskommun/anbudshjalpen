@@ -83,7 +83,8 @@ Anbudshjälpen läser kommunens upphandlingar via e-Avrops Projekt-API med kommu
   MCP-verktyget `hamta_fragor_svar`, och Fråga AI och tolkningen läser dem ([beslut 0018](decisions/0018-publicerade-svar-i-ai-uppgifterna.md)).
 - e-Avrops webbplats hämtas inte automatiskt. Dess `robots.txt` förbjuder det, och API:t gör det onödigt.
 - Samma upphandling i TED och e-Avrop känns igen på länken: TED:s länk till underlaget är e-Avrops annonslänk med
-  upphandlingens id. Den blir en annons, och underlaget från e-Avrop läggs på den.
+  upphandlingens id. Den blir e-Avrops annons, med köpare, uppskattat värde, ort och länk från TED
+  ([beslut 0021](decisions/0021-eavrop-gar-fore-ted.md)).
 
 ## LOU från Riksdagen
 

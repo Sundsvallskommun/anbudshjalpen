@@ -709,6 +709,20 @@ async def test_the_detail_names_unread_files_and_empty_pages_and_hides_replaced_
     assert [(item["filename"], item["empty_pages"]) for item in body["documents"]] == [("underlag.txt", 2)]
 
 
+async def test_the_detail_links_teds_notice_of_a_procurement_from_eavrop(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    """e-Avrop's notice is the one shown, and TED's is a link from it (decision 0021)."""
+
+    ted = "https://ted.europa.eu/sv/notice/-/detail/900001-2026"
+    assert (await client.get(f"/api/notices/{demo.notice.id}")).json()["ted_url"] is None
+    demo.notice.source = "eavrop"
+    demo.notice.raw = {"ted": {"url": ted}}
+    await db_session.flush()
+
+    assert (await client.get(f"/api/notices/{demo.notice.id}")).json()["ted_url"] == ted
+
+
 async def test_the_sources_question_deadline_goes_before_the_checklists(
     client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
 ) -> None:
