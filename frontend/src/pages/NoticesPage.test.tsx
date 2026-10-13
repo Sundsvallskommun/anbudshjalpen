@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CompanyView, NoticeList, UpcomingProcurement, UserView } from "../api/types";
+import type { CompanyView, MatchView, NoticeList, UpcomingProcurement, UserView } from "../api/types";
 import { PHONE_QUERY } from "../lib/usePhone";
 import { companyUser, matchView, noticeBuyers, noticeList, noticeSummary } from "../test/fixtures";
 import { baseRoutes, mockApi, renderApp, type MockRoute, type RecordedCall } from "../test/render";
@@ -38,12 +38,18 @@ const upcoming: UpcomingProcurement = {
   announcement_overdue: false,
 };
 
-function routes(user: UserView | null, notices: MockRoute["body"], companyProfile: CompanyView = profile): MockRoute[] {
+function routes(
+  user: UserView | null,
+  notices: MockRoute["body"],
+  companyProfile: CompanyView = profile,
+  { matches = [matchView], isAssessing = false }: { matches?: MatchView[]; isAssessing?: boolean } = {},
+): MockRoute[] {
   const company: MockRoute[] =
     user?.role === "foretagare"
       ? [
           { method: "GET", path: "/api/profile", body: companyProfile },
-          { method: "GET", path: "/api/matches", body: [matchView] },
+          { method: "GET", path: "/api/matches", body: matches },
+          { method: "GET", path: "/api/matches/status", body: { is_assessing: isAssessing } },
         ]
       : [];
   return [
@@ -329,5 +335,14 @@ describe("NoticesPage", () => {
     );
     expect(within(rail).getByRole("link", { name: "Se träffarna på Start" })).toHaveAttribute("href", "/start");
     expect(await within(rail).findByRole("link", { name: "Se alla på Start" })).toHaveAttribute("href", "/start#kommande");
+  });
+
+  it("tells a company whose profile is being assessed that the engine is at work, not that nothing fits", async () => {
+    mockApi(routes(companyUser, noticeList, profile, { matches: [], isAssessing: true }));
+    renderApp("/upphandlingar");
+
+    const rail = await screen.findByRole("complementary", { name: "För ert företag" });
+    expect(await within(rail).findByText("Anbudshjälpen bedömer upphandlingarna mot er profil …")).toBeInTheDocument();
+    expect(within(rail).queryByText(/Inga öppna upphandlingar verkar passa/)).not.toBeInTheDocument();
   });
 });

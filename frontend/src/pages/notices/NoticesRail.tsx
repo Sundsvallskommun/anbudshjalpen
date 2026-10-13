@@ -8,16 +8,17 @@ import { Text } from "@astryxdesign/core/Text";
 import { VisuallyHidden } from "@astryxdesign/core/VisuallyHidden";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useLocation } from "react-router";
-import { useMatches, useUpcoming } from "../../api/queries";
+import { useMatches, useMatchingStatus, useUpcoming } from "../../api/queries";
 import type { UpcomingProcurement, UserView } from "../../api/types";
 import { RowEnd } from "../../components/RowList";
-import { ErrorNotice, Loading } from "../../components/states";
+import { ErrorNotice, Loading, Working } from "../../components/states";
 import { FictitiousToken, FitToken } from "../../components/tokens";
 import { DeadlineBlock } from "../../components/ui/DeadlineBlock";
 import { plural } from "../../lib/format";
 import { noticeDeadlineLabel, noticeDeadlineNote } from "../../lib/labels";
 import { CardHeading, HeadingCount } from "../start/CardHeading";
 import { ForwardLink } from "../start/ForwardLink";
+import { ASSESSING_TITLE, REASSESSING } from "../start/MatchesSection";
 import { isFitting, sortMatches } from "../start/start";
 import { periodLines, sortUpcoming, UPCOMING_MONTHS } from "../start/upcoming";
 
@@ -40,6 +41,7 @@ function RailHeading({ id, children, count }: { id: string; children: string; co
 /** "Passar er": the open notices the company's matches say fit, with their deadlines. */
 function FitCard({ companyName }: { companyName: string }) {
   const matches = useMatches();
+  const isAssessing = useMatchingStatus();
   const fitting = sortMatches((matches.data ?? []).filter(isFitting));
   return (
     <Card>
@@ -53,11 +55,16 @@ function FitCard({ companyName }: { companyName: string }) {
         )}
         {matches.isSuccess && (
           <>
-            <Text as="p">
-              {fitting.length > 0
-                ? `${plural(fitting.length, "öppen upphandling", "öppna upphandlingar")} verkar passa ${companyName}.`
-                : "Inga öppna upphandlingar verkar passa er just nu. Du får ett mejl när en ny verkar passa."}
-            </Text>
+            {isAssessing && fitting.length === 0 ? (
+              <Working>{ASSESSING_TITLE}</Working>
+            ) : (
+              <Text as="p">
+                {fitting.length > 0
+                  ? `${plural(fitting.length, "öppen upphandling", "öppna upphandlingar")} verkar passa ${companyName}.`
+                  : "Inga öppna upphandlingar verkar passa er just nu. Du får ett mejl när en ny verkar passa."}
+              </Text>
+            )}
+            {isAssessing && fitting.length > 0 && <Working>{REASSESSING}</Working>}
             {fitting.length > 0 && (
               <VStack as="ul" role="list" gap={4}>
                 {fitting.slice(0, SHOWN).map((match, index) => (

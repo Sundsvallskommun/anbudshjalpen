@@ -3,6 +3,7 @@
  * invalidation and query keys live in one place.
  */
 import { queryOptions, useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { api, withQuery } from "./client";
 import type {
   AnswerView,
@@ -29,6 +30,7 @@ import type {
   LabCreateRequest,
   LabLoginRequest,
   LoginRequest,
+  MatchingStatus,
   MatchView,
   NoticeBuyers,
   NoticeCreate,
@@ -79,6 +81,7 @@ export const keys = {
   page: (noticeId: string, documentId: string, page: number) => ["page", noticeId, documentId, page] as const,
   reading: (noticeId: string) => ["notice", noticeId, "reading"] as const,
   matches: ["matches"] as const,
+  matchingStatus: ["matches", "status"] as const,
   upcoming: (months: number) => ["upcoming", months] as const,
   profile: ["profile"] as const,
   reminders: ["reminders"] as const,
@@ -298,7 +301,8 @@ export function useUpdateProfile() {
       const { fitting_notices: _count, ...profile } = saved;
       client.setQueryData<CompanyView>(keys.profile, profile);
       await Promise.all([
-        client.invalidateQueries({ queryKey: keys.matches }),
+        client.invalidateQueries({ queryKey: keys.matches, exact: true }),
+        client.invalidateQueries({ queryKey: keys.matchingStatus }),
         client.invalidateQueries({ queryKey: ["notices"] }),
         client.invalidateQueries({ queryKey: ["notice"] }),
       ]);
@@ -319,6 +323,33 @@ export function searchCpv(q: string): Promise<CpvHit[]> {
 
 export function useMatches() {
   return useQuery({ queryKey: keys.matches, queryFn: () => api.get<MatchView[]>("/api/matches") });
+}
+
+/** How often a page asks whether the re-assessment is done: a language model takes 10–30 s per notice. */
+export const MATCHING_STATUS_POLL_MS = 3000;
+
+/**
+ * Whether the company's matches are being re-assessed right now (after a profile save with a language model). Polls
+ * while they are, and fetches the matches anew once the run is done, so the cards appear without a reload.
+ */
+export function useMatchingStatus() {
+  const client = useQueryClient();
+  const query = useQuery({
+    queryKey: keys.matchingStatus,
+    queryFn: () => api.get<MatchingStatus>("/api/matches/status"),
+    refetchInterval: (query) => (query.state.data?.is_assessing ? MATCHING_STATUS_POLL_MS : false),
+  });
+  const isAssessing = query.data?.is_assessing ?? false;
+  const wasAssessing = useRef(false);
+  useEffect(() => {
+    if (wasAssessing.current && !isAssessing) {
+      void client.invalidateQueries({ queryKey: keys.matches, exact: true });
+      void client.invalidateQueries({ queryKey: ["notices"] });
+      void client.invalidateQueries({ queryKey: ["notice"] });
+    }
+    wasAssessing.current = isAssessing;
+  }, [client, isAssessing]);
+  return isAssessing;
 }
 
 /** "Inte intressant": the match leaves the list (and gets no "Ny träff" mail). Undo with `useRestoreMatch`. */

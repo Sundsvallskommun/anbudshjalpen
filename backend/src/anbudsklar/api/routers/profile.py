@@ -59,6 +59,7 @@ async def update_profile(
     await session.commit()
     fitting = await matching.rematch_quickly(session, engine, view.id)
     if fitting is None:
+        refresher.expect(view.id)
         background.add_task(refresher.run, session_factory, engine, view.id)
     return ProfileSaved(**view.model_dump(), fitting_notices=fitting)
 

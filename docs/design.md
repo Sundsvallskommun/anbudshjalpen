@@ -136,7 +136,9 @@ Avstånden följer temats skala: i regel 16 px mellan rader, 24 px mellan gruppe
   alla skäl (n)", sekundärknappen "Öppna checklistan" (utan checklista "Öppna upphandlingen") och "Inte intressant", som
   döljer kortet och visar en avisering med "Ångra". Ursprungsraden står i kortets fot. Utan publicerad checklista säger
   skälen att bedömningen bara bygger på CPV-kod och ord i annonsen. Träffar som inte verkar passa ligger i en stängd
-  lista under korten.
+  lista under korten. Medan en språkmodell bedömer en nyss sparad profil står "Anbudshjälpen bedömer upphandlingarna
+  mot er profil …" i stället för "Inga nya träffar just nu" (och "träffarna bedöms" i raden under H1), eller en rad
+  ovanför de gamla korten om att träffarna bedöms på nytt; korten dyker upp av sig själva när bedömningen är klar.
 - **Kommande upphandlingar** ur avtalskatalogen som en tidslinje, med valet "För er · Alla" och "Förbered er: det här
   krävdes förra gången".
 - Högerspalten har tre kort: "Dina påminnelser", "Träffarna bygger på er profil" och "Frågor om upphandling?".
@@ -157,8 +159,8 @@ Avstånden följer temats skala: i regel 16 px mellan rader, 24 px mellan gruppe
   Är datumet sista dag för anbudsansökan (ett selektivt förfarande) står "Anbudsansökan" ovanför det.
   På telefon står tokens på en egen rad under. Hela raden är en länk. "Öppen för anbud" visas inte, eftersom det är det
   vanliga läget. Sidorna bläddras med Astryx `Pagination`.
-- Högerspalten har "Passar er" för en företagare eller en uppmaning att logga in för en besökare, och "Kommande enligt
-  avtalskatalogen".
+- Högerspalten har "Passar er" för en företagare (som på Start säger att bedömningen pågår när den gör det) eller en
+  uppmaning att logga in för en besökare, och "Kommande enligt avtalskatalogen".
 
 ### Upphandlingens sida
 
