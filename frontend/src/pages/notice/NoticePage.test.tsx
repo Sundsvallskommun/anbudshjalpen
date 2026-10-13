@@ -330,14 +330,17 @@ describe("NoticePage step 1 Krav", () => {
     expect(within(explanation).getByText(/Ett intyg från försäkringsbolaget/u)).toBeInTheDocument();
   });
 
-  it("ends with the next step, which opens the Fråga AI panel about the notice", async () => {
+  it("ends with the next step, which leads on to 2 Granska with the focus on that step", async () => {
     mockApi([...baseRoutes(null), noticeRoute]);
     renderApp(`/upphandlingar/${NOTICE_ID}`);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Ställ en fråga" }));
-    const panel = await screen.findByRole("dialog", { name: "Fråga AI" });
-    expect(await within(panel).findByRole("radio", { name: "Underlaget" })).toBeChecked();
+    await userEvent.click(await screen.findByRole("button", { name: "Granska utkastet" }));
+    const tab = screen.getByRole("tab", { name: "Granska" });
+    expect(tab).toHaveAttribute("aria-selected", "true");
+    expect(document.activeElement).toBe(document.getElementById(tab.getAttribute("aria-controls")!));
+    // Questions are not a step: the floating button opens Fråga AI from any step (decision 0014).
     expect(screen.queryByRole("tab", { name: "Fråga" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Fråga AI" })).toBeInTheDocument();
   });
 
   it("shows inköp an unpublished checklist as not yet what companies see", async () => {

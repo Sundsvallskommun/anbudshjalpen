@@ -61,7 +61,7 @@ function StepEnd({
   const { goTo } = useStepNav();
   const toSubmit = (variant: "primary" | "secondary") => (
     <Button
-      label="Nästa: 4 Lämna in"
+      label="Nästa: 3 Lämna in"
       variant={variant}
       endContent={<Icon icon={ArrowRightIcon} />}
       onClick={() => goTo("inlamning")}

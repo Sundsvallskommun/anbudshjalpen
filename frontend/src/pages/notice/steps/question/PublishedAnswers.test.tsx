@@ -46,9 +46,10 @@ describe("Frågor och svar från inköp (decisions 0013 and 0018)", () => {
     expect(within(second).getByText("Fråga 2 · Besvarad 2 okt")).toBeInTheDocument();
     // A single line break in the log is not a paragraph.
     expect(within(second).getByText("Ja. Det gäller alla som utför arbete i uppdraget.")).toBeInTheDocument();
-    // It is in the outline, and the reader's own questions follow in the "Fråga AI" panel.
+    // It is in the outline; the reader's own questions go to the floating "Fråga AI" button, and the step leads on.
     expect(screen.getByRole("link", { name: "Frågor och svar från inköp (2)" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Ställ en fråga" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Fråga AI" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Granska utkastet" })).toBeInTheDocument();
     // Few answers need no search field.
     expect(screen.queryByRole("textbox", { name: "Sök bland frågorna och svaren" })).not.toBeInTheDocument();
   });
@@ -84,7 +85,7 @@ describe("Frågor och svar från inköp (decisions 0013 and 0018)", () => {
     mockApi([...baseRoutes(companyUser), noticeWith()]);
     renderApp(`/upphandlingar/${NOTICE_ID}`);
 
-    await screen.findByRole("button", { name: "Ställ en fråga" });
+    await screen.findByRole("button", { name: "Granska utkastet" });
     expect(screen.queryByRole("list", { name: "Frågor och svar från inköp" })).not.toBeInTheDocument();
   });
 

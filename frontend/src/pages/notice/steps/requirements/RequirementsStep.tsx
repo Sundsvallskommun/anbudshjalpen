@@ -1,5 +1,4 @@
 import { Banner } from "@astryxdesign/core/Banner";
-import { useAskAi } from "../../../../components/ask/AskAiProvider";
 import { PublishedAnswers } from "../question/PublishedAnswers";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
@@ -30,6 +29,7 @@ import { TermText } from "../../../../components/TermText";
 import { AiProvenance } from "../../../../components/ui/AiProvenance";
 import { ArrowRightIcon } from "../../../../components/ui/icons";
 import { NextStepCard } from "../../../../components/ui/NextStepCard";
+import { useStepNav } from "../../../../components/ui/StepNav";
 import { StatTile } from "../../../../components/ui/StatTile";
 import { formatLongDate } from "../../../../lib/format";
 import { CHECKLIST_STATUS } from "../../../../lib/labels";
@@ -153,10 +153,11 @@ function Summary({ checklist }: { checklist: Checklist }) {
  * Step 1 Krav (direction.md, section 4): who reviewed the list, once; what the reader has to do as tiles that lead to
  * their parts; the summary; then the groups with their counts, skallkrav and kvalificeringskrav open, the dates split
  * at sista anbudsdag, and the rest closed. Every row has its "s. 5". Then inköp's published answers (decision
- * 0013) and "Ställ en fråga", which opens the "Fråga AI" panel (decision 0014).
+ * 0013) and the next step, which leads on to 2 Granska; questions go to the floating "Fråga AI" button (decision
+ * 0014), so the step never ends in a panel the reader has to close to get on.
  */
 export function RequirementsStep({ notice, view, user }: { notice: NoticeDetail; view: ChecklistView; user: UserView | null }) {
-  const askAi = useAskAi();
+  const { goTo } = useStepNav();
   const config = useConfig();
   const isPhone = useIsPhone();
   const tasksHeadingId = useId();
@@ -234,9 +235,9 @@ export function RequirementsStep({ notice, view, user }: { notice: NoticeDetail;
       </CollapsibleGroup>
       <PublishedAnswers notice={notice} />
       <NextStepCard
-        text="Undrar du något om kraven? Ställ en fråga, så visar svaret var det står i underlaget."
+        text="Har du börjat på ett utkast? Granska det mot kraven, så ser du vad som saknas innan du lämnar in."
         action={
-          <Button label="Ställ en fråga" variant="primary" endContent={<Icon icon={ArrowRightIcon} />} onClick={() => askAi.open()} />
+          <Button label="Granska utkastet" variant="primary" endContent={<Icon icon={ArrowRightIcon} />} onClick={() => goTo("granska")} />
         }
       />
     </StepLayout>

@@ -121,7 +121,7 @@ export function StepNav({ panels, marks = {}, end, idPrefix = "steg" }: StepNavP
     [selected, select],
   );
 
-  // A step opened from its own content ("Ställ en fråga") takes the focus to its panel, with the bar in view.
+  // A step opened from its own content ("Granska utkastet") takes the focus to its panel, with the bar in view.
   useEffect(() => {
     if (pendingFocus.current !== selected) return;
     pendingFocus.current = null;
