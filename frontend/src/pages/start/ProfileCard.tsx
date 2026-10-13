@@ -4,7 +4,9 @@ import { HStack } from "@astryxdesign/core/HStack";
 import { MetadataList, MetadataListItem } from "@astryxdesign/core/MetadataList";
 import { Text } from "@astryxdesign/core/Text";
 import { Token } from "@astryxdesign/core/Token";
+import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { VStack } from "@astryxdesign/core/VStack";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useProfile } from "../../api/queries";
 import type { CompanyView } from "../../api/types";
 import { ErrorNotice, Loading } from "../../components/states";
@@ -16,6 +18,31 @@ import styles from "./ProfileCard.module.css";
 function Value({ text, maxLines }: { text: string | null; maxLines?: number }) {
   if (!text) return <Text color="secondary">Inte angivet</Text>;
   return <Text maxLines={maxLines}>{keepNumbersTogether(text)}</Text>;
+}
+
+/**
+ * An activity by name. A long CPV label is cut off with an ellipsis to keep the card inside its edge
+ * (ProfileCard.module.css), so a cut-off token shows the whole label on hover or tap.
+ */
+function ActivityToken({ label }: { label: string }) {
+  const ref = useRef<HTMLElement>(null);
+  const [isCut, setIsCut] = useState(false);
+  useLayoutEffect(() => {
+    const token = ref.current;
+    const text = token?.lastElementChild;
+    if (!token || !text) return;
+    const measure = () => setIsCut(text.scrollWidth > text.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(token);
+    return () => observer.disconnect();
+  }, [label]);
+  return (
+    <>
+      <Token ref={ref} label={label} size="sm" color="gray" />
+      {isCut && <Tooltip anchorRef={ref} content={label} />}
+    </>
+  );
 }
 
 /** What the company does, by name: CPV codes are shown by their labels only (direction.md, section 1.8). */
@@ -46,7 +73,7 @@ export function ProfileCard() {
               {labels.length > 0 ? (
                 <HStack gap={1.5} wrap="wrap">
                   {labels.map((label) => (
-                    <Token key={label} label={label} size="sm" color="gray" />
+                    <ActivityToken key={label} label={label} />
                   ))}
                 </HStack>
               ) : (

@@ -322,6 +322,22 @@ describe("StartPage", () => {
     expect(within(card).getByRole("link", { name: "Ändra profil" })).toHaveAttribute("href", "/profil");
   });
 
+  it("shows the whole label of an activity cut off with an ellipsis on hover", async () => {
+    // jsdom has no layout: "Målning av byggnader" is wider than its token, "Målning" fits.
+    vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(function (this: HTMLElement) {
+      return this.textContent === "Målning av byggnader" ? 200 : 0;
+    });
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(100);
+    mockApi(startRoutes());
+    renderApp("/start");
+
+    const card = await screen.findByRole("region", { name: "Träffarna bygger på er profil" });
+    const [cutToken] = await within(card).findAllByText("Målning av byggnader");
+    await userEvent.hover(cutToken!);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Målning av byggnader");
+    expect(within(card).getAllByText("Målning")).toHaveLength(1);
+  });
+
   it("offers Regelhjälpen with an example question that it answers on arrival", async () => {
     mockApi(startRoutes());
     renderApp("/start");
