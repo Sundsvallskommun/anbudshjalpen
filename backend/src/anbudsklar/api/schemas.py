@@ -444,6 +444,17 @@ class CompanyView(ApiModel):
     is_fictitious: bool
 
 
+class MatchingStatus(ApiModel):
+    """Whether the signed-in company's matches are being re-assessed right now.
+
+    True from a profile save with a language model until the run after the response is
+    done, so Start can say so instead of "Inga nya träffar". The scheduled `match_all` in
+    the worker is not seen here.
+    """
+
+    is_assessing: bool
+
+
 class ProfileSaved(CompanyView):
     """The saved profile (`CompanyView`) and how many open notices seem to fit it now."""
 

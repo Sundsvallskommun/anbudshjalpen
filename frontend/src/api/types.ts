@@ -597,6 +597,15 @@ export interface CompanyView {
   is_fictitious: boolean;
 }
 
+/**
+ * GET /api/matches/status: true from a profile save with a language model until the re-assessment after the answer
+ * is done, so Start can say that the engine is working instead of "Inga nya träffar". The worker's scheduled run is
+ * not seen here.
+ */
+export interface MatchingStatus {
+  is_assessing: boolean;
+}
+
 /** PUT /api/profile: the saved profile, and how many open notices seem to fit it now. */
 export interface ProfileSaved extends CompanyView {
   /**

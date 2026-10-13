@@ -7,8 +7,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 
-from anbudsklar.api.deps import CompanyUserDep, SessionDep, ViewerDep
-from anbudsklar.api.schemas import MatchView, UpcomingProcurement
+from anbudsklar.api.deps import CompanyUserDep, MatchRefresherDep, SessionDep, ViewerDep
+from anbudsklar.api.schemas import MatchingStatus, MatchView, UpcomingProcurement
 from anbudsklar.models import Company
 from anbudsklar.services import matching, upcoming
 from anbudsklar.services.access import Viewer
@@ -20,6 +20,14 @@ router = APIRouter(tags=["matches"])
 @router.get("/matches")
 async def list_matches(session: SessionDep, user: CompanyUserDep) -> list[MatchView]:
     return await matching.list_matches(session, Viewer.for_user(user))
+
+
+@router.get("/matches/status")
+async def matching_status(user: CompanyUserDep, refresher: MatchRefresherDep) -> MatchingStatus:
+    """Whether the company's matches are being re-assessed after a profile save (so Start can say so)."""
+
+    assessing = user.company_id is not None and refresher.is_assessing(user.company_id)
+    return MatchingStatus(is_assessing=assessing)
 
 
 @router.post("/matches/{match_id}/dismiss", status_code=status.HTTP_204_NO_CONTENT)

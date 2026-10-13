@@ -1,6 +1,8 @@
 import { Banner } from "@astryxdesign/core/Banner";
 import { Button } from "@astryxdesign/core/Button";
+import { HStack } from "@astryxdesign/core/HStack";
 import { Spinner } from "@astryxdesign/core/Spinner";
+import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import { ApiError } from "../api/client";
 
@@ -10,6 +12,19 @@ export function Loading({ label }: { label: string }) {
     <VStack padding={6} hAlign="center" role="status">
       <Spinner size="lg" label={label} />
     </VStack>
+  );
+}
+
+/**
+ * A line saying that something is going on behind what is shown ("Träffarna bedöms på nytt …"): a small spinner
+ * beside supporting text, announced once as a status. For a region that already has content, unlike `Loading`.
+ */
+export function Working({ children }: { children: string }) {
+  return (
+    <HStack gap={2} vAlign="center" role="status">
+      <Spinner size="sm" shade="subtle" aria-hidden />
+      <Text type="supporting">{children}</Text>
+    </HStack>
   );
 }
 

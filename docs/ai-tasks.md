@@ -125,6 +125,11 @@ går en körning i taget per företag (`services/background.py`). Sparas profile
 den, och en ny körning läser den nya profilen. En bedömning som misslyckas ändrar aldrig den sparade profilen, och
 `match_all` gör den vid nästa körning.
 
+Medan körningen pågår svarar `GET /api/matches/status` med `is_assessing: true`, från sparningen tills körningen i
+appen är klar (`match_all` i workern syns inte här). Start och "Passar er" på Upphandlingar frågar var tredje sekund
+under tiden och säger "Anbudshjälpen bedömer upphandlingarna mot er profil …" i stället för "Inga nya träffar", eller
+ovanför de gamla korten att träffarna bedöms på nytt; när svaret blir `false` hämtas träffarna om utan omladdning.
+
 En bedömning som inte längre klarar förvalet raderas inte utan markeras som inaktuell, så att ett avfärdande och
 mejlet "Ny träff" minns om annonsen kommer tillbaka.
 
