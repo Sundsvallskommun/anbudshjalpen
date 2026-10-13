@@ -7,7 +7,7 @@ Läs detta när: Du ändrar insamlingen från e-Avrop, felsöker en upphandling 
 förbereder ett samtal med Antirio eller inköp.
 
 Hör ihop med: [Beslut 0009](decisions/0009-eavrop-projekt-api.md),
-[Beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md), [Datakällor](data-sources.md), [Drift](operations.md),
+[Beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md), [Beslut 0021](decisions/0021-eavrop-gar-fore-ted.md), [Datakällor](data-sources.md), [Drift](operations.md),
 [Öppna frågor](open-questions.md)
 
 > Kontrollerat mot API:t 2026-10-08 och, för frågeloggen, 2026-10-12. Koden ligger i
@@ -35,7 +35,8 @@ Jobbet `ingest_eavrop` körs varje dag 06:30:
    (se [Frågor och svar](#frågor-och-svar)).
 
 Provkörningen 2026-10-08 gav 458 projekt. 115 av dem var publicerade: 77 blev egna annonser och 38 fanns redan som
-TED-annonser och fick underlaget där. 12 var öppna.
+TED-annonser och fick underlaget där. 12 var öppna. Den 2026-10-13 var 12 projekt öppna, och 5 av dem fanns också i TED. Sedan
+[beslut 0021](decisions/0021-eavrop-gar-fore-ted.md) visas alla 12 som e-Avrops annonser.
 
 ## Reglerna som skyddar sekretessen
 
@@ -64,16 +65,20 @@ Markeringen `IsClassified` används inte som skydd. Den saknades på utvärderin
 | Sista dag för frågor | `LastQuestion`, eller `LastQuestionApplication` i första steget, som slutet av den dagen (`question_deadline_at`). Listor, Fråga AI och påminnelser använder det före checklistans datum ([beslut 0020](decisions/0020-checklistan-lases-ur-alla-dokument.md)) |
 | Status | Avbruten (`Aborted`) blir stängd, tilldelad (`Assigned`, `ContractAssigned`) blir tilldelad, annars efter sista dag |
 | Länk | `NoticeLink.aspx?id=<ProcurementId>` under `EAVROP_BASE_URL`, samma länk som TED ger |
-| Köpare | `ORGANIZATION_NAME`, eftersom API:t inte anger köpare |
+| Köpare, uppskattat värde, ort | Från TED när upphandlingen finns där, eftersom API:t inte anger köpare och e-Avrops värde kan vara en intern uppskattning. Annars `ORGANIZATION_NAME` som köpare och inget värde eller ort |
 
 **Midnatt är slutet av samma dag.** Tidsplanen (`TimeTable`) anger datum som midnatt i början av sista dagen:
 `LastBid` "2026-11-06T00:00:00+01:00" visas som sista anbudsdag 2026-11-06 på e-Avrops annonssida (kontrollerat
 2026-10-12). Appen sparar 23:59:59 samma dag, så att datumet stämmer med e-Avrops webbplats och med TED. Fram till
 2026-10-12 sparades dagen före, så att annonserna visade en dag för tidig sista dag och stängdes en dag för tidigt.
 
-**TED och e-Avrop.** TED:s länk till underlaget innehåller e-Avrops `ProcurementId`. Finns upphandlingen redan som
-TED-annons får den underlaget, och ingen ny annons skapas. Kommer den från e-Avrop först skapar TED-insamlaren ingen
-egen annons.
+**TED och e-Avrop.** TED:s länk till underlaget innehåller e-Avrops `ProcurementId`. e-Avrops annons blir kvar,
+eftersom den har underlaget, sista dag för frågor och inköps svar ([beslut 0021](decisions/0021-eavrop-gar-fore-ted.md)).
+Finns upphandlingen redan som TED-annons blir den raden e-Avrops annons, så att dokument, checklistor, matchningar och
+påminnelser följer med. TED:s köpare, uppskattade värde, ort och länk sparas på den (`raw["ted"]`) och behålls vid
+varje ny läsning. Kommer upphandlingen från e-Avrop först lägger TED-insamlaren samma uppgifter på e-Avrops annons i
+stället för att skapa en egen. En förhandsannons i TED med samma länk förblir en egen TED-annons. Annonser som sparats
+före beslutet ändras när projektet läses igen, så efter driftsättningen körs `anbudsklar ingest eavrop --full` en gång.
 
 **Underlaget.** Filer i PDF, Word (`.docx`), Excel (`.xlsx`, `.xlsm`) och text hämtas, högst 50 MB per fil. Ett
 zip-arkiv packas upp, och de filer i det som går att läsa blir egna dokument med arkivets namn först

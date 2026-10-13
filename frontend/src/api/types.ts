@@ -477,6 +477,8 @@ export interface NoticeDetail extends NoticeSummary {
   procedure: string | null;
   url: string | null;
   documents_url: string | null;
+  /** TED's notice of a procurement from e-Avrop that also went to TED; e-Avrop's notice is the one shown. */
+  ted_url?: string | null;
   place: string | null;
   estimated_value_sek: number | null;
   /** CPV code -> Swedish label, for the codes in `cpv_codes` that are in the CPV list. */

@@ -1,5 +1,7 @@
 """e-Avrop's Projekt API: the allowlist, the public request, documents and the TED twin.
 
+A procurement in both TED and e-Avrop is e-Avrop's notice, with what only TED gives (decision 0021).
+
 All responses here are synthetic and fictitious. Real responses cannot be recorded: the API is
 the municipality's own and a project's response holds tenderers, prices and staff. The
 synthetic project below carries such parts on purpose, so the tests can show they never leave
@@ -483,17 +485,31 @@ async def test_projects_unchanged_since_the_last_run_are_not_fetched(
     assert not detail.called
 
 
-async def test_documents_go_to_the_ted_notice_of_the_same_procurement(
+TED_LINK = "https://www.e-avrop.com/sundsvall/e-Upphandling/NoticeLink.aspx?id=900001"
+TED_PAGE = "https://ted.europa.eu/sv/notice/-/detail/900001-2026"
+
+
+def _ted_notice(**changes: Any) -> Notice:
+    values: dict[str, Any] = {
+        "source": "ted",
+        "external_id": "900001-2026",
+        "title": "Fiktiv ommålning (TED)",
+        "notice_type": "contract",
+        "status": "open",
+        "buyer": "Fiktiva Bostäder AB",
+        "estimated_value_sek": 2_000_000,
+        "place": "Västernorrlands län",
+        "url": TED_PAGE,
+        "documents_url": TED_LINK,
+        "raw": {"notice-version": "1"},
+    }
+    return Notice(**(values | changes))
+
+
+async def test_a_ted_notice_of_the_same_procurement_becomes_the_eavrop_notice(
     respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
 ) -> None:
-    twin = Notice(
-        source="ted",
-        external_id="900001-2026",
-        title="Fiktiv ommålning (TED)",
-        status="open",
-        documents_url="https://www.e-avrop.com/sundsvall/e-Upphandling/NoticeLink.aspx?id=900001",
-        raw={},
-    )
+    twin = _ted_notice()
     db_session.add(twin)
     await db_session.flush()
     respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[_list_item(900100)]))
@@ -503,10 +519,16 @@ async def test_documents_go_to_the_ted_notice_of_the_same_procurement(
     stats = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
 
     assert stats["linked"] == 1 and stats["answers_inserted"] == 1
-    assert (
-        await db_session.scalar(select(func.count()).select_from(Notice).where(Notice.source == "eavrop"))
-        == 0
+    assert (await db_session.scalar(select(func.count()).select_from(Notice))) == 1
+    # The same row, so what hangs on it stays; e-Avrop's facts, with what only TED gives.
+    assert (twin.source, twin.external_id, twin.title) == ("eavrop", "900001", "Fiktiv ommålning av förskola")
+    assert twin.url == twin.documents_url == TED_LINK
+    assert (twin.buyer, twin.estimated_value_sek, twin.place) == (
+        "Fiktiva Bostäder AB",
+        2_000_000,
+        "Västernorrlands län",
     )
+    assert twin.raw["ted"]["url"] == TED_PAGE
     assert (
         await db_session.scalar(
             select(func.count()).select_from(Document).where(Document.notice_id == twin.id)
@@ -517,29 +539,101 @@ async def test_documents_go_to_the_ted_notice_of_the_same_procurement(
     assert (await db_session.scalar(select(PublishedAnswer.notice_id))) == twin.id
 
 
-async def test_ted_does_not_add_a_procurement_already_stored_from_eavrop(db_session: AsyncSession) -> None:
-    db_session.add(
-        Notice(source="eavrop", external_id="900001", title="Fiktiv ommålning", status="open", raw={})
-    )
+async def test_an_update_from_eavrop_keeps_what_ted_added(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    db_session.add(_ted_notice())
     await db_session.flush()
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[_list_item(900100)]))
+    respx_mock.get(f"{API}/v1/procurements/900100").mock(return_value=httpx.Response(200, json=_project()))
+    _mock_documents(respx_mock)
+    await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+    await ingest_eavrop(db_session, client, api_settings, now=NOW, refetch=True, request_interval=0)
+
+    [notice] = await db_session.scalars(select(Notice))
+    assert notice.buyer == "Fiktiva Bostäder AB" and notice.raw["ted"]["url"] == TED_PAGE
+
+
+async def test_a_prior_information_notice_stays_teds_own(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    planned = _ted_notice(notice_type="planned", status="planned")
+    db_session.add(planned)
+    await db_session.flush()
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[_list_item(900100)]))
+    respx_mock.get(f"{API}/v1/procurements/900100").mock(return_value=httpx.Response(200, json=_project()))
+    _mock_documents(respx_mock)
+
+    stats = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+    assert stats["inserted"] == 1 and "linked" not in stats
+    assert planned.source == "ted"
+
+
+def _ted_record(version: int = 1, **changes: Any) -> TedRecord:
     values = NoticeValues(
-        source="ted",
-        external_id="900001-2026",
-        title="Fiktiv ommålning (TED)",
-        notice_type="contract",
+        **{
+            "source": "ted",
+            "external_id": "900001-2026",
+            "title": "Fiktiv ommålning (TED)",
+            "notice_type": "contract",
+            "status": "open",
+            "raw": {"notice-version": str(version)},
+            "buyer": "Fiktiva Bostäder AB",
+            "estimated_value_sek": 2_000_000,
+            "place": "Västernorrlands län",
+            "url": TED_PAGE,
+            "documents_url": TED_LINK,
+        }
+        | changes
+    )
+    return TedRecord(values=values, notice_identifier=None, version=version)
+
+
+async def test_ted_adds_its_facts_to_a_procurement_already_stored_from_eavrop(
+    db_session: AsyncSession,
+) -> None:
+    eavrop = Notice(
+        source="eavrop",
+        external_id="900001",
+        title="Fiktiv ommålning",
         status="open",
-        raw={},
-        documents_url="https://www.e-avrop.com/sundsvall/e-Upphandling/NoticeLink.aspx?id=900001",
+        buyer="Sundsvalls kommun",
+        raw={"procurement_id": "900001"},
     )
+    db_session.add(eavrop)
+    await db_session.flush()
 
-    stats = await upsert_ted_notices(
-        db_session, [TedRecord(values=values, notice_identifier=None, version=1)]
-    )
+    stats = await upsert_ted_notices(db_session, [_ted_record()])
 
-    assert stats.skipped == 1
-    assert (
-        await db_session.scalar(select(func.count()).select_from(Notice).where(Notice.source == "ted")) == 0
+    assert stats.updated == 1
+    assert (await db_session.scalar(select(func.count()).select_from(Notice))) == 1
+    assert (eavrop.title, eavrop.buyer, eavrop.estimated_value_sek) == (
+        "Fiktiv ommålning",
+        "Fiktiva Bostäder AB",
+        2_000_000,
     )
+    assert eavrop.raw["procurement_id"] == "900001" and eavrop.raw["ted"]["url"] == TED_PAGE
+
+    # An older version of TED's notice does not undo a newer one's facts.
+    await upsert_ted_notices(db_session, [_ted_record(version=2, buyer="Fiktiva Fastigheter AB")])
+    stats = await upsert_ted_notices(db_session, [_ted_record(version=1)])
+
+    assert stats.unchanged == 1 and eavrop.buyer == "Fiktiva Fastigheter AB"
+
+
+async def test_ted_adds_no_prior_information_notice_of_a_procurement_from_eavrop(
+    db_session: AsyncSession,
+) -> None:
+    eavrop = Notice(source="eavrop", external_id="900001", title="Fiktiv ommålning", status="open", raw={})
+    db_session.add(eavrop)
+    await db_session.flush()
+
+    stats = await upsert_ted_notices(db_session, [_ted_record(notice_type="planned", status="planned")])
+
+    assert stats.skipped == 1 and "ted" not in eavrop.raw
+    assert (await db_session.scalar(select(func.count()).select_from(Notice))) == 1
 
 
 async def test_without_token_the_job_does_nothing(

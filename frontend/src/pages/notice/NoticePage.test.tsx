@@ -147,6 +147,19 @@ describe("NoticePage header", () => {
     expect(within(panel).getByRole("link", { name: /Öppna annonsen/u })).toHaveAttribute("href", noticeDetail.url);
   });
 
+  it("links TED's notice of a procurement from e-Avrop behind Om upphandlingen", async () => {
+    const eavrop = "https://www.e-avrop.com/sundsvall/e-Upphandling/NoticeLink.aspx?id=900001";
+    const ted = "https://ted.europa.eu/sv/notice/-/detail/900001-2026";
+    mockApi([...baseRoutes(null), noticeWith({ source: "eavrop", url: eavrop, documents_url: eavrop, ted_url: ted })]);
+    renderApp(`/upphandlingar/${NOTICE_ID}`);
+
+    const toggle = await screen.findByRole("button", { name: "Om upphandlingen" });
+    await userEvent.click(toggle);
+    const panel = document.getElementById(toggle.getAttribute("aria-controls")!)!;
+    expect(within(panel).getByRole("link", { name: /^Öppna upphandlingen i e-Avrop/u })).toHaveAttribute("href", eavrop);
+    expect(within(panel).getByRole("link", { name: /^Öppna annonsen i TED/u })).toHaveAttribute("href", ted);
+  });
+
   it("names the files the source has that were not read in, behind Om upphandlingen", async () => {
     const unread = [{ filename: "Bilaga 2 Ritningar.zip", reason: "Filformatet .zip stöds inte" }];
     const scanned = { ...noticeDetail.documents[0]!, empty_pages: 3 };

@@ -285,6 +285,7 @@ async def notice_detail(session: AsyncSession, notice_id: uuid.UUID, viewer: Vie
         procedure=notice.procedure,
         url=notice.url,
         documents_url=notice.documents_url,
+        ted_url=ted_url(notice),
         place=notice.place,
         estimated_value_sek=notice.estimated_value_sek,
         cpv_labels=await cpv_labels(session, notice.cpv_codes or []),
@@ -295,6 +296,14 @@ async def notice_detail(session: AsyncSession, notice_id: uuid.UUID, viewer: Vie
         match=match_view(match, summary) if match else None,
         published_answers=[published_answer_view(answer) for answer in answers],
     )
+
+
+def ted_url(notice: Notice) -> str | None:
+    """TED's notice of an e-Avrop procurement that also went to TED (`ingest.ted.ted_facts`)."""
+
+    ted = notice.raw.get("ted") if notice.source == "eavrop" else None
+    url = ted.get("url") if isinstance(ted, dict) else None
+    return url if isinstance(url, str) and url else None
 
 
 def unread_files(notice: Notice) -> list[UnreadFile]:
