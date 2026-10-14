@@ -25,10 +25,10 @@ describe("StatTile", () => {
     mockApi([]);
     function Filter() {
       const [isSelected, setIsSelected] = useState(false);
-      return <StatTile value={3} label="Måste åtgärdas" isSelected={isSelected} onSelectedChange={setIsSelected} />;
+      return <StatTile value={3} label="Bör åtgärdas" isSelected={isSelected} onSelectedChange={setIsSelected} />;
     }
     renderWithProviders(<Filter />);
-    const filter = screen.getByRole("checkbox", { name: "Visa bara: 3 Måste åtgärdas" });
+    const filter = screen.getByRole("checkbox", { name: "Visa bara: 3 Bör åtgärdas" });
     expect(filter).not.toBeChecked();
     await userEvent.click(filter);
     expect(filter).toBeChecked();
@@ -43,10 +43,10 @@ describe("ResultSummary", () => {
       const [selected, setSelected] = useState<string | null>(null);
       return (
         <ResultSummary
-          title="3 saker behöver åtgärdas innan du lämnar anbudet"
+          title="3 saker bör åtgärdas innan du lämnar anbudet"
           progress={{ value: 10, max: 21, label: "10 av 21 skall- och kvalificeringskrav ser bra ut" }}
           filters={[
-            { value: "atgarda", label: "Måste åtgärdas", count: 3 },
+            { value: "atgarda", label: "Bör åtgärdas", count: 3 },
             { value: "kontrollera", label: "Kontrollera själv", count: 8 },
           ]}
           selected={selected}
@@ -58,10 +58,10 @@ describe("ResultSummary", () => {
       );
     }
     renderWithProviders(<Summary />);
-    expect(screen.getByRole("heading", { level: 2, name: "3 saker behöver åtgärdas innan du lämnar anbudet" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "3 saker bör åtgärdas innan du lämnar anbudet" })).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "10 av 21 skall- och kvalificeringskrav ser bra ut" })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("checkbox", { name: /Måste åtgärdas/ }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /Bör åtgärdas/ }));
     await userEvent.click(screen.getByRole("checkbox", { name: /Kontrollera själv/ }));
     await userEvent.click(screen.getByRole("checkbox", { name: /Kontrollera själv/ }));
     expect(changes).toEqual(["atgarda", "kontrollera", null]);

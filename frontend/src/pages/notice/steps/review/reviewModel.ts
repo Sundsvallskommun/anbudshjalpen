@@ -31,18 +31,18 @@ export interface ReviewItem {
 export interface ReviewGroup {
   id: ReviewGroupId;
   title: string;
-  /** The words for the count in the section's name: "Måste åtgärdas, 3 krav". */
+  /** The words for the count in the section's name: "Bör åtgärdas, 3 krav". */
   countNoun: readonly [string, string];
   items: ReviewItem[];
   /** What the group is, or the comment every row shares, said once (direction.md: "skrivs den en gång som grupptext"). */
   helper: string | null;
   /** Rows of a neutral group show their status; the action groups say it in their heading. */
   isNeutral: boolean;
-  /** Måste åtgärdas starts open; the others are closed. */
+  /** Bör åtgärdas starts open; the others are closed. */
   defaultOpen: boolean;
 }
 
-// Within Måste åtgärdas, what was not found at all comes before what lacks its proof.
+// Within Bör åtgärdas, what was not found at all comes before what lacks its proof.
 const STATUS_ORDER: Record<CheckStatus, number> = { saknas: 0, obevisat: 1, oklart: 2, uppfyllt: 3 };
 
 function groupOf(status: CheckStatus, kind: RequirementKind): ReviewGroupId {
@@ -53,7 +53,7 @@ function groupOf(status: CheckStatus, kind: RequirementKind): ReviewGroupId {
 }
 
 const GROUPS: Record<ReviewGroupId, Omit<ReviewGroup, "items" | "helper"> & { describe: string | null }> = {
-  atgarda: { id: "atgarda", title: "Måste åtgärdas", countNoun: ["krav", "krav"], isNeutral: false, defaultOpen: true, describe: null },
+  atgarda: { id: "atgarda", title: "Bör åtgärdas", countNoun: ["krav", "krav"], isNeutral: false, defaultOpen: true, describe: null },
   kontrollera: {
     id: "kontrollera",
     title: "Kontrollera själv",
@@ -123,7 +123,7 @@ export function reviewGroups(view: ReviewView, checklist: Checklist | null): Rev
 }
 
 export interface ReviewVerdict {
-  /** "3 saker behöver åtgärdas innan du lämnar anbudet". */
+  /** "3 saker bör åtgärdas innan du lämnar anbudet". */
   title: string;
   mustFix: number;
   good: number;
@@ -141,9 +141,9 @@ export function reviewVerdict(groups: readonly ReviewGroup[]): ReviewVerdict {
   const essential = mustFix + toCheck + good;
   const title =
     mustFix > 0
-      ? `${plural(mustFix, "sak behöver", "saker behöver")} åtgärdas innan du lämnar anbudet`
+      ? `${plural(mustFix, "sak bör", "saker bör")} åtgärdas innan du lämnar anbudet`
       : toCheck > 0
-        ? `Inget måste åtgärdas, men ${plural(toCheck, "krav", "krav")} behöver du kontrollera själv`
+        ? `Inget verkar behöva åtgärdas, men ${plural(toCheck, "krav", "krav")} bör du kontrollera själv`
         : "Skall- och kvalificeringskraven ser bra ut";
   return { title, mustFix, good, essential, others: count("uppdraget") + count("villkor") };
 }

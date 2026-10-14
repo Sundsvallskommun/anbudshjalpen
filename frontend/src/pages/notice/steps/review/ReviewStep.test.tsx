@@ -17,7 +17,7 @@ const draft = () => new File(["%PDF-1.7 utkast"], "utkast.pdf", { type: "applica
 async function review() {
   await screen.findByRole("heading", { level: 2, name: "Granska ditt anbudsutkast" });
   await userEvent.upload(draftInput(), draft());
-  return screen.findByRole("heading", { level: 3, name: "1 sak behöver åtgärdas innan du lämnar anbudet" });
+  return screen.findByRole("heading", { level: 3, name: "1 sak bör åtgärdas innan du lämnar anbudet" });
 }
 
 beforeEach(() => {
@@ -67,7 +67,7 @@ describe("Step 3 Granska", () => {
     expect(within(rail).getByRole("heading", { name: "Utkastet sparas inte" })).toBeInTheDocument();
 
     // The answer takes the focus when it arrives.
-    const title = await screen.findByRole("heading", { level: 3, name: "1 sak behöver åtgärdas innan du lämnar anbudet" });
+    const title = await screen.findByRole("heading", { level: 3, name: "1 sak bör åtgärdas innan du lämnar anbudet" });
     expect(title).toHaveFocus();
     expect(screen.queryByRole("status", { name: "Granskningen pågår" })).not.toBeInTheDocument();
     expect(calls.filter((call) => call.path.endsWith("/review"))).toHaveLength(1);
@@ -90,7 +90,7 @@ describe("Step 3 Granska", () => {
 
     const calls = mockApi([...baseRoutes(companyUser), noticeRoute, reviewRoute]);
     await userEvent.click(screen.getByRole("button", { name: "Försök igen" }));
-    expect(await screen.findByRole("heading", { level: 3, name: "1 sak behöver åtgärdas innan du lämnar anbudet" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 3, name: "1 sak bör åtgärdas innan du lämnar anbudet" })).toBeInTheDocument();
     expect(screen.queryByText("Utkastet kunde inte granskas")).not.toBeInTheDocument();
     const upload = calls.find((call) => call.path.endsWith("/review"));
     expect((upload?.body as FormData).get("file")).toBeInstanceOf(File);
@@ -107,13 +107,13 @@ describe("Step 3 Granska", () => {
     const rail = screen.getByRole("complementary", { name: "Om granskningen" });
     expect(within(rail).getByRole("heading", { name: "Utkastet sparas inte" })).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "1 av 2 skall- och kvalificeringskrav ser bra ut" })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Visa bara: 1 Måste åtgärdas" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Visa bara: 1 Bör åtgärdas" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Visa bara: 1 Ser bra ut" })).toBeInTheDocument();
 
     const attachments = screen.getByRole("list", { name: "Bilagor i utkastet: 0 av 1" });
     expect(within(attachments).getByRole("listitem")).toHaveTextContent("Prisbilaga, inte med i utkastet");
 
-    const mustFix = screen.getByRole("region", { name: "Måste åtgärdas, 1 krav" });
+    const mustFix = screen.getByRole("region", { name: "Bör åtgärdas, 1 krav" });
     expect(within(mustFix).getByText("Bevis saknas")).toBeInTheDocument();
     expect(within(mustFix).getByText("Skallkrav")).toBeInTheDocument();
     expect(within(mustFix).getByText("Ansvarsförsäkring om minst 5 miljoner kronor")).toBeInTheDocument();
@@ -122,7 +122,7 @@ describe("Step 3 Granska", () => {
     expect(within(mustFix).getByText("Ur ditt utkast, s. 2: ”Vi har ansvarsförsäkring”")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ser bra ut, 1 krav" })).toHaveAttribute("aria-expanded", "false");
     // The step bar says it too, in words.
-    expect(screen.getByRole("tab", { name: "Granska, behöver åtgärdas" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Granska, bör åtgärdas" })).toBeInTheDocument();
 
     const upload = calls.find((call) => call.path.endsWith("/review"));
     expect((upload?.body as FormData).get("file")).toBeInstanceOf(File);
@@ -134,7 +134,7 @@ describe("Step 3 Granska", () => {
 
     await review();
     await userEvent.click(screen.getByRole("checkbox", { name: "Visa bara: 1 Ser bra ut" }));
-    expect(screen.queryByRole("region", { name: "Måste åtgärdas, 1 krav" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Bör åtgärdas, 1 krav" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ser bra ut, 1 krav" })).toHaveAttribute("aria-expanded", "true");
   });
 
@@ -175,6 +175,6 @@ describe("Step 3 Granska", () => {
     await userEvent.click(row!);
     expect(screen.getByRole("form", { name: "Granska ett anbudsutkast" })).toBeInTheDocument();
     // The last result stays until the new one arrives.
-    expect(screen.getByRole("heading", { level: 3, name: "1 sak behöver åtgärdas innan du lämnar anbudet" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 3, name: "1 sak bör åtgärdas innan du lämnar anbudet" })).toBeInTheDocument();
   });
 });

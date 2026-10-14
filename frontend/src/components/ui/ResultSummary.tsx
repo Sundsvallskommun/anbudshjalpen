@@ -8,7 +8,7 @@ import { StatTile } from "./StatTile";
 
 export interface ResultFilter {
   value: string;
-  /** "Måste åtgärdas". */
+  /** "Bör åtgärdas". */
   label: string;
   count: number;
   /** One line of help under the label. */
@@ -16,7 +16,7 @@ export interface ResultFilter {
 }
 
 export interface ResultSummaryProps {
-  /** The verdict, with its number: "3 saker behöver åtgärdas innan du lämnar anbudet". */
+  /** The verdict, with its number: "3 saker bör åtgärdas innan du lämnar anbudet". */
   title: string;
   headingLevel?: 2 | 3;
   /** "10 av 21 skall- och kvalificeringskrav ser bra ut", drawn as a bar. */

@@ -53,7 +53,7 @@ describe("StepNav", () => {
     await userEvent.click(screen.getByRole("tab", { name: "Krav" }));
     expect(screen.getByRole("button", { name: "Räknat 1" })).toBeInTheDocument();
     // A mark is said in words, not only shown as an icon.
-    expect(screen.getByRole("tab", { name: "Granska, behöver åtgärdas" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Granska, bör åtgärdas" })).toBeInTheDocument();
   });
 
   it("moves to a step from its own content, with parameters, and focuses its panel", async () => {
