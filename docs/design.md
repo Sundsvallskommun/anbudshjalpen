@@ -205,19 +205,31 @@ i vyn på varje sida bakom dörren, och panelen som en icke-modal Astryx `Popove
 skärmar och ett högt `BottomSheet` utan skärm på telefon. Sidan går att läsa och använda medan panelen är öppen, och
 källdialogen öppnas ovanpå den. Panelen öppnas kompakt, 420 px bred och högst 36 rem hög, så att det mesta av sidan
 syns bredvid, och knappen "Förstora panelen" gör den 720 px bred och högre för långa svar; storleken står kvar tills
-sidan laddas om. Huvudet är en rad: en liten rubrik "Fråga AI" (h2 i dokumentets disposition, i en panels storlek)
-med ämnet på en rad under, och tysta ikonknappar med verktygstips: "Spara som PDF" och "Rensa samtalet" när det finns
+sidan laddas om. Huvudet ligger på ett dämpat accentfält, som i en chattapp: Anbudshjälpens märke som avatar, en liten
+rubrik "Fråga AI" (h2 i dokumentets disposition, i en panels storlek), "Redo att hjälpa dig" vid en grön punkt och ämnet
+på en rad under, och tysta ikonknappar med verktygstips: "Spara som PDF" och "Rensa samtalet" när det finns
 ett samtal, förstora eller förminska (inte på telefon) och "Stäng". Under huvudet, på en upphandlings sida, valet
-Underlaget · Reglerna (`SegmentedControl`). Samtalet är en `ChatMessageList`: frågan i en bubbla till höger, utan
-namn över sig, och svaret
+Underlaget · Reglerna (`SegmentedControl`). Samtalet är en `ChatMessageList`. Det börjar med panelens välkomst i en bubbla vid märket: "Hej Anna!
+Jag är Anbudshjälpens AI-stöd. Jag finns alltid här i hörnet, genom hela processen …". Frågan står i en bubbla till höger,
+utan namn över sig, och svaret, vid märket,
 som ett kort med ursprungsrad, "Står i underlaget" (eller "Inköp har svarat" när svaret bygger på inköps publicerade
 svar), en fet slutsats, inköps svar med frågan de besvarar och länken till posten, och citaten med sida, eller för reglerna
 paragraferna svaret bygger på, som på Regelhjälpen. När underlaget inte svarar har svaret den tonade rutan "Ger
 underlaget inget entydigt svar?" med "Påminn mig" och länken dit frågan ställs formellt, och annars raden "Oklart?
-Ställ frågan i e-Avrop senast 30 okt.". Tomt säger panelen på en dämpad rad vad svaren bygger på och när sista dag för frågor är.
+Ställ frågan i e-Avrop senast 30 okt.". Före den första frågan säger en andra bubbla under välkomsten vad svaren bygger på och när sista dag för frågor är.
 Exempelfrågor ovanför skrivfältet tills den första frågan är ställd, skrivfältet som är Astryx `ChatComposer` på en rad med
 skicka-knappen bredvid (fältet växer uppåt med frågan), och under det raden att svaren är ett stöd. "Spara
 som PDF" öppnar utskriftsvyn.
+
+**Knappen** har en ljusstrimma i accentfärgen som löper ett varv runt kanten var tredje sekund medan panelen är
+stängd, så att läsaren ser att AI-stödet finns. Strimman slutar efter en minut och syns inte alls för den som har valt
+minskad rörelse.
+
+**Välkomsten:** panelen öppnas av sig själv första gången någon kommer till appen i en webbläsare, och första gången
+varje användare loggar in, men aldrig bakom accesskoden. Den flyttar inte fokus, och märket i huvudet vinkar en gång. Vilka som har välkomnats sparas i
+webbläsarens lokala lagring, så en senare inloggning lämnar panelen stängd. Det sparas inte på användaren i databasen,
+eftersom demons personor delas: då skulle bara den första deltagaren som loggar in som Anna se välkomsten. På telefon
+öppnas panelen inte av sig själv, eftersom den då täcker hela sidan; välkomsten väntar i panelen.
 
 Samtalen sparas per ämne i webbläsarens sessionslagring, så de finns kvar mellan sidorna och efter en omladdning i
 samma flik. "Ställ en fråga" i steg 1, "Fråga om kravet" i Granska (med frågan ifylld, också via `?fraga=` i en ny
