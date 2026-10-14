@@ -102,7 +102,9 @@ describe("Step 2 Granska", () => {
       expect.stringContaining("forsakringsbevis.pdf"),
       expect.stringContaining("prisbilaga.pdf"),
     ]);
-    expect(screen.getByText("3 filer valda")).toBeInTheDocument();
+    // The count is also announced in Astryx's live region, so look for it inside the form.
+    const form = screen.getByRole("form", { name: "Granska ett anbudsutkast" });
+    expect(within(form).getByText("3 filer valda")).toBeInTheDocument();
 
     await userEvent.click(within(list).getByRole("button", { name: "Ta bort prisbilaga.pdf" }));
     expect(within(list).getAllByRole("listitem")).toHaveLength(2);
