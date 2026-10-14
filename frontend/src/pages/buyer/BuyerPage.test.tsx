@@ -1,7 +1,14 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ChecklistAdminItem, InsightItem, InterpretationView, NoticeCreate } from "../../api/types";
+import type {
+  ChecklistAdminItem,
+  InsightItem,
+  InterpretationView,
+  NoticeCreate,
+  SupplierMatch,
+  UpcomingProcurement,
+} from "../../api/types";
 import { buyerUser, checklistAdminItem, noticeDetail } from "../../test/fixtures";
 import { baseRoutes, mockApi, renderApp, type MockRoute } from "../../test/render";
 
@@ -256,5 +263,117 @@ describe("Inköp: Företagens frågor", () => {
 
     await userEvent.click(within(second!).getByRole("button", { name: /Senaste frågorna \(1\)/ }));
     await waitFor(() => expect(within(second!).getByText("Ingår sandning av gångvägar?")).toBeVisible());
+  });
+});
+
+const painter: SupplierMatch = {
+  company_id: "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+  name: "Målerifirman i Matfors AB",
+  is_fictitious: true,
+  is_lab: false,
+  municipalities: ["Sundsvall", "Timrå"],
+  employees: 5,
+  cpv_codes: ["45442100", "45442110"],
+  cpv_labels: { "45442100": "Målning", "45442110": "Målning av byggnader" },
+  cpv_match: { company_code: "45442110", label: "Målning av byggnader", kind: "same_code" },
+  shared_words: ["fasader", "förskolor"],
+};
+
+const cleaner: SupplierMatch = {
+  company_id: "6f7a8b9c-0d1e-4f2a-b3c4-d5e6f7a8b9c0",
+  name: "Fiktiv Städ AB",
+  is_fictitious: false,
+  is_lab: true,
+  municipalities: [],
+  employees: null,
+  cpv_codes: [],
+  cpv_labels: {},
+  cpv_match: null,
+  shared_words: ["korridorer", "förskolor"],
+};
+
+const upcoming: UpcomingProcurement = {
+  agreement_id: "0b8e4c1d-5f9a-4e2b-8c3d-7a6b5c4d3e21",
+  title: "Ramavtal måleriarbeten",
+  category: "Bygg och fastighet",
+  cpv_codes: ["45442100", "45442110"],
+  end_date: "2027-11-30",
+  max_end_date: "2027-11-30",
+  expected_from: "2027-02-28",
+  expected_to: "2027-05-30",
+  previous_requirements: "Ansvarsförsäkring minst 5 miljoner kronor.",
+  is_fictitious: true,
+  relevant_for_company: false,
+  announcement_overdue: false,
+};
+
+describe("Inköp: Möjliga anbudsgivare", () => {
+  it("refuses an empty job, then sends it and lists the companies with why they could answer", async () => {
+    const calls = mockApi(
+      routes([], [
+        { method: "GET", path: "/api/upcoming", body: [] },
+        { method: "POST", path: "/api/admin/suppliers/search", body: [painter, cleaner] },
+      ]),
+    );
+    renderApp("/inkop?flik=anbudsgivare");
+
+    const form = await screen.findByRole("form", { name: "Beskriv uppdraget" });
+    const submit = within(form).getByRole("button", { name: "Visa möjliga anbudsgivare" });
+    await userEvent.click(submit);
+    expect(await within(form).findByText("Beskriv uppdraget eller ange minst en CPV-kod.")).toBeInTheDocument();
+    expect(calls.some((call) => call.method === "POST")).toBe(false);
+
+    await userEvent.type(within(form).getByRole("textbox", { name: /Rubrik/ }), "Ommålning av Solbackens förskola");
+    await userEvent.type(within(form).getByRole("textbox", { name: /CPV-koder/ }), "45442100-8");
+    await userEvent.click(submit);
+
+    expect(await screen.findByRole("heading", { level: 3, name: "2 företag verkar kunna svara" })).toBeInTheDocument();
+    expect(calls.find((call) => call.method === "POST")?.body).toEqual({
+      title: "Ommålning av Solbackens förskola",
+      description: "",
+      cpv_codes: ["45442100-8"],
+    });
+    const table = screen.getByRole("table", { name: "Möjliga anbudsgivare" });
+    const [, first, second] = within(table).getAllByRole("row");
+    expect(within(first!).getByText("Målerifirman i Matfors AB")).toBeInTheDocument();
+    expect(within(first!).getByText("Fiktiv")).toBeInTheDocument();
+    expect(within(first!).getByText("Sundsvall, Timrå · 5 anställda")).toBeInTheDocument();
+    expect(within(first!).getByText("Målning, Målning av byggnader")).toBeInTheDocument();
+    expect(within(first!).getByText("Samma kod")).toBeInTheDocument();
+    expect(within(first!).getByText("Beskrivningen nämner fasader och förskolor")).toBeInTheDocument();
+    expect(within(second!).getByText("Testföretag")).toBeInTheDocument();
+    expect(within(second!).getByText("Inga CPV-koder")).toBeInTheDocument();
+    expect(within(second!).queryByText(/^Samma /)).not.toBeInTheDocument();
+    // Only what the matching reads is shown: never a description, a turnover or an insurance.
+    expect(within(table).queryByText(/försäkring|kronor/i)).not.toBeInTheDocument();
+  });
+
+  it("starts from an agreement in the catalogue that is about to be procured again", async () => {
+    mockApi(routes([], [{ method: "GET", path: "/api/upcoming", body: [upcoming] }]));
+    renderApp("/inkop?flik=anbudsgivare");
+
+    const form = await screen.findByRole("form", { name: "Beskriv uppdraget" });
+    await userEvent.click(within(form).getByRole("combobox", { name: /Utgå från en kommande upphandling/ }));
+    await userEvent.click(await screen.findByRole("option", { name: /Ramavtal måleriarbeten/ }));
+
+    expect(within(form).getByRole("textbox", { name: /Rubrik/ })).toHaveValue("Ramavtal måleriarbeten");
+    expect(within(form).getByRole("textbox", { name: /Beskrivning/ })).toHaveValue("Ansvarsförsäkring minst 5 miljoner kronor.");
+    expect(within(form).getByRole("textbox", { name: /CPV-koder/ })).toHaveValue("45442100, 45442110");
+  });
+
+  it("says when no company seems able to answer", async () => {
+    mockApi(
+      routes([], [
+        { method: "GET", path: "/api/upcoming", body: [] },
+        { method: "POST", path: "/api/admin/suppliers/search", body: [] },
+      ]),
+    );
+    renderApp("/inkop?flik=anbudsgivare");
+
+    const form = await screen.findByRole("form", { name: "Beskriv uppdraget" });
+    await userEvent.type(within(form).getByRole("textbox", { name: /CPV-koder/ }), "60100000");
+    await userEvent.click(within(form).getByRole("button", { name: "Visa möjliga anbudsgivare" }));
+
+    expect(await screen.findByRole("heading", { name: "Inga företag verkar kunna svara" })).toBeInTheDocument();
   });
 });

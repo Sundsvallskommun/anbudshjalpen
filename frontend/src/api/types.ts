@@ -754,6 +754,46 @@ export interface InsightItem {
   visible: boolean;
 }
 
+/** A job inköp is considering (decision 0023), described as a notice would be: words and CPV codes. */
+export interface SupplierSearch {
+  title: string;
+  description: string;
+  cpv_codes: string[];
+}
+
+/**
+ * How close the company's nearest CPV code is to the job's: the same code, a code in the same category (five
+ * significant digits) or one in the same group (three), the level matching starts at.
+ */
+export type SupplierCpvKind = "same_code" | "same_category" | "same_group";
+
+export interface SupplierCpvMatch {
+  company_code: string;
+  /** The company code's Swedish label, when the code is in the CPV list. */
+  label: string | null;
+  kind: SupplierCpvKind;
+}
+
+/**
+ * A company that seems able to answer the job. Only what the matching itself reads: never the description, the
+ * turnover, the insurance or the references.
+ */
+export interface SupplierMatch {
+  company_id: Uuid;
+  name: string;
+  is_fictitious: boolean;
+  /** A workshop participant's own company (decision 0010). */
+  is_lab: boolean;
+  municipalities: string[];
+  employees: number | null;
+  cpv_codes: string[];
+  cpv_labels: Record<string, string>;
+  /** Null when the company got in on its words alone. */
+  cpv_match: SupplierCpvMatch | null;
+  /** Words of the company's own description that the job's text also has, in the company's order. */
+  shared_words: string[];
+}
+
 export interface JobRunView {
   id: Uuid;
   job: string;

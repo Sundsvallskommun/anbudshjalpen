@@ -125,6 +125,7 @@ const STATES: State[] = [
   { name: "inkop-ko", persona: "inkopare", go: (page) => open(page, "/inkop") },
   { name: "inkop-ny", persona: "inkopare", go: (page) => open(page, "/inkop?flik=ny") },
   { name: "inkop-insikter", persona: "inkopare", go: (page) => open(page, "/inkop?flik=insikter") },
+  { name: "inkop-anbudsgivare", persona: "inkopare", go: (page) => open(page, "/inkop?flik=anbudsgivare") },
   // The jobs moved to Drift (/inkop/drift, in inköp's account menu); "/inkop?flik=jobb" redirects there.
   { name: "inkop-jobb", persona: "inkopare", go: (page) => open(page, "/inkop/drift") },
   {
