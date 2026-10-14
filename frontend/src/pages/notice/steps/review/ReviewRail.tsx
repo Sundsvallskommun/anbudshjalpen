@@ -25,7 +25,7 @@ function NotKept() {
             Utkastet sparas inte
           </Heading>
         </HStack>
-        <Text>Filen läses, jämförs med kraven och raderas direkt. Varken filen eller texten sparas.</Text>
+        <Text>Filerna läses, jämförs med kraven och raderas direkt. Varken filerna eller texten sparas.</Text>
         <Text type="supporting">Ladda inte upp riktiga anbud eller personuppgifter i demon.</Text>
       </VStack>
     </Card>

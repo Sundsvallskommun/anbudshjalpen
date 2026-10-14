@@ -12,7 +12,7 @@ import { SourceLink } from "../../../../components/ui/source/SourceLink";
 import { useAskAi } from "../../../../components/ask/AskAiProvider";
 import { REQUIREMENT_KINDS } from "../../../../lib/labels";
 import { keepNumbersTogether } from "../../../../lib/text";
-import { questionAbout, type ReviewGroup, type ReviewItem } from "./reviewModel";
+import { draftSource, questionAbout, type ReviewGroup, type ReviewItem } from "./reviewModel";
 import styles from "./ReviewRow.module.css";
 
 const KIND_LABEL = Object.fromEntries(REQUIREMENT_KINDS.map(({ kind, label }) => [kind, label]));
@@ -51,9 +51,7 @@ function ReviewRow({
           <Text weight="semibold">Så visar du det:</Text> {requirement.evidence}
         </Text>
       )}
-      {check.draft_quote && (
-        <Text type="supporting">{`Ur ditt utkast${check.draft_page ? `, s. ${check.draft_page}` : ""}: ”${check.draft_quote}”`}</Text>
-      )}
+      {check.draft_quote && <Text type="supporting">{`${draftSource(check)}: ”${check.draft_quote}”`}</Text>}
       <HStack gap={4} vAlign="center" wrap="wrap">
         {requirement && (
           <>

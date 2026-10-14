@@ -11,12 +11,19 @@ function draftInput(): HTMLInputElement {
   return document.querySelector<HTMLInputElement>('input[type="file"]')!;
 }
 
-const draft = () => new File(["%PDF-1.7 utkast"], "utkast.pdf", { type: "application/pdf" });
+const draft = (name = "utkast.pdf") => new File([`%PDF-1.7 ${name}`], name, { type: "application/pdf" });
 
-/** Choosing the draft is what starts the review: there is no button to press after it. */
+/** The names of the files a review call sent, in order. */
+function sentFiles(calls: { path: string; body?: unknown }[]): string[] {
+  const upload = calls.find((call) => call.path.endsWith("/review"));
+  return (upload?.body as FormData).getAll("file").map((file) => (file as File).name);
+}
+
+/** The draft is collected first, then "Granska utkastet" starts the review (decision 0025). */
 async function review() {
   await screen.findByRole("heading", { level: 2, name: "Granska ditt anbudsutkast" });
   await userEvent.upload(draftInput(), draft());
+  await userEvent.click(screen.getByRole("button", { name: "Granska utkastet" }));
   return screen.findByRole("heading", { level: 3, name: "1 sak bör åtgärdas innan du lämnar anbudet" });
 }
 
@@ -48,20 +55,23 @@ describe("Step 2 Granska", () => {
 
     // At the upload itself, where the rules can be followed before the file leaves the device.
     const form = await screen.findByRole("form", { name: "Granska ett anbudsutkast" });
-    expect(within(form).getByText("Utkastet sparas inte. Filen läses, jämförs med kraven och raderas direkt.")).toBeInTheDocument();
+    expect(within(form).getByText("Utkastet sparas inte. Filerna läses, jämförs med kraven och raderas direkt.")).toBeInTheDocument();
     expect(within(form).getByText("Ladda inte upp riktiga anbud eller personuppgifter i demon.")).toBeInTheDocument();
-    expect(within(form).queryByRole("button", { name: /Granska utkastet/u })).not.toBeInTheDocument();
     // The rail does not say again what the form says.
     const rail = screen.getByRole("complementary", { name: "Om granskningen" });
     expect(within(rail).queryByRole("heading", { name: "Utkastet sparas inte" })).not.toBeInTheDocument();
 
+    // Nothing is sent before the button: the chosen file waits in the list.
     await userEvent.upload(draftInput(), draft());
+    expect(within(screen.getByRole("list", { name: "Valda filer" })).getByText("utkast.pdf")).toBeInTheDocument();
+    expect(calls.filter((call) => call.path.endsWith("/review"))).toHaveLength(0);
+    await userEvent.click(within(form).getByRole("button", { name: "Granska utkastet" }));
     // While the review runs: the file by name, what is being done, and how long it usually takes. No form, no
     // "Nästa steg", and the rail takes over the promise that the draft is not kept.
     expect(await screen.findByRole("progressbar", { name: /^Läser utkastet och jämför med \d+ krav$/u })).toBeInTheDocument();
     const working = screen.getByRole("status", { name: "Granskningen pågår" });
     expect(within(working).getByText("utkast.pdf")).toBeInTheDocument();
-    expect(within(working).getByText("Tar oftast under en minut. Filen raderas så fort granskningen är klar.")).toBeInTheDocument();
+    expect(within(working).getByText("Tar oftast under en minut. Filerna raderas så fort granskningen är klar.")).toBeInTheDocument();
     expect(screen.queryByRole("form", { name: "Granska ett anbudsutkast" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Nästa steg" })).not.toBeInTheDocument();
     expect(within(rail).getByRole("heading", { name: "Utkastet sparas inte" })).toBeInTheDocument();
@@ -71,6 +81,39 @@ describe("Step 2 Granska", () => {
     expect(title).toHaveFocus();
     expect(screen.queryByRole("status", { name: "Granskningen pågår" })).not.toBeInTheDocument();
     expect(calls.filter((call) => call.path.endsWith("/review"))).toHaveLength(1);
+  });
+
+  it("collects the tender and its attachments, drops one again and sends the rest as one draft", async () => {
+    const calls = mockApi([...baseRoutes(companyUser), noticeRoute, reviewRoute]);
+    renderApp(`/upphandlingar/${NOTICE_ID}?flik=granska`);
+
+    await screen.findByRole("heading", { level: 2, name: "Granska ditt anbudsutkast" });
+    // Pressing the button with nothing chosen says what is missing, at the field.
+    await userEvent.click(screen.getByRole("button", { name: "Granska utkastet" }));
+    expect(screen.getAllByText("Välj anbudet, och det du tänker bifoga, innan du granskar.").length).toBeGreaterThan(0);
+    expect(calls.filter((call) => call.path.endsWith("/review"))).toHaveLength(0);
+
+    // Files are added one at a time or several at once, and the same file twice is one.
+    await userEvent.upload(draftInput(), draft("anbud.pdf"));
+    await userEvent.upload(draftInput(), [draft("forsakringsbevis.pdf"), draft("prisbilaga.pdf"), draft("anbud.pdf")]);
+    const list = screen.getByRole("list", { name: "Valda filer" });
+    expect(within(list).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+      expect.stringContaining("anbud.pdf"),
+      expect.stringContaining("forsakringsbevis.pdf"),
+      expect.stringContaining("prisbilaga.pdf"),
+    ]);
+    // The count is also announced in Astryx's live region, so look for it inside the form.
+    const form = screen.getByRole("form", { name: "Granska ett anbudsutkast" });
+    expect(within(form).getByText("3 filer valda")).toBeInTheDocument();
+
+    await userEvent.click(within(list).getByRole("button", { name: "Ta bort prisbilaga.pdf" }));
+    expect(within(list).getAllByRole("listitem")).toHaveLength(2);
+
+    await userEvent.click(screen.getByRole("button", { name: "Granska utkastet" }));
+    await screen.findByRole("heading", { level: 3, name: "1 sak bör åtgärdas innan du lämnar anbudet" });
+    expect(sentFiles(calls)).toEqual(["anbud.pdf", "forsakringsbevis.pdf"]);
+    // The reviewed row names every file of the draft.
+    expect(screen.getByText("anbud.pdf, forsakringsbevis.pdf")).toBeInTheDocument();
   });
 
   it("says when the review failed and runs the same draft again on request", async () => {
@@ -83,6 +126,7 @@ describe("Step 2 Granska", () => {
 
     await screen.findByRole("heading", { level: 2, name: "Granska ditt anbudsutkast" });
     await userEvent.upload(draftInput(), draft());
+    await userEvent.click(screen.getByRole("button", { name: "Granska utkastet" }));
     expect((await screen.findAllByText("Utkastet kunde inte granskas")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Granskningen är upptagen just nu. Försök om en stund.").length).toBeGreaterThan(0);
     // The field is back for another file, and the same file can be sent again without choosing it anew.
@@ -92,8 +136,7 @@ describe("Step 2 Granska", () => {
     await userEvent.click(screen.getByRole("button", { name: "Försök igen" }));
     expect(await screen.findByRole("heading", { level: 3, name: "1 sak bör åtgärdas innan du lämnar anbudet" })).toBeInTheDocument();
     expect(screen.queryByText("Utkastet kunde inte granskas")).not.toBeInTheDocument();
-    const upload = calls.find((call) => call.path.endsWith("/review"));
-    expect((upload?.body as FormData).get("file")).toBeInstanceOf(File);
+    expect(sentFiles(calls)).toEqual(["utkast.pdf"]);
   });
 
   it("reviews a draft without keeping it and leads with what must be fixed", async () => {
@@ -123,9 +166,7 @@ describe("Step 2 Granska", () => {
     expect(screen.getByRole("button", { name: "Ser bra ut, 1 krav" })).toHaveAttribute("aria-expanded", "false");
     // The step bar says it too, in words.
     expect(screen.getByRole("tab", { name: "Granska, bör åtgärdas" })).toBeInTheDocument();
-
-    const upload = calls.find((call) => call.path.endsWith("/review"));
-    expect((upload?.body as FormData).get("file")).toBeInstanceOf(File);
+    expect(sentFiles(calls)).toEqual(["utkast.pdf"]);
   });
 
   it("shows one group alone when its figure is pressed, opened", async () => {

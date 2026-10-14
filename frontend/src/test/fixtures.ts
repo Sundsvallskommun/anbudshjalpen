@@ -281,13 +281,22 @@ export const reviewView: ReviewView = {
   result: {
     summary: "Två krav behöver kompletteras.",
     checks: [
-      { requirement_id: "K2", status: "uppfyllt", comment: "Två referenser finns.", draft_quote: null, draft_page: null, draft_check: null },
+      {
+        requirement_id: "K2",
+        status: "uppfyllt",
+        comment: "Två referenser finns.",
+        draft_quote: null,
+        draft_page: null,
+        draft_document: null,
+        draft_check: null,
+      },
       {
         requirement_id: "K1",
         status: "obevisat",
         comment: "Försäkringen nämns men beviset saknas.",
         draft_quote: "Vi har ansvarsförsäkring",
         draft_page: 2,
+        draft_document: null,
         draft_check: "verified",
       },
     ],

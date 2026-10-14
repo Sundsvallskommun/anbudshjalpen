@@ -148,6 +148,15 @@ export function reviewVerdict(groups: readonly ReviewGroup[]): ReviewVerdict {
   return { title, mustFix, good, essential, others: count("uppdraget") + count("villkor") };
 }
 
+/**
+ * Where a quote from the draft is: "Ur ditt utkast, s. 2", or with the file when the draft has several
+ * ("Ur forsakringsbevis.pdf, s. 1", decision 0025).
+ */
+export function draftSource(check: Pick<RequirementCheck, "draft_document" | "draft_page">): string {
+  const where = check.draft_document ? `Ur ${check.draft_document}` : "Ur ditt utkast";
+  return check.draft_page ? `${where}, s. ${check.draft_page}` : where;
+}
+
 /** The question "Fråga om kravet" puts in the composer. */
 export function questionAbout(title: string): string {
   return `Hur visar jag att vi uppfyller kravet ”${title.replace(/[.!?]+$/u, "")}”?`;

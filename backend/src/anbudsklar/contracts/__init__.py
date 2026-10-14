@@ -20,6 +20,7 @@ from anbudsklar.contracts.inputs import (
     NoticeContext,
     PagedDocument,
     PublishedAnswerInput,
+    SetRole,
     deadline_kind,
     render_published_answers,
 )
@@ -79,6 +80,7 @@ __all__ = [
     "ReviewResult",
     "RuleSource",
     "RulesAnswer",
+    "SetRole",
     "Task",
     "TermExplanation",
     "deadline_kind",

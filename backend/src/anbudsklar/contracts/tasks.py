@@ -14,7 +14,7 @@ from pydantic import Field
 
 from anbudsklar.contracts.common import AnswerCitation, Citation, CitationCheck, ContractModel
 
-CONTRACT_VERSION = "2026-10-13"
+CONTRACT_VERSION = "2026-10-14"
 
 
 class Task(StrEnum):
@@ -127,6 +127,10 @@ class RequirementCheck(ContractModel):
         default=None, description="Verbatim text from the draft that addresses the requirement."
     )
     draft_page: int | None = Field(default=None, ge=1)
+    draft_document: str | None = Field(
+        default=None,
+        description="The file's name from its DOKUMENT: line, when the draft has several files.",
+    )
     draft_check: CitationCheck | None = None
 
 

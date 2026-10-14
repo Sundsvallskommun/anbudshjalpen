@@ -33,7 +33,6 @@ from anbudsklar.contracts import (
     DocumentSet,
     MatchAssessment,
     NoticeContext,
-    PagedDocument,
     PublishedAnswerInput,
     ReviewResult,
     RulesAnswer,
@@ -146,10 +145,11 @@ class AiEngine(Protocol):
         """bedom_matchning: honest fit assessment of a notice for a company."""
         ...
 
-    async def review_draft(
-        self, checklist: Checklist, draft: PagedDocument
-    ) -> tuple[ReviewResult, EngineRun]:
-        """granska_utkast: check a tender draft against the checklist. The draft is not stored."""
+    async def review_draft(self, checklist: Checklist, draft: DocumentSet) -> tuple[ReviewResult, EngineRun]:
+        """granska_utkast: check a tender draft, one or several files, against the checklist.
+
+        The draft is not stored.
+        """
         ...
 
     async def answer_question(

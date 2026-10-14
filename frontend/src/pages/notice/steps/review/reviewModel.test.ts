@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { Checklist, Requirement, RequirementCheck, ReviewView } from "../../../../api/types";
 import { checklistView, reviewView } from "../../../../test/fixtures";
-import { attachmentCheckFor, attachedCount, attachmentVerdicts, questionAbout, reviewGroups, reviewVerdict } from "./reviewModel";
+import { attachmentCheckFor, attachedCount, attachmentVerdicts, draftSource, questionAbout, reviewGroups, reviewVerdict } from "./reviewModel";
 
 function requirement(id: string, kind: Requirement["kind"], title: string): Requirement {
   return { id, kind, title, plain_language: title, evidence: null, citation: { page: 5, quote: title, check: "verified", found_page: null, document: null, document_id: null } };
 }
 
 function check(requirementId: string, status: RequirementCheck["status"], comment = "Kommentar."): RequirementCheck {
-  return { requirement_id: requirementId, status, comment, draft_quote: null, draft_page: null, draft_check: null };
+  return { requirement_id: requirementId, status, comment, draft_quote: null, draft_page: null, draft_document: null, draft_check: null };
 }
 
 const checklist: Checklist = {
@@ -118,5 +118,14 @@ describe("attachments", () => {
 
   it("puts a question about a requirement in the reader's words", () => {
     expect(questionAbout("Två referensuppdrag.")).toBe("Hur visar jag att vi uppfyller kravet ”Två referensuppdrag”?");
+  });
+});
+
+describe("draftSource", () => {
+  it("names the file when the draft has several, and the page when there is one", () => {
+    expect(draftSource({ draft_document: null, draft_page: 2 })).toBe("Ur ditt utkast, s. 2");
+    expect(draftSource({ draft_document: null, draft_page: null })).toBe("Ur ditt utkast");
+    expect(draftSource({ draft_document: "forsakringsbevis.pdf", draft_page: 1 })).toBe("Ur forsakringsbevis.pdf, s. 1");
+    expect(draftSource({ draft_document: "forsakringsbevis.pdf", draft_page: null })).toBe("Ur forsakringsbevis.pdf");
   });
 });

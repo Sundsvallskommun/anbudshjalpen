@@ -9,35 +9,36 @@ import { reviewGroups, reviewVerdict } from "./review/reviewModel";
 import { ReviewStep, type ReviewControls, type ReviewedDraft } from "./review/ReviewStep";
 
 /**
- * The latest review of this visit, above the steps: step 2 shows it and the step bar marks it. The draft itself is
- * never kept; only the result is, until the page is left.
+ * The latest review of this visit, above the steps: step 2 shows it and the step bar marks it. The draft's files
+ * are never kept; only the result and their names are, until the page is left.
  */
 function useReview(notice: NoticeDetail): ReviewControls {
   const mutation = useReviewDraft(notice.id);
   const [reviewed, setReviewed] = useState<ReviewedDraft | null>(null);
-  const [reviewingFileName, setReviewingFileName] = useState<string | null>(null);
+  const [reviewingFileNames, setReviewingFileNames] = useState<string[] | null>(null);
   const count = useRef(0);
-  // The last draft, so a failed review can be run again without choosing the file anew. Gone with the page.
-  const lastFile = useRef<File | null>(null);
-  const review = (file: File) => {
-    lastFile.current = file;
-    setReviewingFileName(file.name);
-    mutation.mutate(file, {
+  // The last draft, so a failed review can be run again without choosing the files anew. Gone with the page.
+  const lastFiles = useRef<File[] | null>(null);
+  const review = (files: File[]) => {
+    const fileNames = files.map((file) => file.name);
+    lastFiles.current = files;
+    setReviewingFileNames(fileNames);
+    mutation.mutate(files, {
       onSuccess: (view) => {
         count.current += 1;
-        setReviewed({ view, fileName: file.name, number: count.current });
+        setReviewed({ view, fileNames, number: count.current });
       },
-      onSettled: () => setReviewingFileName(null),
+      onSettled: () => setReviewingFileNames(null),
     });
   };
   return {
     reviewed,
     review,
     retry: () => {
-      if (lastFile.current) review(lastFile.current);
+      if (lastFiles.current) review(lastFiles.current);
     },
     isReviewing: mutation.isPending,
-    reviewingFileName,
+    reviewingFileNames,
     error: mutation.isError ? mutation.error : null,
   };
 }

@@ -111,6 +111,11 @@ instruktion, ett kontrakt eller ett MCP-verktyg.
 > träffar ([Drift](operations.md#uppdatera)). De nya fälten `cpv_labels` i motorernas indata och `excerpt` i
 > Regelhjälpens källor sätts av appen vid varje anrop och kräver ingen ny körning.
 
+> **Kör det igen efter ändringen 2026-10-14.** Instruktionen för `granska_utkast` säger nu att utkastet kan bestå av
+> flera filer, att citaten anger filen i `draft_document` och att en fil som är bilagan gör den bifogad
+> ([beslut 0025](decisions/0025-granska-tar-emot-flera-filer.md)). Förteckningen över filerna sätts av appen vid
+> varje anrop och kräver ingen ny körning.
+
 > **Kör det igen efter ändringen 2026-10-13.** Instruktionen för `tolka_underlag` säger nu att underlaget kan bestå
 > av flera dokument och att listan i början kan nämna filer som inte kunde läsas in
 > ([beslut 0020](decisions/0020-checklistan-lases-ur-alla-dokument.md)). Förteckningen, sidor utan text och annonsens
