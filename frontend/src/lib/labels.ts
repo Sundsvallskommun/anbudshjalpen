@@ -104,8 +104,8 @@ export const CHECK_STATUS: Record<CheckStatus, string> = {
 
 /** The review's groups, by what the reader does first (direction.md, section 2). */
 export const CHECK_GROUP: Record<CheckStatus, string> = {
-  saknas: "Måste åtgärdas",
-  obevisat: "Måste åtgärdas",
+  saknas: "Bör åtgärdas",
+  obevisat: "Bör åtgärdas",
   oklart: "Kontrollera själv",
   uppfyllt: "Ser bra ut",
 };

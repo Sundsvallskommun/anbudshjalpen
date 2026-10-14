@@ -84,7 +84,7 @@ function StepEnd({
   }
   return (
     <NextStepCard
-      text="Åtgärda det som saknas och granska sedan den nya versionen, så ser du att allt kom med."
+      text="Gå igenom det granskningen pekar på. Åtgärda det som faktiskt saknas och granska sedan den nya versionen, så ser du att allt kom med."
       action={
         <>
           <Button label="Granska en ny version" variant="primary" icon={<Icon icon={UploadIcon} />} onClick={onNewVersion} />

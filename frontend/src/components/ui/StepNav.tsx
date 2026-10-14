@@ -22,7 +22,7 @@ export function parseStep(value: string | null): StepValue {
 /** A mark on a step: a warning when the review found gaps, a check when everything looks fine. */
 export type StepMark = "warning" | "success";
 
-const MARK_WORDS: Record<StepMark, string> = { warning: "behöver åtgärdas", success: "ser bra ut" };
+const MARK_WORDS: Record<StepMark, string> = { warning: "bör åtgärdas", success: "ser bra ut" };
 
 export interface StepNavApi {
   step: StepValue;
