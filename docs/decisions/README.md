@@ -36,6 +36,7 @@ Hör ihop med: [Dokumentationsindex](../README.md), [Arkitektur](../architecture
 | [0022](0022-kommunens-styrdokument-som-kalla.md) | Kommunens styrdokument för inköp är en egen källa i Regelhjälpen, skild från lagen | Accepterat | 2026-10-14 |
 | [0023](0023-mojliga-anbudsgivare-for-inkop.md) | Inköp ser vilka företag som verkar kunna svara på ett tänkt uppdrag | Accepterat | 2026-10-14 |
 | [0024](0024-granska-ar-sista-steget.md) | Granska är upphandlingens sista steg, och steget Lämna in tas bort | Accepterat | 2026-10-14 |
+| [0025](0025-granska-tar-emot-flera-filer.md) | Granska tar emot flera filer, och citaten pekar på filen | Accepterat | 2026-10-14 |
 
 ## Så skriver du ett beslut
 

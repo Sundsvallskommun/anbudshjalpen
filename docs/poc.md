@@ -40,7 +40,7 @@ loggar man in som Anna Berg på firman ([beslut 0007](decisions/0007-poc-login-p
    e-Avrop före frågestoppet och skapar en påminnelse, när den publicerade checklistan anger ett frågestopp som inte
    har passerat. Samtalet följer med mellan sidorna och går att spara som PDF. I steg 1 står de svar inköp redan har
    publicerat i e-Avrop på andra leverantörers frågor, samma för alla ([beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md)).
-6. **Granska:** firman laddar upp ett utkast och får först ett besked, till exempel hur många saker som bör
+6. **Granska:** firman laddar upp ett utkast, anbudet och det som ska bifogas, och får först ett besked, till exempel hur många saker som bör
    åtgärdas, och sedan kraven grupperade som Bör åtgärdas, Kontrollera själv och Ser bra ut. Inget sparas.
 7. **Lämna in:** sker i e-Avrop. Granska slutar med kortet "Lämna anbudet", med sista anbudsdag och länken till
    e-Avrop. Något eget steg för inlämningen finns inte längre.

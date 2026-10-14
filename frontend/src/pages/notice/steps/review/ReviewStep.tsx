@@ -16,22 +16,23 @@ import { ReviewResult } from "./ReviewResult";
 import { reviewGroups, reviewVerdict } from "./reviewModel";
 import { ReviewedFile, ReviewInProgress, ReviewUpload } from "./ReviewUpload";
 
-/** The latest reviewed draft: kept above the steps, so it survives a step change. The file itself is gone. */
+/** The latest reviewed draft: kept above the steps, so it survives a step change. The files themselves are gone. */
 export interface ReviewedDraft {
   view: ReviewView;
-  fileName: string;
+  /** The draft's files by name, as chosen: the tender and what goes with it (decision 0025). */
+  fileNames: string[];
   /** Counts the reviews of this visit, to start each result fresh. */
   number: number;
 }
 
 export interface ReviewControls {
   reviewed: ReviewedDraft | null;
-  review: (file: File) => void;
+  review: (files: File[]) => void;
   /** Review the last draft again, after a failure. */
   retry: () => void;
   isReviewing: boolean;
-  /** The draft under review, by name, while `isReviewing`. */
-  reviewingFileName: string | null;
+  /** The draft under review, its files by name, while `isReviewing`. */
+  reviewingFileNames: string[] | null;
   error: unknown;
 }
 
@@ -77,12 +78,12 @@ function StepEnd({
 }
 
 /**
- * Step 2 Granska, the last step (direction.md, section 4, and decision 0024): the draft is checked against the
- * published checklist and never stored.
- * Before a review the upload area, with the privacy rules beside it; choosing the file starts the review, and a card
- * shows the work while it runs. After it the form folds into a row with "Granska en ny version", and the result
- * follows and takes the focus, so the answer is where the reader lands. Only a company can review, and only a
- * published checklist.
+ * Step 2 Granska, the last step (direction.md, section 4, and decisions 0024 and 0025): the draft, the tender and
+ * what goes with it, is checked against the published checklist and never stored.
+ * Before a review the upload form, with the privacy rules beside it; the files are collected and "Granska utkastet"
+ * starts the review, and a card shows the work while it runs. After it the form folds into a row with "Granska en
+ * ny version", and the result follows and takes the focus, so the answer is where the reader lands. Only a company
+ * can review, and only a published checklist.
  */
 export function ReviewStep({
   notice,
@@ -97,7 +98,7 @@ export function ReviewStep({
 }) {
   const { pathname, search } = useLocation();
   const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const { reviewed, isReviewing, reviewingFileName, error } = controls;
+  const { reviewed, isReviewing, reviewingFileNames, error } = controls;
   const resultTitle = useRef<HTMLHeadingElement>(null);
   // A result that arrives while the step is open takes the focus; one already there when the step opens does not.
   const seen = useRef(reviewed?.number ?? 0);
@@ -129,8 +130,8 @@ export function ReviewStep({
     );
   }
 
-  const review = (file: File) => {
-    controls.review(file);
+  const review = (files: File[]) => {
+    controls.review(files);
     setIsUploadOpen(false);
   };
   const showsUpload = !isReviewing && (!reviewed || isUploadOpen);
@@ -140,10 +141,10 @@ export function ReviewStep({
     <StepLayout rail={<ReviewRail showsNotKept={!showsUpload} />} railLabel="Om granskningen">
       <Heading level={2}>Granska ditt anbudsutkast</Heading>
       {isReviewing && (
-        <ReviewInProgress fileName={reviewingFileName ?? "Ditt utkast"} requirementCount={view.checklist.requirements.length} />
+        <ReviewInProgress fileNames={reviewingFileNames ?? ["Ditt utkast"]} requirementCount={view.checklist.requirements.length} />
       )}
       {showsReviewedRow && reviewed && (
-        <ReviewedFile fileName={reviewed.fileName} onNewVersion={() => setIsUploadOpen(true)} />
+        <ReviewedFile fileNames={reviewed.fileNames} onNewVersion={() => setIsUploadOpen(true)} />
       )}
       {!isReviewing && error !== null && error !== undefined && (
         <ErrorNotice title="Utkastet kunde inte granskas" error={error} onRetry={controls.retry} />

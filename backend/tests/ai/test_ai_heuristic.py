@@ -168,17 +168,52 @@ async def test_review_draft_flags_missing_proof_and_missing_requirements() -> No
         "Vi har en ansvarsförsäkring om 5 000 000 kronor.\n"
         "Prisbilagan är ifylld och bifogas som bilaga 1."
     ]
-    review, _ = await HeuristicEngine().review_draft(
-        _checklist(), PagedDocument(filename="utkast.pdf", pages=draft_pages)
-    )
+    review, _ = await HeuristicEngine().review_draft(_checklist(), _set(draft_pages, "utkast.pdf"))
     status = {check.requirement_id: check.status for check in review.checks}
     assert status == {"K1": "obevisat", "K2": "saknas", "K3": "uppfyllt"}
     attachments = {check.name: check.status for check in review.attachments}
     assert attachments == {"Bilaga 3 Referensblankett": "saknas", "Prisbilaga": "oklart"}
+    # One file: no quote names it.
+    assert all(check.draft_document is None for check in review.checks)
     verified = verify_review(review, draft_pages)
     assert all(check.draft_check == "verified" for check in verified.checks if check.draft_quote)
     assert review.summary.startswith("I utkastet ser 1 av 3 krav bra ut.")
+    assert not review.summary.endswith("filer.")
     assert_plain_text(review.summary)
+
+
+async def test_review_draft_reads_every_file_and_names_the_one_it_quotes() -> None:
+    """Several files (decision 0025): a quote names its file, and a file named like an attachment is it."""
+
+    tender = PagedDocument(
+        filename="anbud.pdf",
+        pages=["Anbud från Målerifirman i Matfors AB (fiktiv).\nPrisbilagan är ifylld och bifogas."],
+    )
+    proof = PagedDocument(
+        filename="forsakringsbevis.pdf",
+        pages=["Försäkringsbevis.\nVi har en ansvarsförsäkring om 5 000 000 kronor hos Exempelförsäkring."],
+    )
+    blank = PagedDocument(filename="Bilaga 3 Referensblankett.pdf", pages=["Referensblankett (ifylld)."])
+    draft = DocumentSet.of([tender, proof, blank])
+    review, _ = await HeuristicEngine().review_draft(_checklist(), draft)
+
+    by_id = {check.requirement_id: check for check in review.checks}
+    assert (by_id["K1"].status, by_id["K1"].draft_document, by_id["K1"].draft_page) == (
+        "obevisat",
+        "forsakringsbevis.pdf",
+        1,
+    )
+    assert (by_id["K3"].status, by_id["K3"].draft_document) == ("uppfyllt", "anbud.pdf")
+    attachments = {check.name: check for check in review.attachments}
+    assert attachments["Bilaga 3 Referensblankett"].status == "bifogad"
+    assert (
+        attachments["Bilaga 3 Referensblankett"].comment
+        == "Filen Bilaga 3 Referensblankett.pdf i utkastet är bilagan."
+    )
+    assert attachments["Prisbilaga"].status == "oklart"
+    assert review.summary.endswith("Granskningen läste 3 filer.")
+    verified = verify_review(review, draft.documents)
+    assert all(check.draft_check == "verified" for check in verified.checks if check.draft_quote)
 
 
 async def test_answer_question_cites_the_best_sentences() -> None:

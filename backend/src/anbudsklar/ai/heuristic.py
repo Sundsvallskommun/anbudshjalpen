@@ -1069,11 +1069,26 @@ def _check_requirement(requirement: Requirement, sentences: Sequence[Sentence]) 
         comment=_REVIEW_COMMENTS[status],
         draft_quote=_excerpt(found.text) if found else None,
         draft_page=found.page if found else None,
+        draft_document=found.document if found else None,
     )
 
 
-def _check_attachment(attachment: RequiredAttachment, draft_text: str) -> AttachmentCheck:
-    stems = _stems(re.sub(r"\b[Bb]ilaga\s+\d+\b", "", attachment.name)) or _stems(attachment.name)
+def _attachment_stems(attachment: RequiredAttachment) -> set[str]:
+    """The words that name the attachment, without its number: "Bilaga 3 Referensblankett" is the blankett."""
+
+    return _stems(re.sub(r"\b[Bb]ilaga\s+\d+\b", "", attachment.name)) or _stems(attachment.name)
+
+
+def _check_attachment(
+    attachment: RequiredAttachment, draft_text: str, filenames: Sequence[str] = ()
+) -> AttachmentCheck:
+    """A file of the draft named like the attachment is the attachment; a mention in the text is not proof."""
+
+    stems = _attachment_stems(attachment)
+    for filename in filenames:
+        if stems and stems <= _stems(filename):
+            comment = f"Filen {filename} i utkastet är bilagan."
+            return AttachmentCheck(name=attachment.name, status="bifogad", comment=comment)
     if stems and stems <= _stems(draft_text):
         comment = "Utkastet nämner bilagan, men det går inte att se automatiskt att den är bifogad."
         return AttachmentCheck(name=attachment.name, status="oklart", comment=comment)
@@ -1246,18 +1261,23 @@ class HeuristicEngine:
         )
         return MatchAssessment(fit=fit, summary=summary, reasons=reasons[:6]), self._run()
 
-    async def review_draft(
-        self, checklist: Checklist, draft: PagedDocument
-    ) -> tuple[ReviewResult, EngineRun]:
-        sentences = document_sentences(draft.pages)
+    async def review_draft(self, checklist: Checklist, draft: DocumentSet) -> tuple[ReviewResult, EngineRun]:
+        # Every file is read in turn, as the documents of a procurement are; a quote names
+        # its file when there are several. A file named like an attachment is that attachment.
+        sentences = set_sentences(draft)
         checks = [_check_requirement(requirement, sentences) for requirement in checklist.requirements]
-        draft_text = "\n".join(draft.pages)
-        attachments = [_check_attachment(attachment, draft_text) for attachment in checklist.attachments]
+        draft_text = "\n".join(page for document in draft.documents for page in document.pages)
+        filenames = [document.filename for document in draft.documents]
+        attachments = [
+            _check_attachment(attachment, draft_text, filenames) for attachment in checklist.attachments
+        ]
         counts = {status: sum(check.status == status for check in checks) for status in _REVIEW_COMMENTS}
+        files = len(draft.documents)
         summary = (
             f"I utkastet ser {counts['uppfyllt']} av {len(checks)} krav bra ut. Bevis saknas för "
             f"{counts['obevisat']}, {counts['oklart']} behöver du kontrollera själv och {counts['saknas']} "
             "hittades inte. Gå igenom listan innan du lämnar anbudet."
+            + (f" Granskningen läste {files} filer." if files > 1 else "")
         )
         return ReviewResult(summary=summary, checks=checks, attachments=attachments), self._run()
 

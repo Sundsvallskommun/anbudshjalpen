@@ -706,26 +706,45 @@ class AnswerIndex:
         return self._answers[number - 1] if 1 <= number <= len(self._answers) else None
 
 
-def _verify_in_documents(citation: Citation, indexes: Sequence[tuple[PagedDocument, PageIndex]]) -> Citation:
-    if not indexes:
-        return _unverified(citation)
-    name = (citation.document or "").casefold()
-    named = [pair for pair in indexes if name and pair[0].filename.casefold() == name]
+Indexes = Sequence[tuple[PagedDocument, PageIndex]]
+
+
+@dataclass(frozen=True)
+class _Location:
+    """Where a quote was found among several documents, or the document to blame when it was not."""
+
+    document: PagedDocument
+    check: CitationCheck
+    page: int | None
+
+
+def _locate_in_documents(quote: str, name: str | None, page: int | None, indexes: Indexes) -> _Location:
+    """The named document first, then the others in order; found elsewhere than named is moved."""
+
+    wanted = (name or "").casefold()
+    named = [pair for pair in indexes if wanted and pair[0].filename.casefold() == wanted]
     elsewhere = [pair for pair in indexes if pair not in named]
     for document, index in named:
-        match = match_quote(citation.quote, index, citation.page)
+        match = match_quote(quote, index, page)
         if match.check != "unverified":
-            return _located(citation, document, match.check, match.page)
+            return _Location(document, match.check, match.page)
     for document, index in elsewhere:
-        match = match_quote(citation.quote, index, citation.page)
+        match = match_quote(quote, index, page)
         if match.check != "unverified":
             # Found, but not where the model said: moved, whatever the page, when a document was named.
-            check = match.check if not named else "moved"
-            return _located(citation, document, check, match.page)
-    fallback = (named or indexes)[0][0]
-    return citation.model_copy(
-        update={"check": "unverified", "found_page": None, "document_id": fallback.document_id}
-    )
+            return _Location(document, match.check if not named else "moved", match.page)
+    return _Location((named or indexes)[0][0], "unverified", None)
+
+
+def _verify_in_documents(citation: Citation, indexes: Indexes) -> Citation:
+    if not indexes:
+        return _unverified(citation)
+    found = _locate_in_documents(citation.quote, citation.document, citation.page, indexes)
+    if found.check == "unverified":
+        return citation.model_copy(
+            update={"check": "unverified", "found_page": None, "document_id": found.document.document_id}
+        )
+    return _located(citation, found.document, found.check, found.page)
 
 
 def _located(citation: Citation, document: PagedDocument, check: CitationCheck, page: int | None) -> Citation:
@@ -751,21 +770,30 @@ def verify_match(assessment: MatchAssessment, material: Material) -> MatchAssess
     return assessment.model_copy(update={"reasons": reasons})
 
 
-def verify_review(review: ReviewResult, draft_pages: Sequence[str]) -> ReviewResult:
-    """Check that each quote from the tender draft really is in the draft.
+def verify_review(review: ReviewResult, draft: Material) -> ReviewResult:
+    """Check that each quote from the tender draft really is in the draft's files.
 
-    `draft_check` gets the status. `RequirementCheck` has no separate found-page field,
-    so when the quote is on another page `draft_page` is corrected to where it is; the
-    UI shows "på annan sida" next to the corrected page.
+    `draft_check` gets the status. `RequirementCheck` has no separate found fields, so
+    when the quote is in another file or on another page, `draft_document` and
+    `draft_page` are corrected to where it is; the check says moved. A draft of one file
+    needs no name, so `draft_document` is then left as it came.
     """
 
-    index = PageIndex(draft_pages)
+    indexes = [(document, PageIndex(document.pages)) for document in _as_documents(draft)]
+    several = len(indexes) > 1
     checks = []
     for check in review.checks:
         if not check.draft_quote:
             checks.append(check.model_copy(update={"draft_check": None}))
             continue
-        match = match_quote(check.draft_quote, index, check.draft_page)
-        page = match.page if match.page is not None else check.draft_page
-        checks.append(check.model_copy(update={"draft_check": match.check, "draft_page": page}))
+        if not indexes:
+            checks.append(check.model_copy(update={"draft_check": "unverified"}))
+            continue
+        found = _locate_in_documents(check.draft_quote, check.draft_document, check.draft_page, indexes)
+        update: dict[str, object] = {"draft_check": found.check}
+        if found.check != "unverified":
+            update["draft_page"] = found.page if found.page is not None else check.draft_page
+            if several:
+                update["draft_document"] = found.document.filename
+        checks.append(check.model_copy(update=update))
     return review.model_copy(update={"checks": checks})

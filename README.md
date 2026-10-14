@@ -67,8 +67,9 @@ kontrollerat. Webbappen säger vilken motor som tog fram innehållet.
   er".
 - **Upphandlingens två steg:**
   - **1 Krav:** en checklista där varje rad länkar till citatet i underlaget.
-  - **2 Granska:** jämför ett anbudsutkast (PDF, Word eller text, högst 20 MB) med kraven och sparar det aldrig, och
-    slutar med sista anbudsdag och länken till e-Avrop, där anbudet lämnas.
+  - **2 Granska:** jämför ett anbudsutkast, anbudet och det som ska bifogas (PDF, Word eller text, tillsammans högst
+    20 MB), med kraven och sparar det aldrig, och slutar med sista anbudsdag och länken till e-Avrop, där anbudet
+    lämnas.
 - **Fråga AI:** en panel på varje sida som svarar med citat ur underlaget.
 - **Mejl:** påminnelser före sista dag för frågor och sista anbudsdag, och besked om nya träffar.
 - **Företagsprofil:** företaget beskriver sig med egna ord och får förslag på CPV-koder med skäl.

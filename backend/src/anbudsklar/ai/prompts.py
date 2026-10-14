@@ -31,7 +31,6 @@ from anbudsklar.contracts import (
     CpvCandidate,
     DocumentSet,
     NoticeContext,
-    PagedDocument,
     PublishedAnswerInput,
     Task,
     model_output_schema,
@@ -170,8 +169,8 @@ def _render_answers(answers: Sequence[PublishedAnswerInput]) -> str:
     return _block("publicerade_svar", render_published_answers(list(answers)))
 
 
-def _render_draft(draft: PagedDocument) -> str:
-    return _block("anbudsutkast", draft.render())
+def _render_draft(draft: DocumentSet) -> str:
+    return _block("anbudsutkast", draft.render(role="utkast"))
 
 
 def _render_profile(profile: CompanyProfile) -> str:

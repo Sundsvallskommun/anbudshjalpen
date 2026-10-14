@@ -124,6 +124,8 @@ export interface RequirementCheck {
   comment: string;
   draft_quote: string | null;
   draft_page: number | null;
+  /** The file the quote is in, by name, when the draft has several files (decision 0025). */
+  draft_document: string | null;
   draft_check: CitationCheck | null;
 }
 

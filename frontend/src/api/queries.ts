@@ -254,11 +254,12 @@ export function useAskQuestion(noticeId: string) {
   });
 }
 
+/** The draft's files, the tender and what goes with it, all in the one `file` field (decision 0025). */
 export function useReviewDraft(noticeId: string) {
   return useMutation({
-    mutationFn: (file: File) => {
+    mutationFn: (files: File[]) => {
       const form = new FormData();
-      form.append("file", file);
+      for (const file of files) form.append("file", file);
       return api.post<ReviewView>(`/api/notices/${noticeId}/review`, form);
     },
   });

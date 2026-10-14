@@ -138,13 +138,15 @@ mejlet "Ny träff" minns om annonsen kommer tillbaka.
 | | |
 |---|---|
 | Metod | `review_draft(checklist, draft)` |
-| Indata | Den publicerade checklistan och företagets utkast (`PagedDocument`) |
+| Indata | Den publicerade checklistan och företagets utkast som ett `DocumentSet`: en eller flera filer, anbudet och det som ska bifogas ([beslut 0025](decisions/0025-granska-tar-emot-flera-filer.md)). Förteckningen säger att det är ett utkast och pekar inte ut något huvuddokument |
 | Svar | `ReviewResult`: sammanfattning, en kontroll per krav (`uppfyllt`, `obevisat`, `saknas` eller `oklart`) med kommentar och citat ur utkastet, och en kontroll per bilaga (`bifogad`, `saknas` eller `oklart`). Webbappen säger Ser bra ut, Bevis saknas, Hittades inte och Kontrollera själv, och grupperar kraven som Bör åtgärdas, Kontrollera själv och Ser bra ut |
-| Kontroll | Citaten ur utkastet kontrolleras mot utkastets sidor (`draft_check`) |
+| Kontroll | Citaten ur utkastet kontrolleras mot utkastets filer (`draft_check`): först i filen som `draft_document` anger, sedan i de andra, och `draft_document` och `draft_page` rättas till där citatet står |
 | Körs av | En inloggad företagare som laddar upp ett utkast |
 
 Utkastet sparas aldrig. Det hanteras i minnet, och svaret till webbappen säger uttryckligen att det inte sparats.
-Granskningen pekar ut brister men skriver aldrig om utkastet.
+Granskningen pekar ut brister men skriver aldrig om utkastet. Filerna delar gränserna en fil hade (20 MB, 300 sidor
+och 1 500 000 tecken, och högst tio filer); ett utkast över dem avvisas, så att inget läses till hälften. En fil som
+heter som en bilaga i checklistan räknas som bifogad.
 
 ### Besvara fråga (`besvara_fraga`)
 
@@ -234,6 +236,12 @@ fältet `engine` bredvid varje resultat, och webbappen visar det i ursprungsrade
 - **Förfarande:** med de namn som LOU använder i dag. Ett underlag som bara säger "förenklat förfarande" eller
   "urvalsförfarande" får "Upphandling under tröskelvärdena (19 kap. LOU)", och checklistans termförklaringar säger att
   de namnen togs bort ur LOU den 1 februari 2022.
+
+**Granska utkast**
+
+- **Flera filer:** filerna läses i ordning som dokumenten i ett underlag, och citaten anger filen. En fil vars namn
+  innehåller bilagans ord ("Bilaga 3 Referensblankett.pdf") gör bilagan bifogad; nämns bilagan bara i texten är den
+  oklar. Sammanfattningen säger hur många filer som lästes.
 
 **Bedöma matchning**
 

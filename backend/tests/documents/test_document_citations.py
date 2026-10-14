@@ -490,6 +490,42 @@ def test_verify_review_checks_quotes_against_the_draft() -> None:
     ]
 
 
+def test_verify_review_finds_quotes_across_the_files_of_a_draft() -> None:
+    """Several files (decision 0025): the named file first, then the others; elsewhere than named is moved."""
+
+    tender = PagedDocument(
+        filename="anbud.pdf", pages=["Anbud.", "Vi har ansvarsförsäkring om 5 000 000 kronor."]
+    )
+    proof = PagedDocument(filename="bevis.pdf", pages=["Försäkringsbevis utfärdat 2026-01-01."])
+
+    def check(id: str, quote: str, document: str | None, page: int) -> RequirementCheck:
+        return RequirementCheck(
+            requirement_id=id,
+            status="uppfyllt",
+            comment="c",
+            draft_quote=quote,
+            draft_document=document,
+            draft_page=page,
+        )
+
+    review = ReviewResult(
+        summary="s",
+        checks=[
+            check("K1", "ansvarsförsäkring om 5 000 000 kronor", "anbud.pdf", 2),
+            check("K2", "Försäkringsbevis utfärdat 2026-01-01", "anbud.pdf", 2),  # it is in bevis.pdf
+            check("K3", "Försäkringsbevis utfärdat 2026-01-01", None, 1),  # no file named: found as it is
+            check("K4", "Vi är certifierade enligt ISO 14001.", "bevis.pdf", 1),
+        ],
+    )
+    checks = verify_review(review, [tender, proof]).checks
+    assert [(c.draft_check, c.draft_document, c.draft_page) for c in checks] == [
+        ("verified", "anbud.pdf", 2),
+        ("moved", "bevis.pdf", 1),
+        ("verified", "bevis.pdf", 1),
+        ("unverified", "bevis.pdf", 1),
+    ]
+
+
 def test_summarize_counts_unchecked_as_unverified() -> None:
     summary = summarize([_citation(1, "abc"), Citation(page=1, quote="def", check="moved")])
     assert (summary.citations_total, summary.citations_moved, summary.citations_unverified) == (2, 1, 1)

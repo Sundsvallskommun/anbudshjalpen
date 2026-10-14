@@ -115,8 +115,8 @@ gemensamma kvot. Appen har därför gränser, som ligger i processens minne (`ba
 | Samtidiga AI-anrop från webbappen (frågor, Regelhjälpen, granskning och CPV-förslag) | 4. Ett anrop väntar högst 30 sekunder på en ledig plats | 503 med `Retry-After: 30` |
 | Storlek på en begäran, till exempel JSON | 1 MB | 413 |
 | Uppladdat underlag (inköpare) | 50 MB | 413 |
-| Anbudsutkast för granskning | 20 MB | 413 |
-| Text i ett underlag eller utkast | 300 sidor och 1 500 000 tecken. Word-, Excel- och textfiler räknas i beräknade sidor | 413 med förklaring på svenska |
+| Anbudsutkast för granskning | 20 MB och högst tio filer, tillsammans ([beslut 0025](decisions/0025-granska-tar-emot-flera-filer.md)) | 413, och 422 för fler filer |
+| Text i ett underlag eller utkast | 300 sidor och 1 500 000 tecken, för ett utkast räknat över alla filer. Word-, Excel- och textfiler räknas i beräknade sidor | 413 med förklaring på svenska |
 | Word-fil (`.docx`) och Excel-fil (`.xlsx`, `.xlsm`) | Packad upp högst 100 MB, högst 32 MB XML eller 1 000 000 XML-element, högst 2 000 filer, ingen stor fil packad mer än 100 gånger, högst 100 000 stycken och tabeller i Word och högst 200 000 rader i Excel | 413 med förklaring på svenska. En fil som inte går att läsa alls ger 422 |
 | Zip-arkiv från e-Avrop | Högst 500 filer i arkivet, högst 50 MB per fil och ingen stor fil packad mer än 100 gånger | Arkivet eller filen hoppas över och står som oläst på annonsen |
 | Underlag till en tolkning | 150 000 tecken (`BUNDLE_BUDGET_CHARS`). Huvuddokumentet måste rymmas helt; bilagor som inte ryms utelämnas och står som utelämnade för modellen | Tolkningen stoppas med "Huvuddokumentet är för stort för en tolkning i ett anrop", som inköp ser under Att granska |

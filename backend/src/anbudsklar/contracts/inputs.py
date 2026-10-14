@@ -7,7 +7,7 @@ numbers that our citation verification checks against.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import datetime
 from typing import Literal
 from zoneinfo import ZoneInfo
@@ -115,8 +115,24 @@ class DocumentOutline(ContractModel):
     layout: str | None = None
 
 
+SetRole = Literal["underlag", "utkast"]
+"""What a `DocumentSet` is to the model: the procurement's documents, or the company's tender draft."""
+_LEADS: dict[SetRole, Callable[[int], str]] = {
+    "underlag": lambda count: (
+        f"Underlaget består av {count} dokument. Det första är huvuddokumentet."
+        if count > 1
+        else "Underlaget består av ett dokument."
+    ),
+    "utkast": lambda count: (
+        f"Utkastet består av {count} filer: anbudet och det som bifogas."
+        if count > 1
+        else "Utkastet består av en fil."
+    ),
+}
+
+
 class DocumentSet(ContractModel):
-    """The documents of a procurement as one piece of material, the main document first.
+    """The documents of a procurement, the main document first, or the files of a tender draft.
 
     Built by `anbudsklar.documents.bundle`: every page when they fit the budget, otherwise a
     choice, with the pages left out saying so in place. The outline lets the model see what
@@ -153,15 +169,15 @@ class DocumentSet(ContractModel):
     def is_complete(self) -> bool:
         return all(item.pages_included == item.page_count for item in self.outline)
 
-    def render(self) -> str:
-        """The outline, then each document with its own DOKUMENT: line and page markers."""
+    def render(self, *, role: SetRole = "underlag") -> str:
+        """The outline, then each document with its own DOKUMENT: line and page markers.
+
+        The procurement's documents have a main document, the first; a tender draft is the
+        files the company chose, in no particular order.
+        """
 
         count = len(self.documents)
-        lines = [
-            f"Underlaget består av {count} dokument. Det första är huvuddokumentet."
-            if count > 1
-            else "Underlaget består av ett dokument."
-        ]
+        lines = [_LEADS[role](count)]
         if not self.is_complete:
             lines.append('Sidor som inte är med står som "(sidan är inte med i urvalet)".')
         for index, item in enumerate(self.outline, start=1):

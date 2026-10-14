@@ -41,7 +41,6 @@ from anbudsklar.contracts import (
     DocumentSet,
     MatchAssessment,
     NoticeContext,
-    PagedDocument,
     PublishedAnswerInput,
     ReviewResult,
     RulesAnswer,
@@ -255,9 +254,7 @@ class OpenAICompatEngine:
             Task.ASSESS_MATCH, MatchAssessment, profile=profile, notice=notice, checklist=checklist
         )
 
-    async def review_draft(
-        self, checklist: Checklist, draft: PagedDocument
-    ) -> tuple[ReviewResult, EngineRun]:
+    async def review_draft(self, checklist: Checklist, draft: DocumentSet) -> tuple[ReviewResult, EngineRun]:
         return await self._run_task(Task.REVIEW_DRAFT, ReviewResult, checklist=checklist, draft=draft)
 
     async def answer_question(

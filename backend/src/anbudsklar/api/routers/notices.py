@@ -32,7 +32,7 @@ from anbudsklar.api.schemas import (
     ReminderView,
     ReviewView,
 )
-from anbudsklar.api.uploads import UPLOAD_OPENAPI, read_upload
+from anbudsklar.api.uploads import read_uploads, upload_openapi
 from anbudsklar.documents.store import read_file
 from anbudsklar.services import notices, questions, reminders, review
 from anbudsklar.services.ai_usage import token_prices
@@ -170,7 +170,7 @@ async def ask_question(
 @router.post(
     "/notices/{notice_id}/review",
     dependencies=[Depends(rate_limited("review")), Depends(require_company_user)],
-    openapi_extra=UPLOAD_OPENAPI,
+    openapi_extra=upload_openapi(several=True),
 )
 async def review_draft(
     notice_id: uuid.UUID,
@@ -180,24 +180,24 @@ async def review_draft(
     slots: AiSlotsDep,
     settings: SettingsDep,
 ) -> ReviewView:
-    """The draft is read into memory, reviewed and dropped. It is never stored or logged.
+    """The draft's files are read into memory, reviewed and dropped. They are never stored or logged.
 
     The AI slot is taken after the upload has arrived, so a slow upload never holds one.
     The commit keeps only the record of the call for the statistics on Drift.
     """
 
-    upload = await read_upload(
+    uploads = await read_uploads(
         request,
         max_bytes=review.MAX_DRAFT_BYTES,
-        too_large_message="Utkastet är för stort. Den största tillåtna storleken är 20 MB.",
+        max_files=review.MAX_DRAFT_FILES,
+        too_large_message=review.TOO_LARGE_MESSAGE,
     )
     async with slots.hold():
         view = await review.review_draft(
             session,
             engine,
             notice_id,
-            filename=upload.filename,
-            data=upload.data,
+            files=[review.DraftFile(upload.filename, upload.data) for upload in uploads],
             prices=token_prices(settings),
         )
     await session.commit()
