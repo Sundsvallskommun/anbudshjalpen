@@ -7,11 +7,10 @@ import { StepNav, type StepMark, type StepValue } from "../../../components/ui/S
 import { RequirementsStep } from "./requirements/RequirementsStep";
 import { reviewGroups, reviewVerdict } from "./review/reviewModel";
 import { ReviewStep, type ReviewControls, type ReviewedDraft } from "./review/ReviewStep";
-import { SubmitStep } from "./submit/SubmitStep";
 
 /**
- * The latest review of this visit, above the steps: step 3 shows it, step 4 ticks what it found and the step bar marks
- * step 3. The draft itself is never kept; only the result is, until the page is left.
+ * The latest review of this visit, above the steps: step 2 shows it and the step bar marks it. The draft itself is
+ * never kept; only the result is, until the page is left.
  */
 function useReview(notice: NoticeDetail): ReviewControls {
   const mutation = useReviewDraft(notice.id);
@@ -51,9 +50,10 @@ function reviewMark(reviewed: ReviewedDraft | null, view: ChecklistView): StepMa
 }
 
 /**
- * The three steps of a notice with a checklist (direction.md, section 4, with step 2 Fråga replaced by the "Fråga AI"
- * panel in decision 0014): 1 Krav, 2 Granska and 3 Lämna in in a sticky bar, with sista anbudsdag at its end once it
- * has stuck. Granska is marked when a review found gaps, or when everything looked fine.
+ * The two steps of a notice with a checklist (direction.md, section 4, with step 2 Fråga replaced by the "Fråga AI"
+ * panel in decision 0014 and step 4 Lämna in folded into Granska in decision 0024): 1 Krav and 2 Granska in a sticky
+ * bar, with sista anbudsdag at its end once it has stuck. Granska is marked when a review found gaps, or when
+ * everything looked fine.
  */
 export function NoticeSteps({ notice, view, user }: { notice: NoticeDetail; view: ChecklistView; user: UserView | null }) {
   const review = useReview(notice);
@@ -70,7 +70,6 @@ export function NoticeSteps({ notice, view, user }: { notice: NoticeDetail; view
       panels={{
         checklista: () => <RequirementsStep notice={notice} view={view} user={user} />,
         granska: () => <ReviewStep notice={notice} view={view} user={user} controls={review} />,
-        inlamning: () => <SubmitStep notice={notice} view={view} review={review.reviewed?.view ?? null} />,
       }}
     />
   );

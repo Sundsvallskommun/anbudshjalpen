@@ -292,11 +292,13 @@ export function verificationText(summary: VerificationSummary): string | null {
   return parts.join(" · ");
 }
 
-/** The four steps of a notice page, in order, with the values `?flik=` has always used. */
+/**
+ * The two steps of a notice page, in order, with the values `?flik=` has always used. Granska is the last step
+ * (decision 0024): the old step "Lämna in" (`inlamning`) is gone, and its address opens Granska.
+ */
 export const STEPS = [
   { value: "checklista", label: "Krav", number: 1 },
   { value: "granska", label: "Granska", number: 2 },
-  { value: "inlamning", label: "Lämna in", number: 3 },
 ] as const;
 
 export type StepValue = (typeof STEPS)[number]["value"];

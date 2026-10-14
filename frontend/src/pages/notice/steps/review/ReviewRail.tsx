@@ -59,7 +59,7 @@ function Legend() {
 }
 
 /**
- * Step 3's rail (direction.md, section 2 "Högerspalten"): integrity and the legend. While the upload form is open it
+ * Step 2's rail (direction.md, section 2 "Högerspalten"): integrity and the legend. While the upload form is open it
  * says at the field that the draft is not kept, so the rail does not say it again (`showsNotKept` false).
  */
 export function ReviewRail({ showsNotKept = true }: { showsNotKept?: boolean }) {

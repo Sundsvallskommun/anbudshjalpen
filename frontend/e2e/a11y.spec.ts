@@ -45,8 +45,8 @@ async function openFirstNotice(page: Page, withChecklist: boolean): Promise<stri
   await ready(page);
 }
 
-/** One of the notice page's three steps: Krav, Granska or Lämna in (a step's mark adds words to its name). */
-async function openStep(page: Page, step: "Krav" | "Granska" | "Lämna in") {
+/** One of the notice page's two steps: Krav or Granska (a step's mark adds words to its name). */
+async function openStep(page: Page, step: "Krav" | "Granska") {
   await page.getByRole("tablist", { name: "Steg" }).getByRole("tab", { name: step }).click();
   await ready(page);
 }
@@ -111,15 +111,6 @@ const STATES: State[] = [
       const skip = await openFirstNotice(page, true);
       if (skip) return skip;
       await openStep(page, "Granska");
-    },
-  },
-  {
-    name: "upphandling-inlamning",
-    persona: "foretagare",
-    go: async (page) => {
-      const skip = await openFirstNotice(page, true);
-      if (skip) return skip;
-      await openStep(page, "Lämna in");
     },
   },
   { name: "inkop-ko", persona: "inkopare", go: (page) => open(page, "/inkop") },

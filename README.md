@@ -65,11 +65,11 @@ kontrollerat. Webbappen säger vilken motor som tog fram innehållet.
 - **Start för företaget:** nästa frist överst med "Påminn mig", och träffarna som kort med skälen till bedömningen.
 - **Upphandlingar:** sök, filtrera på källa och köpare och, som inloggad företagare, välj "Visa bara det som passar
   er".
-- **Upphandlingens fyra steg:**
+- **Upphandlingens två steg:**
   - **1 Krav:** en checklista där varje rad länkar till citatet i underlaget.
-  - **2 Fråga:** svar med citat ur underlaget.
-  - **3 Granska:** jämför ett anbudsutkast (PDF, Word eller text, högst 20 MB) med kraven och sparar det aldrig.
-  - **4 Lämna in:** en lista att bocka av och en länk till e-Avrop.
+  - **2 Granska:** jämför ett anbudsutkast (PDF, Word eller text, högst 20 MB) med kraven och sparar det aldrig, och
+    slutar med sista anbudsdag och länken till e-Avrop, där anbudet lämnas.
+- **Fråga AI:** en panel på varje sida som svarar med citat ur underlaget.
 - **Mejl:** påminnelser före sista dag för frågor och sista anbudsdag, och besked om nya träffar.
 - **Företagsprofil:** företaget beskriver sig med egna ord och får förslag på CPV-koder med skäl.
 - **Regelhjälpen:** svar på allmänna frågor om upphandling, med paragraferna i lagen om offentlig upphandling (LOU)

@@ -17,7 +17,7 @@ export function NextStepCard({
 }: {
   /** One sentence: "Undrar du något om kraven?". */
   text: string;
-  /** One Button (or two: the primary and a secondary "Nästa: 3 Lämna in"). */
+  /** One Button (or two: the primary and a secondary one, such as the link to e-Avrop). */
   action: ReactNode;
   title?: string;
   headingLevel?: 2 | 3;

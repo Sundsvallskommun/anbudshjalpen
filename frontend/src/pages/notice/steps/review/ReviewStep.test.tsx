@@ -29,7 +29,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("Step 3 Granska", () => {
+describe("Step 2 Granska", () => {
   it("asks a visitor to log in as a company first", async () => {
     mockApi([...baseRoutes(null), noticeRoute]);
     renderApp(`/upphandlingar/${NOTICE_ID}?flik=granska`);
