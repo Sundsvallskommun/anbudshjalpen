@@ -158,15 +158,23 @@ export interface CpvSuggestions {
   suggestions: CpvSuggestion[];
 }
 
+/** A section of the law (LOU), or of one of the municipality's steering documents (decision 0022). */
+export type RuleSourceKind = "law" | "policy";
+
 export interface RuleSource {
   title: string;
+  /** "LOU 20 kap. 1 §" or "Inköpsstrategin 5.2". */
   reference: string | null;
   url: string | null;
   /**
-   * The start of the law text itself, cut after a whole sentence and ending with " …" when shortened. Set by the
-   * backend from its own copy of LOU (never by a model); null for sources that are not a LOU section it holds.
+   * The start of the source's own text, cut after a whole sentence and ending with " …" when shortened. Set by the
+   * backend from its own copy of LOU or the steering document (never by a model); null for sources it does not hold.
    */
   excerpt: string | null;
+  /** Set by the backend; null for guidance and web pages. */
+  kind: RuleSourceKind | null;
+  /** Set by the backend for a steering document: "Kommunens styrdokument, fastställt av kommunfullmäktige 2023-09-25." */
+  note: string | null;
 }
 
 export interface RulesAnswer {
@@ -744,6 +752,46 @@ export interface InsightItem {
   formal_question_suggestions: number;
   sample_questions: string[];
   visible: boolean;
+}
+
+/** A job inköp is considering (decision 0023), described as a notice would be: words and CPV codes. */
+export interface SupplierSearch {
+  title: string;
+  description: string;
+  cpv_codes: string[];
+}
+
+/**
+ * How close the company's nearest CPV code is to the job's: the same code, a code in the same category (five
+ * significant digits) or one in the same group (three), the level matching starts at.
+ */
+export type SupplierCpvKind = "same_code" | "same_category" | "same_group";
+
+export interface SupplierCpvMatch {
+  company_code: string;
+  /** The company code's Swedish label, when the code is in the CPV list. */
+  label: string | null;
+  kind: SupplierCpvKind;
+}
+
+/**
+ * A company that seems able to answer the job. Only what the matching itself reads: never the description, the
+ * turnover, the insurance or the references.
+ */
+export interface SupplierMatch {
+  company_id: Uuid;
+  name: string;
+  is_fictitious: boolean;
+  /** A workshop participant's own company (decision 0010). */
+  is_lab: boolean;
+  municipalities: string[];
+  employees: number | null;
+  cpv_codes: string[];
+  cpv_labels: Record<string, string>;
+  /** Null when the company got in on its words alone. */
+  cpv_match: SupplierCpvMatch | null;
+  /** Words of the company's own description that the job's text also has, in the company's order. */
+  shared_words: string[];
 }
 
 export interface JobRunView {

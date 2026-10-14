@@ -1145,6 +1145,16 @@ def _answer_from_published(
 
 
 RULES_LEAD = "Paragrafer som kan handla om din fråga:"
+# When a section of one of the municipality's steering documents is among the hits (decision 0022).
+RULES_LEAD_MIXED = "Paragrafer och avsnitt som kan handla om din fråga:"
+
+
+def rules_lead(sources: Sequence[RuleSource]) -> str:
+    """The line over the sources: paragraphs only while every source is a section of the law."""
+
+    if all((source.reference or "").startswith("LOU") for source in sources):
+        return RULES_LEAD
+    return RULES_LEAD_MIXED
 
 
 class HeuristicEngine:
@@ -1350,7 +1360,7 @@ class HeuristicEngine:
             for item in context[:3]
         ]
         excerpts = "\n\n".join(f"{source.reference} – {source.title}: {source.excerpt}" for source in sources)
-        return RulesAnswer(answer=f"{RULES_LEAD}\n\n{excerpts}", sources=sources), self._run()
+        return RulesAnswer(answer=f"{rules_lead(sources)}\n\n{excerpts}", sources=sources), self._run()
 
     async def aclose(self) -> None:
         return None

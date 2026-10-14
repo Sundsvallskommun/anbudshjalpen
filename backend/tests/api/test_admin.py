@@ -585,3 +585,29 @@ async def test_ai_usage_counts_the_calls_the_app_made(
     week = (await client.get("/api/admin/ai-usage", params={"days": 7})).json()
     assert (week["calls"], week["input_tokens"]) == (1, 0)
     assert [item["task"] for item in week["by_task"]] == ["besvara_fraga"]
+
+
+async def test_possible_bidders_need_a_buyer_and_say_who_could_answer_a_job(
+    client: httpx.AsyncClient, demo: Demo
+) -> None:
+    body = {"title": "Ommålning av Solbackens förskola", "cpv_codes": ["45442100-8"]}
+    await login(client, "foretagare")
+    assert (await client.post("/api/admin/suppliers/search", json=body)).status_code == 403
+
+    await login(client, "inkopare")
+    response = await client.post("/api/admin/suppliers/search", json=body)
+    assert response.status_code == 200, response.text
+    [item] = response.json()  # the cleaning company shares neither a group nor a word with the job
+    assert item["name"] == demo.company.name
+    assert item["cpv_match"]["kind"] == "same_code"
+    assert item["shared_words"] == ["förskolor"]
+    assert not {"description", "annual_turnover_sek", "insurance", "public_references"} & set(item)
+
+    # Words alone are enough when two of the company's words are in the job.
+    job = {"title": "Städning av kontor och lager"}
+    by_words = (await client.post("/api/admin/suppliers/search", json=job)).json()
+    assert [item["name"] for item in by_words] == [demo.other_company.name]
+    assert by_words[0]["cpv_match"] is None
+
+    assert (await client.post("/api/admin/suppliers/search", json={"title": " "})).status_code == 422
+    assert (await client.post("/api/admin/suppliers/search", json={"cpv_codes": ["abc"]})).status_code == 422

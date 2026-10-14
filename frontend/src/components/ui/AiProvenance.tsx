@@ -62,8 +62,8 @@ const BASIS_COPY: Record<ProvenanceBasis, BasisCopy> = {
   },
   law: {
     sources:
-      "Varje paragraf som svaret bygger på visas med lagens egna ord, ur Anbudshjälpens egen kopia av LOU, med en länk till hela paragrafen.",
-    unreviewed: "Inköp har inte granskat det här. Läs alltid hela paragrafen.",
+      "Varje paragraf och avsnitt som svaret bygger på visas med källans egna ord, ur Anbudshjälpens egen kopia av LOU och av kommunens styrdokument, med en länk till hela texten. Ett styrdokument, som inköpsstrategin, säger vad kommunen vill med sina inköp och binder kommunens egna beställare, inte dig.",
+    unreviewed: "Inköp har inte granskat det här. Läs alltid hela paragrafen eller avsnittet.",
     rule: "Det är alltid lagtexten som gäller.",
   },
 };

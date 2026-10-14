@@ -50,6 +50,8 @@ import type {
   RulesRequest,
   RulesView,
   SessionView,
+  SupplierMatch,
+  SupplierSearch,
   UpcomingProcurement,
   Uuid,
 } from "./types";
@@ -512,6 +514,13 @@ export function useUploadDocument() {
 
 export function useInsights() {
   return useQuery({ queryKey: keys.insights, queryFn: () => api.get<InsightItem[]>("/api/admin/insights") });
+}
+
+/** Which companies could answer a job inköp is considering (decision 0023): a computation, so a mutation; nothing is stored. */
+export function useSearchSuppliers() {
+  return useMutation({
+    mutationFn: (search: SupplierSearch) => api.post<SupplierMatch[]>("/api/admin/suppliers/search", search),
+  });
 }
 
 /** How often the jobs list is refetched while a run is going on, so "pågår" turns into the outcome. */

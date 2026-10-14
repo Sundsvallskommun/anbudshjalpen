@@ -84,15 +84,17 @@ async def test_reference_data_is_loaded_once(
 
     monkeypatch.setitem(jobs.JOBS, "load_cpv", recorder("load_cpv"))
     monkeypatch.setitem(jobs.JOBS, "ingest_lou", recorder("ingest_lou"))
+    monkeypatch.setitem(jobs.JOBS, "load_policies", recorder("load_policies"))
     factory = bound_session_factory(db_session)
 
     await ensure_reference_data(factory, context)
-    assert loaded == ["load_cpv", "ingest_lou"]
+    assert loaded == ["load_cpv", "ingest_lou", "load_policies"]
 
+    # The steering documents are refreshed from the repo file on every start (decision 0022).
     await add_cpv_codes(db_session, {"45442100": "Målning"})
     loaded.clear()
     await ensure_reference_data(factory, context)
-    assert loaded == ["ingest_lou"]
+    assert loaded == ["ingest_lou", "load_policies"]
 
 
 async def test_a_scheduled_run_skips_a_job_that_is_already_running(

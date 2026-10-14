@@ -25,7 +25,7 @@ Hör ihop med: [Dokumentationsindex](../README.md), [Arkitektur](../architecture
 | [0011](0011-installningar-granskning-valfri.md) | Inköp styr inställningar i tjänsten, och granskningen före publicering går att slå av | Accepterat, annonsernas märkning när granskningen är av ersatt av 0017 och ursprungsradens ord av 0019 | 2026-10-12 |
 | [0012](0012-fragor-mot-alla-dokument.md) | Frågor besvaras mot alla dokument i upphandlingen, med ett urval över en budget | Accepterat, tolkningens läsning ersatt av 0020 | 2026-10-12 |
 | [0013](0013-fragor-och-svar-fran-eavrop.md) | Inköps publicerade svar på leverantörernas frågor hämtas från e-Avrops frågelogg | Accepterat, AI-uppgifternas läsning ersatt av 0018 | 2026-10-12 |
-| [0014](0014-fraga-ai-panel.md) | AI-stödet är en panel som följer läsaren, och samtalet går att spara som PDF | Accepterat | 2026-10-12 |
+| [0014](0014-fraga-ai-panel.md) | AI-stödet är en panel som följer läsaren, och samtalet går att spara som PDF | Accepterat, stegens antal och namn ersatta av 0024 | 2026-10-12 |
 | [0015](0015-namnet-anbudshjalpen.md) | Tjänsten heter Anbudshjälpen och får märket Toppen, och de tekniska namnen behåller anbudsklar | Accepterat, repots namn ersatt av 0016 | 2026-10-12 |
 | [0016](0016-repot-heter-anbudshjalpen.md) | Repot på GitHub heter anbudshjalpen | Accepterat | 2026-10-12 |
 | [0017](0017-granskad-bara-nar-inkop-granskar.md) | Ordet "granskad" i annonslistorna visas bara när inköp granskar checklistor | Accepterat, checklistans ursprungsrad när granskningen är av ersatt av 0019 | 2026-10-12 |
@@ -33,6 +33,9 @@ Hör ihop med: [Dokumentationsindex](../README.md), [Arkitektur](../architecture
 | [0019](0019-utan-granskning-ingen-ogranskad-och-checklista-pa-vag.md) | När granskningen är av säger ingen vy "inte granskad", och en checklista på väg visas som på väg | Accepterat | 2026-10-12 |
 | [0020](0020-checklistan-lases-ur-alla-dokument.md) | Checklistan tolkas ur alla dokument i upphandlingen, och det som inte lästs in syns | Accepterat | 2026-10-13 |
 | [0021](0021-eavrop-gar-fore-ted.md) | En upphandling som finns i både TED och e-Avrop visas som e-Avrops annons | Accepterat | 2026-10-13 |
+| [0022](0022-kommunens-styrdokument-som-kalla.md) | Kommunens styrdokument för inköp är en egen källa i Regelhjälpen, skild från lagen | Accepterat | 2026-10-14 |
+| [0023](0023-mojliga-anbudsgivare-for-inkop.md) | Inköp ser vilka företag som verkar kunna svara på ett tänkt uppdrag | Accepterat | 2026-10-14 |
+| [0024](0024-granska-ar-sista-steget.md) | Granska är upphandlingens sista steg, och steget Lämna in tas bort | Accepterat | 2026-10-14 |
 
 ## Så skriver du ett beslut
 

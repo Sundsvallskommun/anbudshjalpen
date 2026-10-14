@@ -16,6 +16,8 @@ sidan. Ändras en term här, ändra den där också. Förklarar en checklista sj
 | Term | Betydelse |
 |---|---|
 | LOU | Lagen (2016:1145) om offentlig upphandling, som styr hur kommunen köper in |
+| Styrdokument | Ett dokument som kommunens politiker har beslutat om och som styr kommunens egen verksamhet, till exempel inköpsstrategin. Det binder kommunens beställare, inte leverantören. Vad som gäller för leverantören står i lagen och i förfrågningsunderlaget |
+| Inköpsstrategi | Kommunfullmäktiges strategi för kommunens inköp (2023-09-25): inköpen ska vara effektiva, rättssäkra och hållbara. Den säger bland annat att kommunen ska ta tillvara småföretagens konkurrenskraft och ställa krav på hållbarhet och på villkor i nivå med kollektivavtal. Regelhjälpen använder den som källa vid sidan av LOU ([beslut 0022](decisions/0022-kommunens-styrdokument-som-kalla.md)) |
 | Förfrågningsunderlag | Dokumenten som beskriver vad kommunen vill köpa och vilka krav som gäller. Lagen kallar dem upphandlingsdokument |
 | Skallkrav | Krav som måste uppfyllas. Ett anbud som inte uppfyller ett skallkrav förkastas |
 | Kvalificeringskrav | Krav på företaget, till exempel ekonomisk stabilitet, referensuppdrag eller försäkring |

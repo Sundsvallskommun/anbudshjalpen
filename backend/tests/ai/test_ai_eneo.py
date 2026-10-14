@@ -283,6 +283,19 @@ def test_clean_answer_removes_reference_tags() -> None:
     assert clean_answer(' Text <inref id="x"/> slut. ') == "Text slut."
 
 
+def test_rule_sources_read_a_steering_document_section_from_the_tool_reference() -> None:
+    """Our MCP server labels a section with the reference as title and the heading as section."""
+
+    tool_reference = {
+        "uri": "https://sundsvall.se/download/strategi.pdf#page=8",
+        "meta": {"title": "Inköpsstrategin 5.2", "section": "Hållbara inköp"},
+        "mcp_tool_name": "sok_styrdokument",
+    }
+    [source] = rule_sources([], [tool_reference])
+    assert (source.title, source.reference) == ("Hållbara inköp", "Inköpsstrategin 5.2")
+    assert source.url == "https://sundsvall.se/download/strategi.pdf#page=8"
+
+
 def test_rule_sources_deduplicate_and_fall_back_to_a_title() -> None:
     reference = {"metadata": {"url": "https://www.upphandlingsmyndigheten.se/x/"}}
     sources = rule_sources([reference, reference, {"metadata": {}}], [])

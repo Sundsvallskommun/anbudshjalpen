@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from anbudsklar.ai.engine import AiEngine, EngineError, build_engine
 from anbudsklar.api.schemas import JobRunView
 from anbudsklar.config import Settings
-from anbudsklar.ingest import ingest_eavrop, ingest_lou, ingest_ted, load_cpv
+from anbudsklar.ingest import POLICY_DIR, ingest_eavrop, ingest_lou, ingest_ted, load_cpv, load_policies
 from anbudsklar.ingest.common import IngestError
 from anbudsklar.ingest.http import user_agent
 from anbudsklar.models import JobRun
@@ -87,6 +87,10 @@ def agreements_csv_path(settings: Settings) -> Path:
     return settings.data_dir / "fixtures" / "agreements.csv"
 
 
+def policies_dir(settings: Settings) -> Path:
+    return settings.data_dir / POLICY_DIR
+
+
 async def _ingest_ted(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:
     return await ingest_ted(session, ctx.http, ctx.settings)
 
@@ -108,6 +112,10 @@ async def _ingest_lou(session: AsyncSession, ctx: JobContext) -> Mapping[str, in
 
 async def _load_cpv(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:
     return {"loaded": await load_cpv(session, cpv_csv_path(ctx.settings))}
+
+
+async def _load_policies(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:
+    return await load_policies(session, policies_dir(ctx.settings))
 
 
 async def _close_expired(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:
@@ -145,6 +153,7 @@ JOBS: dict[str, JobFunction] = {
     "ingest_eavrop": _ingest_eavrop,
     "ingest_lou": _ingest_lou,
     "load_cpv": _load_cpv,
+    "load_policies": _load_policies,
     "close_expired": _close_expired,
     "interpret_pending": _interpret_pending,
     "reextract_outdated": _reextract_outdated,

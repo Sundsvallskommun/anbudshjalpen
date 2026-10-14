@@ -8,13 +8,13 @@ Everything is written inside the test transaction and rolled back afterwards.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.documents.extract import TEXT_MIMETYPE
 from anbudsklar.documents.store import store_document
-from anbudsklar.models import CpvCode, Document, LouSection, Notice
+from anbudsklar.models import CpvCode, Document, LouSection, Notice, PolicyDocument, PolicySection
 
 NOW = datetime.now(UTC)
 
@@ -177,6 +177,15 @@ LOU_ROWS = (
         "anbudsgivare om de beslut som fattats om att tilldela ett kontrakt eller ingå ett ramavtal.",
     ),
     (
+        17,
+        "Fullgörande av kontrakt",
+        "2",
+        "Särskilda arbetsrättsliga villkor",
+        "En upphandlande myndighet ska, om det är behövligt, kräva att leverantören ska fullgöra kontraktet "
+        "enligt angivna villkor om lön, semester och arbetstid som arbetstagarna som ska utföra arbetet "
+        "enligt kontraktet minst ska tillförsäkras.",
+    ),
+    (
         20,
         "Avtalsspärr, överprövning och skadestånd",
         "1",
@@ -199,6 +208,59 @@ async def seed_lou_sections(db_session: AsyncSession) -> dict[str, LouSection]:
             consolidated_through="SFS 2026:880",
         )
         for index, (chapter, chapter_title, section, heading, text) in enumerate(LOU_ROWS)
+    }
+    db_session.add_all(rows.values())
+    await db_session.flush()
+    return rows
+
+
+# Short excerpts of the municipality's procurement strategy (a public decision of kommunfullmäktige).
+STRATEGY_URL = "https://sundsvall.se/download/strategi.pdf"
+POLICY_ROWS = (
+    (
+        "5.2",
+        "Hållbara inköp",
+        8,
+        9,
+        "Sundsvalls kommuns inköp ska vara hållbara.\n\n- Bidra till ökad sysselsättning. Genom att ställa "
+        "krav på sysselsättningsfrämjande åtgärder, exempelvis sommarjobb och praktikplatser.\n- Anlita "
+        "socialt ansvarsfulla leverantörer. Krav på villkor i nivå med kollektivavtal ska gälla även för "
+        "underleverantörer i obegränsat antal led.",
+    ),
+    (
+        "5.3",
+        "Konkurrensinriktade inköp",
+        9,
+        9,
+        "Sundsvalls kommuns inköp ska tillvarata och vårda konkurrensen på de olika marknaderna.\n\n- Prata "
+        "med marknaden. Dialog ökar förståelsen av såväl behovsbild som lösningar.\n- Tillvarata "
+        "småföretagens konkurrenskraft, t.ex. genom att undanröja hinder såsom oproportionerliga krav.",
+    ),
+)
+
+
+async def seed_policy_sections(db_session: AsyncSession) -> dict[str, PolicySection]:
+    strategy = PolicyDocument(
+        slug="inkopsstrategi",
+        title="Inköpsstrategi för Sundsvalls kommun",
+        short_title="Inköpsstrategin",
+        decided_by="Kommunfullmäktige",
+        decided_on=date(2023, 9, 25),
+        source_url=STRATEGY_URL,
+    )
+    db_session.add(strategy)
+    await db_session.flush()
+    rows = {
+        number: PolicySection(
+            document_id=strategy.id,
+            number=number,
+            heading=heading,
+            text=text,
+            page_start=start,
+            page_end=end,
+            sort_key=index,
+        )
+        for index, (number, heading, start, end, text) in enumerate(POLICY_ROWS, start=1)
     }
     db_session.add_all(rows.values())
     await db_session.flush()

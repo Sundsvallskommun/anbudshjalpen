@@ -173,7 +173,7 @@ När frågan bör ställas formellt visar webbappen:
 
 Svarar underlaget på frågan står bara en kort rad om att fråga i e-Avrop före frågestoppet om något är oklart.
 
-Steg 4 "Lämna in" följer samma regel för var anbudet lämnas: upphandlingen i e-Avrop när annonsen länkar dit,
+Kortet "Lämna anbudet" sist i steg 2 Granska följer samma regel för var anbudet lämnas: upphandlingen i e-Avrop när annonsen länkar dit,
 annonsens egen sida när den inte är TED:s, och annars "Gå till e-Avrop" med adressen från `GET /api/config`
 (`eavrop_url`, samma som `EAVROP_BASE_URL`). En påhittad annons utan egen sida säger även där att den inte finns i
 e-Avrop.
@@ -195,11 +195,14 @@ e-Avrop.
 |---|---|
 | Metod | `answer_rules(question, session_id, context)` |
 | Indata | En allmän fråga om upphandlingsregler, och session för följdfrågor |
-| Svar | `RulesAnswer`: svaret och källor med rubrik, hänvisning (till exempel "LOU 20 kap. 1 §"), länk och, för LOU-paragrafer, början av lagtexten i hela meningar (`excerpt`), som appen hämtar ur sin egen kopia av LOU oavsett motor. Webbappen visar varje källa som ett kort, under rubriken "Svaret bygger på". Med en språkmodell börjar svaret med det korta svaret i en mening, som webbappen visar i fetstil. Med `heuristic` är svaret raden "Paragrafer som kan handla om din fråga:" och utdragen, så webbappen visar bara korten, med raden som rubrik |
-| Med Eneo | Assistenten har vägledningar från Upphandlingsmyndigheten och sundsvall.se som kunskap och hämtar LOU via MCP-verktygen `sok_lou` och `hamta_paragraf`. Följdfrågor går i samma session, men bara från webbläsaren som startade samtalet. Ett `session_id` som inte är ett UUID ger 422, och ett som appen inte gav just den webbläsaren startar ett nytt samtal, se [Eneo-integration](eneo-integration.md#så-anropar-appen-en-assistent) |
-| Med andra motorer | Appen söker själv fram LOU-paragrafer och skickar dem med som sammanhang |
+| Svar | `RulesAnswer`: svaret och källor med rubrik, hänvisning (till exempel "LOU 20 kap. 1 §" eller "Inköpsstrategin 5.2"), länk och början av källans text i hela meningar (`excerpt`), som appen hämtar ur sin egen kopia av LOU eller styrdokumentet oavsett motor. Appen sätter också `kind` (`law` eller `policy`) och, för ett styrdokument, `note` ("Kommunens styrdokument, fastställt av kommunfullmäktige 2023-09-25."), aldrig modellen ([beslut 0022](decisions/0022-kommunens-styrdokument-som-kalla.md)). Webbappen visar varje källa som ett kort, under rubriken "Svaret bygger på", med noten under rubriken och "Läs hela avsnittet" i stället för "Läs hela paragrafen". Med en språkmodell börjar svaret med det korta svaret i en mening, som webbappen visar i fetstil. Med `heuristic` är svaret raden "Paragrafer som kan handla om din fråga:" (eller "Paragrafer och avsnitt som kan handla om din fråga:" när ett styrdokument är med) och utdragen, så webbappen visar bara korten, med raden som rubrik |
+| Med Eneo | Assistenten har vägledningar från Upphandlingsmyndigheten och sundsvall.se som kunskap, och hämtar LOU via MCP-verktygen `sok_lou` och `hamta_paragraf` och kommunens styrdokument via `sok_styrdokument` och `hamta_avsnitt`. Modellen väljer verktyg efter frågan; beskrivningarna säger när vart och ett passar. Följdfrågor går i samma session, men bara från webbläsaren som startade samtalet. Ett `session_id` som inte är ett UUID ger 422, och ett som appen inte gav just den webbläsaren startar ett nytt samtal, se [Eneo-integration](eneo-integration.md#så-anropar-appen-en-assistent) |
+| Med andra motorer | Appen söker själv i LOU och i kommunens styrdokument (`search_rule_texts`) och skickar de fem bästa träffarna som sammanhang. Träffarna rangordnas tillsammans: först det en hänvisning namnger, sedan avsnitt med alla frågans ord, sedan avsnitt med något av dem, sist trigramträffar; lagen går före vid lika. Testet `test_the_question_decides_which_source_answers_first` visar valet för fjorton frågor |
 
-Svaret gäller inte ett visst underlag. Källorna pekar på lagparagrafer och webbsidor, inte på sidor.
+Svaret gäller inte ett visst underlag. Källorna pekar på lagparagrafer, avsnitt i kommunens styrdokument och
+webbsidor, inte på sidor. Lagen och styrdokumenten är två slags källor: lagen binder leverantören, styrdokumenten
+kommunens egna beställare. Prompten säger att svaret ska ange vilket slag källan är, använda båda när frågan gäller ett
+krav, och aldrig dra slutsatser ur styrdokumenten om hur ett visst anbud eller en viss upphandling bedöms.
 
 ## Den heuristiska motorn
 

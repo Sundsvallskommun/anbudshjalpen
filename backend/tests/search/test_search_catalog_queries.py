@@ -7,17 +7,20 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from anbudsklar.models import LouSection, Notice
+from anbudsklar.models import LouSection, Notice, PolicySection
 from anbudsklar.search.queries import (
     count_notices_by_status,
     cpv_labels,
     cpv_prefix,
     cpv_with_ancestors,
     get_lou_section,
+    get_policy_section,
     parse_lou_reference,
     search_cpv,
     search_lou,
     search_notices,
+    search_policy_sections,
+    search_rule_texts,
 )
 
 
@@ -301,3 +304,80 @@ async def test_get_lou_section_normalises_the_section(
     assert await get_lou_section(db_session, 4, "1") == lou_sections["4:1"]
     assert await get_lou_section(db_session, 4, "99") is None
     assert await get_lou_section(db_session, 4, "inte en paragraf") is None
+
+
+# --- The municipality's steering documents (decision 0022) ----------------------------------
+
+
+async def test_policy_reference_returns_that_section(
+    db_session: AsyncSession, policy_sections: dict[str, PolicySection]
+) -> None:
+    assert await search_policy_sections(db_session, "Inköpsstrategin 5.2") == [policy_sections["5.2"]]
+    assert await search_policy_sections(db_session, "avsnitt 5.3") == [policy_sections["5.3"]]
+    assert await search_policy_sections(db_session, "5.2") == [policy_sections["5.2"]]
+    strategy = "inköpsstrategin för Sundsvalls kommun"
+    assert await get_policy_section(db_session, "5.2.", strategy) == policy_sections["5.2"]
+    assert await get_policy_section(db_session, "5.2", "strategin") == policy_sections["5.2"]
+    assert await get_policy_section(db_session, "9.9") is None
+    assert await get_policy_section(db_session, "5.2", "Miljöpolicyn") is None
+
+
+async def test_policy_full_text_search_and_fallbacks(
+    db_session: AsyncSession, policy_sections: dict[str, PolicySection]
+) -> None:
+    assert (await search_policy_sections(db_session, "småföretag"))[0] == policy_sections["5.3"]
+    hits = await search_policy_sections(db_session, "kollektivavtal för underleverantörer")
+    assert hits[0] == policy_sections["5.2"]
+    hits = await search_policy_sections(db_session, "varför vill kommunen prata med marknaden")
+    assert hits[0] == policy_sections["5.3"]
+    assert (await search_policy_sections(db_session, "kolektivavtal"))[0] == policy_sections["5.2"]  # trigram
+    assert await search_policy_sections(db_session, "xylofonstämning") == []
+    assert await search_policy_sections(db_session, "   ") == []
+
+
+async def test_rule_texts_are_ranked_together(
+    db_session: AsyncSession,
+    lou_sections: dict[str, LouSection],
+    policy_sections: dict[str, PolicySection],
+) -> None:
+    assert await search_rule_texts(db_session, "20 kap. 1 §") == [lou_sections["20:1"]]
+    assert await search_rule_texts(db_session, "Inköpsstrategin 5.3") == [policy_sections["5.3"]]
+    both = await search_rule_texts(db_session, "kollektivavtal lön semester arbetstid underleverantörer")
+    assert {type(row) for row in both} == {LouSection, PolicySection}
+    assert await search_rule_texts(db_session, "xylofonstämning") == []
+
+
+def _label(row: LouSection | PolicySection) -> str:
+    return row.number if isinstance(row, PolicySection) else f"{row.chapter}:{row.section}"
+
+
+# Questions a company asks, and whether the law or the strategy should answer first. The whole
+# committed strategy is loaded, against a few sections of the law.
+ROUTING: tuple[tuple[str, type[LouSection] | type[PolicySection]], ...] = (
+    ("Hur lång är avtalsspärren?", LouSection),
+    ("Får förvaltningslagen tillämpas i ett ärende om upphandling?", LouSection),
+    ("Måste myndigheten skicka en underrättelse om tilldelningsbeslut?", LouSection),
+    ("Ska leverantörer behandlas likvärdigt och icke-diskriminerande?", LouSection),
+    ("Vilka villkor om lön, semester och arbetstid kan krävas i kontraktet?", LouSection),
+    ("Vilka hållbarhetskrav ställer kommunen?", PolicySection),
+    ("Ställer kommunen krav på sommarjobb och praktikplatser?", PolicySection),
+    ("Hur ser kommunen på småföretag och nystartade företag?", PolicySection),
+    ("Varför vill kommunen prata med marknaden före en upphandling?", PolicySection),
+    ("Upphandlar Sundsvall åt Timrå kommun?", PolicySection),
+    ("Vad är målet med kommunens inköp?", PolicySection),
+    ("Vilka kemikalier vill kommunen fasa ut?", PolicySection),
+    ("Hur motverkar kommunen jäv och korruption vid inköp?", PolicySection),
+    ("Ska behov mötas genom återbruk innan kommunen köper på avtal?", PolicySection),
+)
+
+
+@pytest.mark.parametrize(("question", "expected"), ROUTING, ids=[question for question, _ in ROUTING])
+async def test_the_question_decides_which_source_answers_first(
+    db_session: AsyncSession,
+    lou_sections: dict[str, LouSection],
+    whole_strategy: None,
+    question: str,
+    expected: type[LouSection] | type[PolicySection],
+) -> None:
+    rows = await search_rule_texts(db_session, question, limit=3)
+    assert rows and isinstance(rows[0], expected), [_label(row) for row in rows]

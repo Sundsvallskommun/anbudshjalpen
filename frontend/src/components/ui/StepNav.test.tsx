@@ -25,11 +25,10 @@ const panels = {
     </>
   ),
   granska: () => <p>Granskningen</p>,
-  inlamning: () => <p>Inlämningen</p>,
 };
 
 describe("StepNav", () => {
-  it("shows the three steps and the one the address asks for", () => {
+  it("shows the two steps and the one the address asks for", () => {
     mockApi([]);
     renderWithProviders(<StepNav panels={panels} />, { path: "/upphandlingar/1?flik=granska" });
     const tabs = screen.getAllByRole("tab");
@@ -39,6 +38,8 @@ describe("StepNav", () => {
     expect(screen.getByRole("tab", { name: "Granska" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tabpanel", { name: "Granska" })).toBeVisible();
     expect(parseStep("okänd")).toBe("checklista");
+    // The address of the step "Lämna in" from before decision 0024 opens the last step.
+    expect(parseStep("inlamning")).toBe("granska");
   });
 
   it("puts the step in the address and keeps a visited step's state", async () => {
@@ -46,9 +47,9 @@ describe("StepNav", () => {
     renderWithProviders(<StepNav panels={panels} marks={{ granska: "warning" }} />, { path: "/upphandlingar/1" });
 
     await userEvent.click(screen.getByRole("button", { name: "Räknat 0" }));
-    await userEvent.click(screen.getByRole("tab", { name: "Lämna in" }));
-    expect(screen.getByTestId("location")).toHaveTextContent("/upphandlingar/1?flik=inlamning");
-    expect(screen.getByText("Inlämningen")).toBeVisible();
+    await userEvent.click(screen.getByRole("tab", { name: "Granska, bör åtgärdas" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("/upphandlingar/1?flik=granska");
+    expect(screen.getByText("Granskningen")).toBeVisible();
 
     await userEvent.click(screen.getByRole("tab", { name: "Krav" }));
     expect(screen.getByRole("button", { name: "Räknat 1" })).toBeInTheDocument();

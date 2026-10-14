@@ -1,4 +1,4 @@
-"""The buyer's (inköpare) tools: checklist review, notices, documents, insights and jobs.
+"""The buyer's (inköpare) tools: checklist review, notices, documents, insights, possible bidders and jobs.
 
 Every route needs the buyer persona, which a deployment can turn off (DEMO_BUYER_ENABLED).
 """
@@ -37,9 +37,11 @@ from anbudsklar.api.schemas import (
     NoticeCreate,
     NoticeDetail,
     RejectRequest,
+    SupplierMatch,
+    SupplierSearch,
 )
 from anbudsklar.api.uploads import UPLOAD_OPENAPI, read_upload
-from anbudsklar.services import checklists, insights, jobs, notices, reminders
+from anbudsklar.services import checklists, insights, jobs, notices, reminders, suppliers
 from anbudsklar.services.access import Viewer
 from anbudsklar.services.ai_usage import DEFAULT_DAYS, MAX_DAYS, token_prices, usage_summary
 from anbudsklar.services.app_settings import get_app_settings, save_app_settings
@@ -200,6 +202,13 @@ async def interpret_document(
 @router.get("/insights")
 async def list_insights(session: SessionDep) -> list[InsightItem]:
     return await insights.list_insights(session, utcnow())
+
+
+@router.post("/suppliers/search")
+async def search_suppliers(body: SupplierSearch, session: SessionDep) -> list[SupplierMatch]:
+    """The companies that could answer a job inköp is considering (decision 0023). Nothing is stored."""
+
+    return await suppliers.find_suppliers(session, body, utcnow())
 
 
 @router.get("/settings")

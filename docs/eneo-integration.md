@@ -238,6 +238,9 @@ Tänk på:
 - **Godkänn ändringar.** Eneo sparar verktygens beskrivningar när servern registreras. Ändras en beskrivning eller
   parameter läggs ändringen som väntande, och den gamla versionen gäller tills verktygen synkas och godkänns, med
   `anbudsklar eneo provision --mcp-url …` eller av en admin i Eneo. Lägg därför bara till nya, valfria parametrar.
+- **Nya verktyg kräver omsynk.** `hamta_avsnitt` och `sok_styrdokument` kom till 2026-10-14 (beslut 0022). Kör
+  `anbudsklar eneo provision --mcp-url …` igen, som synkar och godkänner verktygen, eller godkänn dem i Eneo. Stäng
+  sedan av dem för assistenten för frågor om underlag om den inte ska ha dem.
 - **Storlek och tid.** Ett verktygssvar hålls under `MCP_MAX_OUTPUT_CHARS` (16 000 tecken). Eneo kortar själv av vid
   32 768. En fråga får högst tio verktygsrundor, och ett anrop får ta högst 60 sekunder.
 - **Fel räknas.** Efter fem fel stänger Eneo av servern i 60 sekunder, för alla användare. I 2.2 räknas även
@@ -264,6 +267,8 @@ Tänk på:
 | `hamta_checklista` | Visar den publicerade checklistan för en annons |
 | `hamta_paragraf` | Visar en paragraf i LOU, till exempel "20 kap. 1 §" |
 | `sok_lou` | Söker i LOU |
+| `hamta_avsnitt` | Visar ett avsnitt i kommunens styrdokument för inköp, till exempel "Inköpsstrategin 5.2" ([beslut 0022](decisions/0022-kommunens-styrdokument-som-kalla.md)) |
+| `sok_styrdokument` | Söker i kommunens styrdokument för inköp. Svaret säger att ett styrdokument binder kommunens beställare, inte leverantören |
 | `sla_upp_cpv` | Slår upp CPV-koder från en beskrivning |
 | `kommande_upphandlingar` | Visar avtal som löper ut och när en ny upphandling kan väntas |
 
@@ -275,7 +280,8 @@ Prova gärna en ändring i Eneo, men för in den i repot och kör kommandot igen
 | Vad | Var | Att tänka på |
 |---|---|---|
 | Instruktionen för en uppgift | `backend/src/anbudsklar/ai/prompts/` | Kör [kvalitetstestet](quality-test.md) efter en ändring av `tolka_underlag` |
-| Kunskap för Regelhjälpen | `KNOWLEDGE_WEBSITES` i `backend/src/anbudsklar/ai/eneo_provision.py` | Kommandot kopplar exakt de webbplatserna till assistenten och låter Eneo hämta om dem varje vecka. Lägg inte in LOU som kunskap: den nås redan via MCP, och då skulle hänvisningarna konkurrera |
+| Kunskap för Regelhjälpen | `KNOWLEDGE_WEBSITES` i `backend/src/anbudsklar/ai/eneo_provision.py` | Kommandot kopplar exakt de webbplatserna till assistenten och låter Eneo hämta om dem varje vecka. Lägg inte in LOU eller kommunens styrdokument som kunskap: de nås redan via MCP, och då skulle hänvisningarna konkurrera |
+| Kommunens styrdokument | `data/styrdokument/` | Filerna läses in av worker vid varje start, så en ny version är en pull request, inte en ändring i Eneo. Hur står i [data/styrdokument/README.md](../data/styrdokument/README.md) |
 | Modell | Flaggan `--model` | Kommandot sätter modellen på spacet och alla assistenter. Modellen måste ha verktygsanrop påslaget |
 | Enskilda MCP-verktyg | Assistenten i Eneo | Kommandot bestämmer vilka assistenter som har MCP-servern, men inte vilka verktyg som är på. Stäng av verktyg som inte behövs |
 

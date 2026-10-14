@@ -37,6 +37,8 @@ const rulesView: RulesView = {
         reference: "LOU 20 kap. 1 §",
         url: "https://data.riksdagen.se/dokument/sfs-2016-1145.html#K20P1",
         excerpt: "Om en upphandlande myndighet är skyldig att skicka en underrättelse om beslutet …",
+        kind: "law",
+        note: null,
       },
     ],
     session_id: null,

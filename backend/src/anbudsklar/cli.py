@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.config import get_settings
 from anbudsklar.db import get_engine, session_scope
-from anbudsklar.ingest import load_agreements, load_cpv
+from anbudsklar.ingest import load_agreements, load_cpv, load_policies
 from anbudsklar.models import JobRun
 from anbudsklar.services.checklists import interpret_notice
 from anbudsklar.services.jobs import (
@@ -26,6 +26,7 @@ from anbudsklar.services.jobs import (
     cpv_csv_path,
     ingest_eavrop_full,
     open_job_context,
+    policies_dir,
     run_job,
 )
 
@@ -137,6 +138,20 @@ def ingest_cpv(
         return {"loaded": await load_cpv(session, path or cpv_csv_path(context.settings))}
 
     _run_job("load_cpv", load)
+
+
+@ingest_app.command("styrdokument")
+def ingest_policies(
+    path: Annotated[
+        Path | None, typer.Option(help="Mapp med styrdokument; standard är data/styrdokument")
+    ] = None,
+) -> None:
+    """Läs in kommunens styrdokument för inköp (inköpsstrategin) från repots filer."""
+
+    async def load(session: AsyncSession, context: JobContext) -> Mapping[str, int]:
+        return await load_policies(session, path or policies_dir(context.settings))
+
+    _run_job("load_policies", load)
 
 
 @ingest_app.command("agreements")

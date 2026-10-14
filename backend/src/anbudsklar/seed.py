@@ -40,6 +40,7 @@ from anbudsklar.config import get_settings
 from anbudsklar.documents.store import store_document
 from anbudsklar.ingest.agreements import load_agreements
 from anbudsklar.ingest.cpv import load_cpv
+from anbudsklar.ingest.policies import POLICY_DIR, load_policies
 from anbudsklar.models import ChecklistRecord, Company, CpvCode, Document, Notice, User
 
 log = logging.getLogger(__name__)
@@ -186,6 +187,9 @@ async def load_demo_data(
         session, fixtures.directory / manifest.agreements.path, anchor - manifest.reference_date
     )
     cpv_codes = await _load_cpv_if_empty(session, settings.data_dir / CPV_FILE)
+    # The steering documents are few and the repo file is their source of truth, so they
+    # are refreshed on every seed (decision 0022).
+    policies = await load_policies(session, settings.data_dir / POLICY_DIR)
     await session.flush()
 
     counts = {
@@ -195,6 +199,7 @@ async def load_demo_data(
         "users": users,
         "agreements": agreements,
         "cpv_codes": cpv_codes,
+        "policy_sections": policies["fetched"],
         "replaced_documents": replaced,
     }
     log.info("Loaded demo data anchored at %s: %s", anchor.isoformat(), counts)

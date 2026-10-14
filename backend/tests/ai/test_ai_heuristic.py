@@ -277,6 +277,25 @@ async def test_answer_rules_summarises_context() -> None:
     assert_plain_text(empty.answer)
 
 
+async def test_answer_rules_says_sections_when_a_steering_document_is_among_the_hits() -> None:
+    """The lead says "paragrafer" only while every source is a section of the law (decision 0022)."""
+
+    context = [
+        RuleContext(
+            reference="Inköpsstrategin 5.3",
+            title="Konkurrensinriktade inköp",
+            text="Sundsvalls kommuns inköp ska tillvarata och vårda konkurrensen på de olika marknaderna.",
+            url="https://sundsvall.se/download/strategi.pdf#page=9",
+        ),
+        RuleContext(reference="LOU 4 kap. 1 §", title="Principer", text="Upphandlande myndigheter ska …"),
+    ]
+    answer, _ = await HeuristicEngine().answer_rules("Hur ser kommunen på småföretag?", None, context)
+    assert answer.answer.startswith("Paragrafer och avsnitt som kan handla om din fråga:")
+    assert [source.reference for source in answer.sources] == ["Inköpsstrategin 5.3", "LOU 4 kap. 1 §"]
+    assert answer.sources[0].excerpt == context[0].text
+    assert_plain_text(answer.answer)
+
+
 # --- Precision of tolka_underlag (sentences adapted from the fictitious fixtures) ---------
 
 HEADER = "Sundsvalls kommun – Ommålning av förskola (fiktiv) DEMO-0001"

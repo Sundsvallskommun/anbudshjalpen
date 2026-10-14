@@ -312,6 +312,58 @@ class LouSection(Base):
     )
 
 
+class PolicyDocument(Base):
+    """One of the municipality's steering documents for purchasing (styrdokument), from data/styrdokument/.
+
+    Decision 0022: a source class of its own next to LOU. A steering document binds the
+    municipality's own purchasers, not the supplier, so everything that shows one labels
+    it "Kommunens styrdokument", never as law.
+    """
+
+    __tablename__ = "policy_documents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    slug: Mapped[str] = mapped_column(String(64), unique=True)  # the file name without .md
+    title: Mapped[str] = mapped_column(Text)
+    short_title: Mapped[str] = mapped_column(String(64))  # "Inköpsstrategin": the reference prefix
+    decided_by: Mapped[str | None] = mapped_column(Text)
+    decided_on: Mapped[date | None] = mapped_column(Date)
+    diarienummer: Mapped[str | None] = mapped_column(String(64))
+    validity: Mapped[str | None] = mapped_column(Text)
+    source_url: Mapped[str] = mapped_column(Text)  # the public PDF; sections link to it with #page=N
+    retrieved_on: Mapped[date | None] = mapped_column(Date)
+
+
+class PolicySection(Base):
+    """One numbered section ("5.2 Hållbara inköp") of a steering document, with its PDF pages."""
+
+    __tablename__ = "policy_sections"
+    __table_args__ = (
+        UniqueConstraint("document_id", "number", name="uq_policy_sections_document_number"),
+        Index("ix_policy_sections_search", "search", postgresql_using="gin"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("policy_documents.id", ondelete="CASCADE"))
+    number: Mapped[str] = mapped_column(String(16))  # "5.2"
+    heading: Mapped[str] = mapped_column(Text)
+    text: Mapped[str] = mapped_column(Text)
+    page_start: Mapped[int] = mapped_column(Integer)
+    page_end: Mapped[int] = mapped_column(Integer)
+    sort_key: Mapped[int] = mapped_column(Integer, default=0)
+    search: Mapped[Any] = mapped_column(
+        TSVECTOR,
+        Computed(
+            "setweight(to_tsvector('swedish', coalesce(heading, '')), 'A') || "
+            "setweight(to_tsvector('swedish', coalesce(text, '')), 'B')",
+            persisted=True,
+        ),
+    )
+    # Loaded with the section: references and links need the document, and the async
+    # session cannot load it lazily.
+    document: Mapped[PolicyDocument] = relationship(lazy="joined")
+
+
 class CpvCode(Base):
     """The EU Common Procurement Vocabulary (CPV 2008) with Swedish labels."""
 
