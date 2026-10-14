@@ -41,10 +41,13 @@ from anbudsklar.contracts import (
     MatchAssessment,
     NoticeContext,
     PagedDocument,
+    ProfileChange,
     PublishedAnswerInput,
     ReviewResult,
     RulesAnswer,
     RuleSource,
+    SubjectChoice,
+    SubjectOption,
     Task,
 )
 
@@ -188,6 +191,24 @@ def rule_sources(references: list[dict[str, Any]], tool_references: list[dict[st
         title, reference = _tool_source(item)
         add(title, reference, url)
     return sources
+
+
+def tool_names(tool_references: list[dict[str, Any]]) -> list[str]:
+    """The MCP tools behind a set of references, by our server's names, first use first.
+
+    Eneo prefixes a tool with its server name ("anbudsklar_poc__sok_lou"); the part after
+    the last "__" is the name our server registered. Only tools whose result Eneo kept as a
+    reference are seen: that is every tool of ours that answers with sources, which is
+    what the reader wants to know was looked up.
+    """
+
+    names: list[str] = []
+    for item in tool_references:
+        raw = str(item.get("mcp_tool_name") or "").strip()
+        name = raw.rsplit("__", 1)[-1]
+        if name and name not in names:
+            names.append(name)
+    return names
 
 
 def _error_body(response: httpx.Response) -> dict[str, Any]:
@@ -372,12 +393,14 @@ class EneoEngine:
         assistant_id = self._assistant(task)
         session_id: str | None = None
         model_name: str | None = None
+        references: list[dict[str, Any]] = []
 
         async def send(message: str) -> str:
             nonlocal session_id, model_name
             result = await self._ask(assistant_id, message, session_id)
             session_id = result.session_id or session_id
             model_name = result.model or model_name
+            references.extend(result.tool_references)
             return clean_answer(result.answer)
 
         try:
@@ -388,7 +411,9 @@ class EneoEngine:
             if session_id:
                 await self._delete_session(assistant_id, session_id)
         # usage stays None: see the note above AskResult on how to read Eneo's token counts.
-        return value, EngineRun(engine=self.name, model=model_name, attempts=attempts)
+        return value, EngineRun(
+            engine=self.name, model=model_name, attempts=attempts, tools=tool_names(references)
+        )
 
     async def interpret_document(
         self,
@@ -461,7 +486,31 @@ class EneoEngine:
             sources=rule_sources(result.references, result.tool_references),
             session_id=result.session_id or None,
         )
-        return answer, EngineRun(engine=self.name, model=result.model)
+        run = EngineRun(engine=self.name, model=result.model, tools=tool_names(result.tool_references))
+        return answer, run
+
+    async def update_profile(
+        self,
+        profile: CompanyProfile,
+        candidates: list[CpvCandidate],
+        history: list[QuestionTurn],
+        message: str,
+    ) -> tuple[ProfileChange, EngineRun]:
+        return await self._run_task(
+            Task.UPDATE_PROFILE,
+            ProfileChange,
+            profile=profile,
+            candidates=candidates,
+            history=history,
+            message=message,
+        )
+
+    async def choose_subject(
+        self, question: str, subjects: list[SubjectOption], history: list[QuestionTurn]
+    ) -> tuple[SubjectChoice, EngineRun]:
+        return await self._run_task(
+            Task.CHOOSE_SUBJECT, SubjectChoice, subjects=subjects, history=history, question=question
+        )
 
     async def aclose(self) -> None:
         await self._client.aclose()

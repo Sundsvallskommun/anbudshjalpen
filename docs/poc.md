@@ -36,9 +36,12 @@ loggar man in som Anna Berg på firman ([beslut 0007](decisions/0007-poc-login-p
    Knappen visas bara för en öppen upphandling och aldrig för ett datum som har passerat, och för frågestoppet bara när
    checklistan är publicerad.
 5. **Fråga AI:** en panel som öppnas på varje sida ([beslut 0014](decisions/0014-fraga-ai-panel.md)), med svar med
-   citat och slutsatsen först. Om underlaget inte ger svar föreslår Anbudshjälpen att firman ställer frågan formellt i
+   citat och slutsatsen först. Läsaren väljer inget ämne: appen avgör om frågan gäller underlaget, reglerna eller
+   profilen ([beslut 0026](decisions/0026-fraga-ai-valjer-amne-sjalv.md)). Om underlaget inte ger svar föreslår Anbudshjälpen att firman ställer frågan formellt i
    e-Avrop före frågestoppet och skapar en påminnelse, när den publicerade checklistan anger ett frågestopp som inte
-   har passerat. Samtalet följer med mellan sidorna och går att spara som PDF. I steg 1 står de svar inköp redan har
+   har passerat. Samtalet följer med mellan sidorna och går att spara som PDF. Varje svar visar vilka verktyg som
+   kördes bakom det, och en inloggad företagare kan ändra sin profil genom att skriva i panelen, till exempel "Vi har
+   numera tolv anställda" ([beslut 0025](decisions/0025-profilen-uppdateras-via-fraga-ai.md)). I steg 1 står de svar inköp redan har
    publicerat i e-Avrop på andra leverantörers frågor, samma för alla ([beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md)).
 6. **Granska:** firman laddar upp ett utkast och får först ett besked, till exempel hur många saker som bör
    åtgärdas, och sedan kraven grupperade som Bör åtgärdas, Kontrollera själv och Ser bra ut. Inget sparas.

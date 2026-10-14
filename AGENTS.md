@@ -91,6 +91,9 @@ Each test session creates its own database (`backend/tests/conftest.py`); use th
   checklists only once published. Serve `/mcp` and `/mcp/` without redirects. Change tool schemas additively, because
   Eneo needs a re-sync and approval for every change.
 - Tender drafts are processed in memory and never stored.
+- A profile change written in Fråga AI goes through the app's own API with the browser session (decision 0025): the
+  engine only reads the wish (`ProfileChange`), `services.profiles` applies it with the form's validation, and the MCP
+  server never gets a write tool. Every answer lists the tools behind it (`tools`, `services/tools.py`).
 - PoC login is a persona picker (decision 0007). Never build real authentication into the PoC or let it hold real
   company data. The one exception is lab mode (decision 0010): behind `ACCESS_CODE`, which gates the whole service,
   a workshop participant creates a company with only a name and their own description, no personal data, purged

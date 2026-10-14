@@ -265,7 +265,7 @@ async def add_agreement(
 
 
 async def add_lou_section(
-    session: AsyncSession, *, chapter: int, section: str, heading: str, text: str
+    session: AsyncSession, *, chapter: str, section: str, heading: str, text: str
 ) -> None:
     session.add(
         LouSection(

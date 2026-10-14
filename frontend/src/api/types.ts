@@ -533,11 +533,24 @@ export interface TokenUsageView {
   cost_sek: number | null;
 }
 
+/**
+ * One tool an answer rested on, as the panel lists them under the answer: our MCP tools that Eneo's assistant called,
+ * by their titles ("Sök i LOU"), and the app's own steps around the call ("Sök i underlaget", "Spara profilen"), in
+ * the order they ran. `detail` is a short note such as "12 kandidater".
+ */
+export interface ToolUse {
+  name: string;
+  label: string;
+  detail: string | null;
+}
+
 export interface AnswerView {
   answer: Answer;
   engine: string;
   /** Always sent by the backend; an answer kept in the browser from before the field existed has none. */
   usage?: TokenUsageView | null;
+  /** Always sent by the backend; an answer kept in the browser from before the tools were listed has none. */
+  tools?: ToolUse[];
   /** The main document; a citation's own document_id says where its quote is. */
   document_id: Uuid;
   read: ReadSummary;
@@ -639,6 +652,36 @@ export interface CpvSuggestionRequest {
   description: string;
 }
 
+/** POST /api/profile/chat: a message to the profile in Fråga AI, what to change in the company's own words. */
+export interface ProfileChatRequest {
+  message: string;
+  history: QuestionTurnIn[];
+}
+
+/** One part of the profile the message changed, with its words before and after. */
+export interface ProfileChangeItem {
+  field: string;
+  label: string;
+  before: string | null;
+  after: string | null;
+}
+
+/**
+ * What came of a message to the profile: the assistant's reply, the changes and the saved profile. `applied` is false
+ * when the engine asked a question back or found nothing to change; `profile` is the saved profile when it is true.
+ * `fitting_notices` is as ProfileSaved: null when the matches are re-assessed after the answer.
+ */
+export interface ProfileChatView {
+  reply: string;
+  applied: boolean;
+  changes: ProfileChangeItem[];
+  profile: CompanyView | null;
+  fitting_notices: number | null;
+  engine: string;
+  usage: TokenUsageView | null;
+  tools: ToolUse[];
+}
+
 export interface CpvSuggestionView {
   suggestions: CpvSuggestions;
   engine: string;
@@ -679,8 +722,46 @@ export interface RulesRequest {
 export interface RulesView {
   answer: RulesAnswer;
   engine: string;
+  /** Always sent by the backend; an answer kept in the browser from before the tools were listed has none. */
+  tools?: ToolUse[];
   /** Always sent by the backend; a conversation kept in the browser from before the field existed has none. */
   usage?: TokenUsageView | null;
+}
+
+// --- api/schemas.py: Fråga AI, one question whichever subject answers it (decision 0026) --------
+
+/** What a message in Fråga AI can be about: a notice's documents, the rules of procurement, or the company's profile. */
+export type Subject = "underlag" | "regler" | "profil";
+
+/** An earlier turn in the panel's conversation, with the subject that answered it. */
+export interface AskTurnIn {
+  question: string;
+  answer: string;
+  subject: Subject;
+}
+
+/**
+ * POST /api/ask: a message to Fråga AI. The app picks the subject. `notice_id` is the notice of the page the reader
+ * is on, which makes its documents a subject; the profile is one when signed in as a company. `rules_session_id`
+ * continues the engine's conversation in Regelhjälpen, as RulesRequest.session_id.
+ */
+export interface AskRequest {
+  question: string;
+  notice_id: Uuid | null;
+  history: AskTurnIn[];
+  rules_session_id: Uuid | null;
+}
+
+/** What picked the subject: our own rules on the words, the model (task valj_amne), or the page's own subject. */
+export type DecidedBy = "rule" | "model" | "default";
+
+/** The answer under the subject that gave it: exactly one of the three views is set. */
+export interface AskView {
+  subject: Subject;
+  decided_by: DecidedBy;
+  answer: AnswerView | null;
+  rules: RulesView | null;
+  profile: ProfileChatView | null;
 }
 
 // --- api/schemas.py: buyer (inköpare) views ----------------------------------------------------

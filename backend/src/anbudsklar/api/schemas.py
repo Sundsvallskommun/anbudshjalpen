@@ -22,6 +22,7 @@ from anbudsklar.contracts import (
     MatchAssessment,
     ReviewResult,
     RulesAnswer,
+    Subject,
 )
 from anbudsklar.search.types import NoticeOrder
 
@@ -376,10 +377,24 @@ class TokenUsageView(ApiModel):
     cost_sek: float | None  # None until AI_PRICE_INPUT_SEK_PER_MILLION and the output price are set
 
 
+class ToolUse(ApiModel):
+    """One tool an answer rested on, as the panel lists them under the answer.
+
+    Our MCP tools that Eneo's assistant called, by their titles ("Sök i LOU"), and the
+    app's own steps around the call ("Sök i underlaget", "Spara profilen"), in the order
+    they ran. `detail` is a short note such as "12 kandidater" (`services.tools`).
+    """
+
+    name: str
+    label: str
+    detail: str | None = None
+
+
 class AnswerView(ApiModel):
     answer: Answer
     engine: str
     usage: TokenUsageView | None = None
+    tools: list[ToolUse] = Field(default_factory=list)
     document_id: uuid.UUID  # the main document; a citation's own document_id says where its quote is
     read: ReadSummary
     # Frågestopp as the end of that day in Stockholm: the source's date, else the published
@@ -491,6 +506,40 @@ class CpvHit(ApiModel):
     parent_code: str | None
 
 
+class ProfileChatRequest(ApiModel):
+    """A message to the profile in Fråga AI: what to change, in the company's own words."""
+
+    message: str = Field(min_length=3, max_length=2000)
+    history: list[QuestionTurnIn] = Field(default_factory=list, max_length=10)
+
+
+class ProfileChangeItem(ApiModel):
+    """One part of the profile the message changed, with its words before and after."""
+
+    field: str  # e.g. "employees"
+    label: str  # e.g. "Antal anställda"
+    before: str | None
+    after: str | None
+
+
+class ProfileChatView(ApiModel):
+    """What came of a message to the profile: the assistant's reply, the changes and the saved profile.
+
+    `applied` is False when the engine asked a question back or found nothing to change;
+    `profile` is the saved profile when it is True. `fitting_notices` is as `ProfileSaved`:
+    None when the matches are re-assessed after the answer.
+    """
+
+    reply: str
+    applied: bool
+    changes: list[ProfileChangeItem] = Field(default_factory=list)
+    profile: CompanyView | None = None
+    fitting_notices: int | None = None
+    engine: str
+    usage: TokenUsageView | None = None
+    tools: list[ToolUse] = Field(default_factory=list)
+
+
 class UpcomingProcurement(ApiModel):
     agreement_id: uuid.UUID
     title: str
@@ -521,6 +570,49 @@ class RulesView(ApiModel):
     answer: RulesAnswer
     engine: str
     usage: TokenUsageView | None = None
+    tools: list[ToolUse] = Field(default_factory=list)
+
+
+# --- Fråga AI: one question, whichever subject answers it (decision 0026) ----------------
+
+
+class AskTurnIn(ApiModel):
+    """An earlier turn in the panel's conversation, with the subject that answered it."""
+
+    question: str = Field(max_length=2000)
+    answer: str = Field(max_length=8000)
+    subject: Subject
+
+
+class AskRequest(ApiModel):
+    """A message to Fråga AI. The app picks the subject: the words first, a model when unsure.
+
+    `notice_id` is the notice of the page the reader is on, which makes the documents a
+    subject; the profile is one when the caller is signed in as a company. `rules_session_id`
+    continues the engine's conversation in Regelhjälpen, as `RulesRequest.session_id`.
+    """
+
+    question: str = Field(min_length=3, max_length=2000)
+    notice_id: uuid.UUID | None = None
+    history: list[AskTurnIn] = Field(default_factory=list, max_length=10)
+    rules_session_id: uuid.UUID | None = None
+
+
+DecidedBy = Literal["rule", "model", "default"]
+
+
+class AskView(ApiModel):
+    """The answer, under the subject that gave it: exactly one of the three views is set.
+
+    `decided_by` says what picked the subject: our own rules on the words, the model
+    (task valj_amne), or the page's own subject when neither could tell.
+    """
+
+    subject: Subject
+    decided_by: DecidedBy
+    answer: AnswerView | None = None
+    rules: RulesView | None = None
+    profile: ProfileChatView | None = None
 
 
 # --- Buyer (inköpare) views ---------------------------------------------------------

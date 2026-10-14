@@ -8,6 +8,7 @@ import { VStack } from "@astryxdesign/core/VStack";
 import { lazy, Suspense, useId } from "react";
 import type { RulesView, TokenUsageView } from "../../api/types";
 import { AiProvenance } from "../../components/ui/AiProvenance";
+import { ToolsUsed } from "../../components/ui/ToolsUsed";
 import { RuleSourceCard } from "./RuleSourceCard";
 import { needsSourceWarning, parseRulesAnswer, sourcesHeading, type RulesAnswerParts } from "./rulesAnswer";
 
@@ -104,6 +105,7 @@ function AnswerContent({ view }: { view: RulesView }) {
       )}
       {view.answer.sources.length > 0 && <SourceList parts={parts} view={view} />}
       {needsSourceWarning(view) && <UnsourcedNote />}
+      <ToolsUsed tools={view.tools ?? []} />
     </>
   );
 }

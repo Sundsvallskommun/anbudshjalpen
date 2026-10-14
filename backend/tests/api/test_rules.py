@@ -167,11 +167,11 @@ async def test_a_conversation_continues_only_in_the_browser_that_started_it(
     assert engine.continued[-1] is None
 
 
-async def test_the_conversation_cookie_is_scoped_to_regelhjalpen(client: httpx.AsyncClient) -> None:
+async def test_the_conversation_cookie_is_scoped_to_the_api(client: httpx.AsyncClient) -> None:
     response = await client.post("/api/rules/ask", json={"question": "Vad är avtalsspärr?"})
     header = response.headers["set-cookie"]
     assert header.startswith(f"{RULES_COOKIE}=")
-    assert "Path=/api/rules" in header
+    assert "Path=/api;" in header or header.endswith("Path=/api")  # Regelhjälpen and /api/ask (decision 0026)
     assert "HttpOnly" in header
     assert "SameSite=lax" in header
 

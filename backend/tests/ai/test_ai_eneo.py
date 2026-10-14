@@ -10,7 +10,7 @@ import httpx
 import pytest
 import respx
 
-from anbudsklar.ai.eneo import EneoEngine, clean_answer, load_assistant_ids, rule_sources
+from anbudsklar.ai.eneo import EneoEngine, clean_answer, load_assistant_ids, rule_sources, tool_names
 from anbudsklar.ai.engine import EngineConfigError, EngineError, EngineOutputError
 from anbudsklar.config import Settings
 from anbudsklar.contracts import DocumentSet, NoticeContext, PagedDocument, Task
@@ -309,3 +309,30 @@ def test_assistant_file_ignores_unknown_keys(tmp_path: Path) -> None:
     path = tmp_path / "eneo-assistants.json"
     path.write_text(json.dumps({"tolka_underlag": "a1", "okand": "x", "regelhjalpen": ""}), encoding="utf-8")
     assert load_assistant_ids(path) == {Task.INTERPRET_DOCUMENT: "a1"}
+
+
+def test_tool_names_strip_the_server_prefix_and_keep_first_use_order() -> None:
+    references = [
+        {"uri": "https://lou/20-1", "mcp_tool_name": "anbudsklar_poc__sok_lou"},
+        {"uri": "https://lou/20-2", "mcp_tool_name": "anbudsklar_poc__sok_lou"},
+        {"uri": "https://lou/4-1", "mcp_tool_name": "hamta_paragraf"},
+        {"uri": "https://x", "mcp_tool_name": None},
+    ]
+    assert tool_names(references) == ["sok_lou", "hamta_paragraf"]
+
+
+async def test_rules_answer_lists_the_tools_eneo_called(engine: EneoEngine) -> None:
+    references = [
+        {
+            "uri": "https://data.riksdagen.se/dokument/sfs-2016-1145.html#K20P1",
+            "mcp_tool_name": "anbudsklar_poc__sok_lou",
+            "meta": {"title": "LOU 20 kap. 1 §", "section": "Avtalsspärr"},
+        }
+    ]
+    with respx.mock(base_url=BASE_URL, assert_all_called=False) as router:
+        router.post(f"/api/v1/assistants/{RULES}/sessions/").mock(
+            return_value=_ask("Avtalsspärren är tio dagar.", R1, mcp_tool_references=references)
+        )
+        answer, run = await engine.answer_rules("Hur lång är avtalsspärren?", None, [])
+    assert run.tools == ["sok_lou"]
+    assert answer.sources[0].reference == "LOU 20 kap. 1 §"

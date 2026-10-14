@@ -4,6 +4,7 @@
  */
 import type {
   AnswerView,
+  ProfileChatView,
   AppConfig,
   ChecklistAdminItem,
   ChecklistView,
@@ -360,4 +361,36 @@ export const checklistAdminItem: ChecklistAdminItem = {
   created_at: "2026-09-22T09:00:00+02:00",
   verification: checklistView.verification,
   requirement_count: checklistView.checklist.requirements.length,
+};
+
+/** What a message to the profile came to (decision 0025): one change saved, and the steps the app ran. */
+export const profileChatView: ProfileChatView = {
+  reply: "Jag uppdaterar antal anställda i er profil.",
+  applied: true,
+  changes: [{ field: "employees", label: "Antal anställda", before: "5", after: "12" }],
+  profile: {
+    id: companyUser.company?.id ?? "1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+    org_number: "559900-0013",
+    name: "Målerifirman i Matfors AB",
+    description: "Vi är en målerifirma i Matfors.",
+    cpv_codes: ["45442100"],
+    cpv_labels: { "45442100": "Målning" },
+    cpv_divisions: { "45000000": "Anläggningsarbete" },
+    municipalities: ["Sundsvall", "Timrå"],
+    employees: 12,
+    annual_turnover_sek: 4_800_000,
+    certifications: [],
+    insurance: null,
+    public_references: null,
+    is_fictitious: true,
+  },
+  fitting_notices: 1,
+  engine: "heuristic",
+  usage: null,
+  tools: [
+    { name: "hamta_profil", label: "Hämta profilen", detail: null },
+    { name: "sok_cpv", label: "Sök CPV-koder", detail: "0 kandidater" },
+    { name: "tolka_meddelande", label: "Tolka meddelandet", detail: null },
+    { name: "spara_profil", label: "Spara profilen", detail: null },
+  ],
 };

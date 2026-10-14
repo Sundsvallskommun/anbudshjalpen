@@ -1,18 +1,18 @@
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useSearchParams } from "react-router";
-import { useAskQuestion, useAskRules } from "../../api/queries";
+import { useAsk, useSession } from "../../api/queries";
 import type { NoticeDetail } from "../../api/types";
 import { errorMessage } from "../states";
 import {
+  GENERAL_PLACE,
   historyOf,
   latestRulesSession,
   loadConversations,
   nextTurnId,
-  noticeScope,
-  RULES_SCOPE,
+  noticePlace,
+  placeKey,
   saveConversations,
-  scopeKey,
-  type AskScope,
+  type AskPlace,
   type Conversations,
   type Turn,
 } from "./askAiState";
@@ -20,16 +20,17 @@ import {
 export interface OpenOptions {
   /** A question to put in the writing field, as "Fråga om kravet" hands one over. */
   question?: string;
-  /** What to ask about. By default the notice on the page, else the rules. */
-  scope?: AskScope;
 }
 
 export interface AskAiApi {
   isOpen: boolean;
-  scope: AskScope;
-  /** The notice of the page the reader is on, if any: the subject the panel offers first. */
+  /** Where the conversation is held: the notice page the reader is on, or everywhere else. */
+  place: AskPlace;
+  /** The notice of the page the reader is on, if any: its documents are then a subject the backend can pick. */
   notice: NoticeDetail | null;
-  /** The conversation about the current subject, oldest first. */
+  /** Whether the profile is a subject too: the reader is signed in as a company (decision 0025). */
+  canEditProfile: boolean;
+  /** The conversation at the current place, oldest first. */
   turns: readonly Turn[];
   conversations: Conversations;
   draft: string;
@@ -39,7 +40,6 @@ export interface AskAiApi {
   open: (options?: OpenOptions) => void;
   close: () => void;
   toggle: () => void;
-  chooseScope: (scope: AskScope) => void;
   setDraft: (draft: string) => void;
   ask: (question: string) => void;
   retry: (turnId: number) => void;
@@ -58,29 +58,31 @@ export const QUESTION_PARAM = "fraga";
 const OLD_STEP = "fraga";
 
 /**
- * Owns the "Fråga AI" panel (decision 0014): whether it is open, what it is about and every conversation, so the
- * panel is the same wherever it is opened from and a conversation follows the reader between pages. Mounted once in
- * AppProviders, inside the router and the query client. The conversations are kept in session storage
- * (`askAiState`); each question is the only thing that leaves the browser.
+ * Owns the "Fråga AI" panel (decision 0014): whether it is open, where the reader is and every conversation, so the
+ * panel is the same wherever it is opened from and a conversation follows the reader between pages. The reader never
+ * picks what a question is about: every question goes to one endpoint, and the backend answers it from the documents,
+ * the rules or the profile (decision 0026). Mounted once in AppProviders, inside the router and the query client. The
+ * conversations are kept in session storage (`askAiState`); each question, with the conversation's earlier turns as
+ * history, is the only thing that leaves the browser.
  */
 export function AskAiProvider({ children }: { children: ReactNode }) {
   const [conversations, setConversations] = useState<Conversations>(() => loadConversations());
   const [notice, setNoticeState] = useState<NoticeDetail | null>(null);
-  const [scope, setScope] = useState<AskScope>(RULES_SCOPE);
   const [isOpen, setIsOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [focusField, setFocusField] = useState(false);
   const nextId = useRef<number | null>(null);
-  const noticeId = useRef<string | null>(null);
   const openerRef = useRef<HTMLElement | null>(null);
-  const askNotice = useAskQuestion(scope.kind === "notice" ? scope.noticeId : "");
-  const askRules = useAskRules();
+  const send = useAsk();
+  const user = useSession().data?.user;
+  const canEditProfile = user?.role === "foretagare" && user.company !== null;
 
   useEffect(() => {
     saveConversations(conversations);
   }, [conversations]);
 
-  const key = scopeKey(scope);
+  const place = useMemo<AskPlace>(() => (notice ? noticePlace(notice.id) : GENERAL_PLACE), [notice]);
+  const key = placeKey(place);
   const turns = conversations[key] ?? [];
 
   const updateTurn = useCallback((inKey: string, id: number, changes: Partial<Turn>) => {
@@ -94,29 +96,28 @@ export function AskAiProvider({ children }: { children: ReactNode }) {
     (question: string) => {
       const text = question.trim();
       if (!text) return;
-      const target = scope;
-      const targetKey = scopeKey(target);
+      const targetKey = key;
       const earlier = conversations[targetKey] ?? [];
       nextId.current ??= nextTurnId(conversations);
       const id = nextId.current++;
       setConversations((previous) => ({
         ...previous,
-        [targetKey]: [...(previous[targetKey] ?? []), { id, question: text, answer: null, rules: null, error: null }],
+        [targetKey]: [...(previous[targetKey] ?? []), { id, question: text, answer: null, rules: null, profile: null, error: null }],
       }));
-      const fail = (error: unknown) => updateTurn(targetKey, id, { error: errorMessage(error) });
-      if (target.kind === "notice") {
-        askNotice.mutate(
-          { question: text, history: historyOf(earlier) },
-          { onSuccess: (view) => updateTurn(targetKey, id, { answer: view }), onError: fail },
-        );
-      } else {
-        askRules.mutate(
-          { question: text, session_id: latestRulesSession(earlier) },
-          { onSuccess: (view) => updateTurn(targetKey, id, { rules: view }), onError: fail },
-        );
-      }
+      send.mutate(
+        {
+          question: text,
+          notice_id: place.kind === "notice" ? place.noticeId : null,
+          history: historyOf(earlier),
+          rules_session_id: latestRulesSession(earlier),
+        },
+        {
+          onSuccess: (view) => updateTurn(targetKey, id, { answer: view.answer, rules: view.rules, profile: view.profile }),
+          onError: (error) => updateTurn(targetKey, id, { error: errorMessage(error) }),
+        },
+      );
     },
-    [scope, conversations, askNotice, askRules, updateTurn],
+    [key, place, conversations, send, updateTurn],
   );
 
   const retry = useCallback(
@@ -129,21 +130,12 @@ export function AskAiProvider({ children }: { children: ReactNode }) {
     [turns, key, ask],
   );
 
-  const open = useCallback(
-    (options: OpenOptions = {}) => {
-      openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      let wanted = options.scope ?? scope;
-      // A conversation about another notice than the page's is not what the reader asks about here.
-      if (!options.scope && wanted.kind === "notice" && wanted.noticeId !== notice?.id) {
-        wanted = notice ? noticeScope(notice.id) : RULES_SCOPE;
-      }
-      setScope(wanted);
-      if (options.question !== undefined) setDraft(options.question);
-      setFocusField(options.question !== undefined);
-      setIsOpen(true);
-    },
-    [notice, scope],
-  );
+  const open = useCallback((options: OpenOptions = {}) => {
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (options.question !== undefined) setDraft(options.question);
+    setFocusField(options.question !== undefined);
+    setIsOpen(true);
+  }, []);
 
   const close = useCallback(() => {
     setIsOpen(false);
@@ -164,38 +156,28 @@ export function AskAiProvider({ children }: { children: ReactNode }) {
     });
   }, [key]);
 
-  const setNotice = useCallback((next: NoticeDetail | null) => {
-    const nextId = next?.id ?? null;
-    if (nextId !== noticeId.current) {
-      noticeId.current = nextId;
-      // A new page: its notice is the subject; leaving a notice falls back to the rules.
-      setScope((current) => (next ? noticeScope(next.id) : current.kind === "notice" ? RULES_SCOPE : current));
-    }
-    setNoticeState(next);
-  }, []);
-
   const api = useMemo<AskAiApi>(
     () => ({
       isOpen,
-      scope,
+      place,
       notice,
+      canEditProfile,
       turns,
       conversations,
       draft,
-      isPending: askNotice.isPending || askRules.isPending,
+      isPending: send.isPending,
       focusField,
       open,
       close,
       toggle,
-      chooseScope: setScope,
       setDraft,
       ask,
       retry,
       clear,
       openerRef,
-      setNotice,
+      setNotice: setNoticeState,
     }),
-    [isOpen, scope, notice, turns, conversations, draft, askNotice.isPending, askRules.isPending, focusField, open, close, toggle, ask, retry, clear, setNotice],
+    [isOpen, place, notice, canEditProfile, turns, conversations, draft, send.isPending, focusField, open, close, toggle, ask, retry, clear],
   );
 
   return <AskAiContext value={api}>{children}</AskAiContext>;
@@ -208,7 +190,7 @@ export function useAskAi(): AskAiApi {
   return api;
 }
 
-/** A notice page's notice is the panel's subject while the page is shown. */
+/** A notice page's notice is the panel's place, and its documents a subject, while the page is shown. */
 export function useRegisterNotice(notice: NoticeDetail) {
   const { setNotice } = useAskAi();
   useEffect(() => {
@@ -231,7 +213,7 @@ export function useAskDeepLink(notice: NoticeDetail | undefined) {
 
   useEffect(() => {
     if (!noticeId || !wantsPanel) return;
-    open({ scope: noticeScope(noticeId), ...(question !== null ? { question } : {}) });
+    open(question !== null ? { question } : {});
     setParams(
       (current) => {
         const next = new URLSearchParams(current);
@@ -241,6 +223,6 @@ export function useAskDeepLink(notice: NoticeDetail | undefined) {
       },
       { replace: true },
     );
-    // Runs once per requested question; `open` changes with the page's notice, which is what it should follow.
+    // Runs once per requested question, on the page whose notice the panel then follows.
   }, [noticeId, wantsPanel, question]);
 }

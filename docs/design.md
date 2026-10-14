@@ -67,7 +67,7 @@ sidhuvudet rullar bort med sidan.
 | `/start` | Start. Den gamla adressen `/bevakning` leder hit, med sina parametrar kvar |
 | `/upphandlingar` | Listan över upphandlingar. Sökningen och filtren står i adressen, så att en sökning går att dela: `?q=`, `?status=planned\|alla` (utan värde visas Öppna), `?kalla=`, `?kopare=`, `?passar=1`, `?sortera=frist\|publicerad\|relevans` och `?sida=` |
 | `/upphandlingar/:id?flik=checklista\|granska` | Upphandlingens sida och dess steg. Värdena är kvar från före omgörningen, så `checklista` är steget Krav. `?flik=fraga` och `?fraga=…` öppnar Fråga AI, det senare med frågan ifylld, och `?flik=inlamning`, det borttagna steget Lämna in, öppnar Granska |
-| `/fraga-ai/utskrift?amne=notice:<id>\|rules` | Ett samtal i Fråga AI som utskriftsvy, utanför ramen ([beslut 0014](decisions/0014-fraga-ai-panel.md)) |
+| `/fraga-ai/utskrift?amne=notice:<id>\|general` | Ett samtal i Fråga AI som utskriftsvy, utanför ramen ([beslut 0014](decisions/0014-fraga-ai-panel.md)); de gamla värdena `rules` och `profile` öppnar det allmänna samtalet |
 | `/upphandlingar/:id?citat=…&sida=…&pastaende=…` | Öppnar källdialogen på upphandlingens sida. `?flik=underlag` öppnar underlaget på sida 1 |
 | `/regelhjalpen?fraga=…` | Regelhjälpen, som ställer frågan direkt och sedan tar bort den ur adressen |
 | `/profil` och `/paminnelser` | Företagsprofil och Påminnelser. Påminnelsemejlen länkar till `/paminnelser` |
@@ -225,28 +225,51 @@ skärmar och ett högt `BottomSheet` utan skärm på telefon. Sidan går att lä
 källdialogen öppnas ovanpå den. Panelen öppnas kompakt, 420 px bred och högst 36 rem hög, så att det mesta av sidan
 syns bredvid, och knappen "Förstora panelen" gör den 720 px bred och högre för långa svar; storleken står kvar tills
 sidan laddas om. Huvudet är en rad: en liten rubrik "Fråga AI" (h2 i dokumentets disposition, i en panels storlek)
-med ämnet på en rad under, och tysta ikonknappar med verktygstips: "Spara som PDF" och "Rensa samtalet" när det finns
-ett samtal, förstora eller förminska (inte på telefon) och "Stäng". Under huvudet, på en upphandlings sida, valet
-Underlaget · Reglerna (`SegmentedControl`). Samtalet är en `ChatMessageList`: frågan i en bubbla till höger, utan
-namn över sig, och svaret
+med en rad under som säger var läsaren är: upphandlingens titel på dess sida, annars "Reglerna för offentlig
+upphandling" (för en inloggad företagare "Reglerna för upphandling och er profil"), och tysta ikonknappar med
+verktygstips: "Spara som PDF" och "Rensa samtalet" när det finns ett samtal, förstora eller förminska (inte på
+telefon) och "Stäng". Läsaren väljer inget ämne ([beslut 0026](decisions/0026-fraga-ai-valjer-amne-sjalv.md)): varje
+fråga går till `POST /api/ask`, och appen avgör om den gäller underlaget (bara på en upphandlings sida), reglerna eller
+profilen (bara för en inloggad företagare, [beslut 0025](decisions/0025-profilen-uppdateras-via-fraga-ai.md)), på
+frågans ord först och med AI-uppgiften `valj_amne` när orden inte räcker. Ett svar vars ämne inte är sidans eget har en
+dämpad rad över kortet: "Allmänt om reglerna, inte om just den här upphandlingen" eller "Ändring i er profil", och
+det första verktyget under varje svar säger vad som avgjorde ("Välj ämne · Reglerna, på frågans ord"). Samtalet är en
+`ChatMessageList`:
+frågan i en bubbla till höger, utan namn över sig, och svaret
 som ett kort med ursprungsrad, "Står i underlaget" (eller "Inköp har svarat" när svaret bygger på inköps publicerade
 svar), en fet slutsats, inköps svar med frågan de besvarar och länken till posten, och citaten med sida, eller för reglerna
 paragraferna svaret bygger på, som på Regelhjälpen. När underlaget inte svarar har svaret den tonade rutan "Ger
 underlaget inget entydigt svar?" med "Påminn mig" och länken dit frågan ställs formellt, och annars raden "Oklart?
-Ställ frågan i e-Avrop senast 30 okt.". Tomt säger panelen på en dämpad rad vad svaren bygger på och när sista dag för frågor är.
-Exempelfrågor ovanför skrivfältet tills den första frågan är ställd, skrivfältet som är Astryx `ChatComposer` på en rad med
-skicka-knappen bredvid (fältet växer uppåt med frågan), och under det raden att svaren är ett stöd. "Spara
-som PDF" öppnar utskriftsvyn.
+Ställ frågan i e-Avrop senast 30 okt.". Sist i varje svar verktygen som kördes (`ToolsUsed`, designsystemets
+`ChatToolCalls`): ett verktyg på sin egen rad, flera hopfällda med det sista synligt och antalet, till exempel "Sök i
+underlaget · 12 träffar", "Sök i LOU" eller "Spara profilen". Tomt säger panelen på en dämpad rad vad läsaren kan
+fråga om och vad svaren bygger på: på en upphandlings sida "Fråga om underlaget eller om reglerna: svaren visar var det
+står" med sista dag för frågor, annars att svaren visar vilka paragrafer de bygger på, och för en inloggad företagare
+också "Skriv vad som ska ändras i er profil, så sparar Anbudshjälpen det".
 
-Samtalen sparas per ämne i webbläsarens sessionslagring, så de finns kvar mellan sidorna och efter en omladdning i
-samma flik. "Fråga om kravet" i Granska (med frågan ifylld, också via `?fraga=` i en ny flik), "Fråga underlaget"
+**Profilen** är ett av ämnena panelen leder ett meddelande till, i samma skrivfält som frågorna. Svaret (`ProfileChatCard`) är motorns svar i fetstil
+och, när något sparades, den gröna tokenen "Sparat i profilen" med länken "Visa profilen", "Det här ändrades" med varje
+del av profilen, orden nu och "Förut: …", och "1 upphandling verkar passa er nu" när träffarna hann bedömas före
+svaret. En motfråga visar bara svaret.
+Exempelfrågor ovanför skrivfältet tills den första frågan är ställd: på en upphandlings sida fyra om underlaget och
+"Vad är ett kvalificeringskrav?" om reglerna, annars Regelhjälpens fyra, och för en inloggad företagare också två
+ändringar ("Vi har numera tolv anställda", "Vi är också verksamma i Härnösand"). Skrivfältet är Astryx `ChatComposer`
+på en rad med skicka-knappen bredvid (fältet växer uppåt med frågan), och under det raden "Svaren är ett stöd, inte
+juridisk rådgivning. Det är alltid förfrågningsunderlaget och lagtexten som gäller." "Spara som PDF" öppnar
+utskriftsvyn.
+
+Samtalen sparas per plats i webbläsarens sessionslagring, ett per upphandling och ett allmänt, så de finns kvar
+mellan sidorna och efter en omladdning i samma flik. Ett samtal på en upphandlings sida blandar svar ur underlaget
+med svar om reglerna. "Fråga om kravet" i Granska (med frågan ifylld, också via `?fraga=` i en ny flik), "Fråga underlaget"
 utan checklista och den gamla adressen `?flik=fraga` öppnar panelen. Steg 1 slutade förut med "Ställ en fråga"; nu
 leder dess "Nästa steg" vidare till Granska, så att läsaren inte stannar i panelen, och knappen räcker som ingång.
 
 **Utskriftsvyn** (`/fraga-ai/utskrift?amne=…`) ligger utanför ramen: "Frågor och svar", ämnet, "Från Anbudshjälpen 5 okt
 2026 kl. 10:00. Svaren är automatiskt framtagna och inte granskade av inköp. Det är alltid förfrågningsunderlaget som
 gäller." och varje fråga med sitt svar, citaten med sida ("s. 6 (AI angav 5)", "hittades inte i underlaget") eller
-paragraferna. Knapparna "Tillbaka" och "Skriv ut eller spara som PDF" syns inte i utskriften, och ingen fråga delas
+paragraferna, och raden "Verktyg: …". Raden om vad som gäller följer ämnena i samtalet: underlaget, lagtexten och
+att ändringarna är sparade i profilen. Ett meddelande till profilen skriver "Meddelande 1" i stället för "Fråga 1",
+svaret och vad som ändrades. Knapparna "Tillbaka" och "Skriv ut eller spara som PDF" syns inte i utskriften, och ingen fråga delas
 över en sida.
 
 ### Källdialogen
@@ -366,6 +389,7 @@ Byggstenarna som omgörningen lade till ligger i `frontend/src/components/ui/`. 
 | `PublishedAnswerQuote` | Ett citat ur inköps publicerade svar ([beslut 0018](decisions/0018-publicerade-svar-i-ai-uppgifterna.md)): frågan det besvarar i dämpad text, svaret på en egen yta med accentkant (`AnswerText`, som också listan "Frågor och svar från inköp" använder) och "Källa: Frågor och svar från inköp, fråga 3", som leder till posten (`#svar-…`). Ett citat som inte hittades bland svaren säger "Hittades inte bland inköps svar" |
 | `ResultSummary` | Ett utlåtande: rubrik med siffran, framstegsstapel och statistikrutor som filtrerar raderna under |
 | `StatTile` | En siffra att agera på, med etikett och stödrad. Antingen en länk (ett ankare som öppnar sitt avsnitt) eller ett filter |
+| `ToolsUsed` | Verktygen som kördes bakom ett svar, under svaret, med designsystemets `ChatToolCalls` ([beslut 0025](decisions/0025-profilen-uppdateras-via-fraga-ai.md)): Eneos MCP-anrop och appens egna steg, i ordning, med en kort notis ("12 träffar"). Ingenting när inget verktyg kördes |
 | `StepNav` | Upphandlingens två steg som en sticky flikrad, med steget i adressen (`?flik=`). Ett steg monteras första gången det öppnas och behålls sedan. `useStepNav().goTo` byter steg och flyttar fokus till steget |
 | `icons.tsx` | Appens egna ikoner där Astryx semantiska ikoner saknar en: dokument, papperskorg, pil framåt, `DownloadIcon` ("Ladda ned"), `UploadIcon` ("Granska en ny version" och "Ladda upp") och `ExpandIcon` och `CollapseIcon` (förstora och förminska Fråga AI). De ritas med `Icon` som alla andra |
 | `source/SourceLink` | Källan till ett påstående: "6.1 Upphandlingsföreskrifter.pdf, s. 5" som en diskret länk, med filnamnet där sidan känner till upphandlingens dokument (`SourceDocumentsProvider`, upphandlingens sida) och annars bara "s. 5" (Start). På upphandlingens sida står källan på en egen rad under texten, "Källa: …", i checklistans rader och under varje citat i ett svar. Bara avvikelser får en token: "…, s. 9 (AI angav 7)" i blått och "Hittades inte i underlaget" i gult. Namnet säger vad källan belägger: "Visa källan för ”Anbudet är skrivet på svenska”, 6.1 Upphandlingsföreskrifter.pdf, s. 5" |
@@ -382,7 +406,7 @@ Andra delade delar ligger i `frontend/src/components/`, `frontend/src/shell/` oc
 | `tokens.tsx` | Statusorden som tokens: `FitToken`, `StatusToken`, `FictitiousToken`, `PublishedChecklistToken`, `ClosingSoonToken`, `NoticeStatusToken` och `ChecklistStatusToken` |
 | `NoticeRow` och `RowList` | En upphandling som rad, och listor med rader där hela raden är en länk |
 | `TermText` | Fackord som går att trycka på för en förklaring, ur `frontend/src/lib/glossary.ts` (som bygger på [Ordlistan](glossary.md)) eller checklistans egna termer |
-| `ask/` | Fråga AI ([beslut 0014](decisions/0014-fraga-ai-panel.md)): `AskAiProvider` äger panelen och samtalen (`askAiState.ts`, sessionslagringen), `AskAiPanel` är panelen och `AskAiButton` knappen som följer läsaren. `useAskAi().open({ question })` öppnar panelen varifrån som helst, och `useAskDeepLink` öppnar den från adressen |
+| `ask/` | Fråga AI ([beslut 0014](decisions/0014-fraga-ai-panel.md)): `AskAiProvider` äger panelen och samtalen (`askAiState.ts`, sessionslagringen, ett samtal per plats) och skickar varje fråga till `POST /api/ask`, som väljer ämnet ([beslut 0026](decisions/0026-fraga-ai-valjer-amne-sjalv.md)); `AskAiPanel` är panelen med knappen som följer läsaren och visar svaret med kortet för det ämne som svarade, och `ProfileChatCard` är svaret på ett meddelande till profilen ([beslut 0025](decisions/0025-profilen-uppdateras-via-fraga-ai.md)). `useAskAi().open({ question })` öppnar panelen varifrån som helst, och `useAskDeepLink` öppnar den från adressen |
 | `FormalQuestionAdvice` | Rutan om likabehandling, tonad och infälld i svaret: "Ger underlaget inget entydigt svar?" Ställ frågan i e-Avrop före sista dag för frågor, med "Påminn mig" och länken dit frågan ställs, eller för en påhittad upphandling utan egen sida att den inte finns i e-Avrop |
 | `states.tsx` | `Loading` och `ErrorNotice`, med vad som misslyckades och "Försök igen" när det kan hjälpa |
 | `shell/` | Ramen: `AppFrame`, `ModuleShell` (Astryx `AppShell` med foten efter `main`), `PhaseStrip`, `FrameHeader`, `Brand`, `MainNav`, `AccountMenu`, `AboutDemo` (dialogen "Om demon och AI"), `readingTrace.ts` (växeln "Visa hur underlaget lästes", sparad i webbläsaren), `appearance.tsx` (temat i besökarens utseende) och `AppearanceControl` (valet Utseende), `Page`, `SiteFooter`, `RequireRole` och reglerna i `navigation.ts` och `redirects.tsx` |
