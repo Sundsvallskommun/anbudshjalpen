@@ -18,6 +18,66 @@
   }
 }
 
+/* While the panel is closed, a streak of light runs once round the button every three seconds, so the reader notices
+   that the AI support is there. It is a ring of a conic gradient whose angle turns (registered below, so it can be
+   animated), masked to the button's edge; it takes no clicks. Still for a reader who asks for reduced motion
+   (WCAG 2.3.3), and it stops after the first minute (WCAG 2.2.2: nothing moves for more than five seconds unless it
+   can be paused, and a reader who has not opened the panel by then has seen it). */
+@property --ask-ai-sweep {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.button::before {
+  content: "";
+  position: absolute;
+  inset: calc(var(--spacing-0-5) * -1.5);
+  border-radius: inherit;
+  padding: calc(var(--spacing-0-5) * 1.5);
+  background: conic-gradient(
+    from var(--ask-ai-sweep),
+    transparent 0deg 250deg,
+    var(--color-accent-muted) 290deg,
+    var(--color-accent) 340deg,
+    transparent 360deg
+  );
+  mask:
+    linear-gradient(black 0 0) content-box exclude,
+    linear-gradient(black 0 0);
+  opacity: 0;
+  pointer-events: none;
+  animation: ask-ai-sweep 3s var(--ease-standard) 1s 20;
+}
+
+.button[data-open]::before {
+  animation: none;
+}
+
+@keyframes ask-ai-sweep {
+  0% {
+    --ask-ai-sweep: 0deg;
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  42% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    --ask-ai-sweep: 360deg;
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button::before {
+    animation: none;
+  }
+}
+
 html:has([data-ask-ai-button]) {
   scroll-padding-block-end: calc(var(--spacing-10) * 2);
 }
@@ -49,4 +109,44 @@ html:has([data-ask-ai-button]) {
 
 .composer > :has(> * > :global(.astryx-chat-composer-input)) > :last-child > :empty {
   display: none;
+}
+
+/* The panel's header sits on a tinted band, as a chat app's does (the sketch for the welcome, 2026-10-14): the design
+   system's LayoutHeader has no surface colour of its own. The muted accent keeps the header's text and icon buttons at
+   their own contrast. Tokens only. */
+.header {
+  background-color: var(--color-accent-muted);
+  border-block-end: var(--border-width) solid var(--color-border);
+}
+
+/* The mark waves hello when "Fråga AI" opens by itself with its welcome: a small tilt back and forth from its foot,
+   twice, then still. The design system's motion tokens set its pace. Nothing moves for a reader who asks for reduced
+   motion (WCAG 2.3.3). */
+.waving {
+  transform-origin: 50% 90%;
+  animation: wave calc(var(--duration-slow) * 4) var(--ease-standard) var(--duration-medium) 1 both;
+}
+
+@keyframes wave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  15%,
+  45% {
+    transform: rotate(14deg);
+  }
+  30%,
+  60% {
+    transform: rotate(-10deg);
+  }
+  75% {
+    transform: rotate(6deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waving {
+    animation: none;
+  }
 }

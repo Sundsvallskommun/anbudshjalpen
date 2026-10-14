@@ -23,6 +23,19 @@ interface State {
   persona: Persona;
   /** Brings the page into the state; returns a reason to skip when the data for it is missing. */
   go: (page: Page) => Promise<string | void>;
+  /** The state is "Fråga AI" opening by itself with its welcome; every other state is a returning reader's. */
+  isWelcome?: boolean;
+}
+
+/** components/ask/askAiState: who "Fråga AI" has welcomed in this browser, so it does not open by itself again. */
+const WELCOMED_KEY = "anbudsklar.fraga-ai.valkomnad.v1";
+
+/** Makes the browser a returning reader's: the visitor and the logged-in user have had the welcome. */
+async function asReturningReader(page: Page, baseURL: string) {
+  const response = await page.request.get(`${baseURL}/api/session`);
+  const session = (await response.json()) as { user: { id: string } | null };
+  const welcomed = JSON.stringify(["besokare", ...(session.user ? [session.user.id] : [])]);
+  await page.addInitScript(([key, value]) => window.localStorage.setItem(key, value), [WELCOMED_KEY, welcomed] as const);
 }
 
 /** The token on a notice whose checklist inköp has reviewed and published (lib/labels PUBLISHED_CHECKLIST). */
@@ -93,6 +106,19 @@ const STATES: State[] = [
   },
   { name: "start", persona: "foretagare", go: (page) => open(page, "/start") },
   {
+    // The first visit after a login: "Fråga AI" is open with its welcome, beside Start.
+    name: "fraga-ai-valkomst",
+    persona: "foretagare",
+    isWelcome: true,
+    go: async (page) => {
+      // A phone is not interrupted: there the welcome waits in the panel until the reader opens it.
+      if ((page.viewportSize()?.width ?? 1024) < 640) return "telefonen öppnar inte Fråga AI av sig själv";
+      await open(page, "/start");
+      await page.getByRole("dialog", { name: "Fråga AI" }).waitFor();
+      await ready(page);
+    },
+  },
+  {
     name: "kontomeny",
     persona: "foretagare",
     go: async (page) => {
@@ -151,6 +177,7 @@ for (const state of STATES) {
     });
     page.on("pageerror", (error) => errors.push(error.message));
     if (state.persona) await loginAs(page.request, baseURL ?? "", state.persona);
+    if (!state.isWelcome) await asReturningReader(page, baseURL ?? "");
     const skip = await state.go(page);
     test.skip(Boolean(skip), String(skip));
 

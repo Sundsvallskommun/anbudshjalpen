@@ -224,28 +224,29 @@ i vyn på varje sida bakom dörren, och panelen som en icke-modal Astryx `Popove
 skärmar och ett högt `BottomSheet` utan skärm på telefon. Sidan går att läsa och använda medan panelen är öppen, och
 källdialogen öppnas ovanpå den. Panelen öppnas kompakt, 420 px bred och högst 36 rem hög, så att det mesta av sidan
 syns bredvid, och knappen "Förstora panelen" gör den 720 px bred och högre för långa svar; storleken står kvar tills
-sidan laddas om. Huvudet är en rad: en liten rubrik "Fråga AI" (h2 i dokumentets disposition, i en panels storlek)
-med en rad under som säger var läsaren är: upphandlingens titel på dess sida, annars "Reglerna för offentlig
-upphandling" (för en inloggad företagare "Reglerna för upphandling och er profil"), och tysta ikonknappar med
-verktygstips: "Spara som PDF" och "Rensa samtalet" när det finns ett samtal, förstora eller förminska (inte på
-telefon) och "Stäng". Läsaren väljer inget ämne ([beslut 0026](decisions/0026-fraga-ai-valjer-amne-sjalv.md)): varje
-fråga går till `POST /api/ask`, och appen avgör om den gäller underlaget (bara på en upphandlings sida), reglerna eller
-profilen (bara för en inloggad företagare, [beslut 0025](decisions/0025-profilen-uppdateras-via-fraga-ai.md)), på
-frågans ord först och med AI-uppgiften `valj_amne` när orden inte räcker. Ett svar vars ämne inte är sidans eget har en
-dämpad rad över kortet: "Allmänt om reglerna, inte om just den här upphandlingen" eller "Ändring i er profil", och
-det första verktyget under varje svar säger vad som avgjorde ("Välj ämne · Reglerna, på frågans ord"). Samtalet är en
-`ChatMessageList`:
-frågan i en bubbla till höger, utan namn över sig, och svaret
+sidan laddas om. Huvudet ligger på ett dämpat accentfält, som i en chattapp: Anbudshjälpens märke som avatar, en liten
+rubrik "Fråga AI" (h2 i dokumentets disposition, i en panels storlek), "Redo att hjälpa dig" vid en grön punkt och en
+rad under som säger var läsaren är: upphandlingens titel på dess sida, annars "Reglerna för offentlig upphandling" (för
+en inloggad företagare "Reglerna för upphandling och er profil"), och tysta ikonknappar med verktygstips: "Spara som
+PDF" och "Rensa samtalet" när det finns ett samtal, förstora eller förminska (inte på telefon) och "Stäng". Läsaren
+väljer inget ämne ([beslut 0026](decisions/0026-fraga-ai-valjer-amne-sjalv.md)): varje fråga går till `POST /api/ask`,
+och appen avgör om den gäller underlaget (bara på en upphandlings sida), reglerna eller profilen (bara för en inloggad
+företagare, [beslut 0025](decisions/0025-profilen-uppdateras-via-fraga-ai.md)), på frågans ord först och med
+AI-uppgiften `valj_amne` när orden inte räcker. Ett svar vars ämne inte är sidans eget har en dämpad rad över kortet:
+"Allmänt om reglerna, inte om just den här upphandlingen" eller "Ändring i er profil", och det första verktyget under
+varje svar säger vad som avgjorde ("Välj ämne · Reglerna, på frågans ord"). Samtalet är en `ChatMessageList`. Det
+börjar med panelens välkomst i en bubbla vid märket: "Hej Anna! Jag är Anbudshjälpens AI-stöd. Jag finns alltid här i
+hörnet, genom hela processen …". Frågan står i en bubbla till höger, utan namn över sig, och svaret, vid märket,
 som ett kort med ursprungsrad, "Står i underlaget" (eller "Inköp har svarat" när svaret bygger på inköps publicerade
 svar), en fet slutsats, inköps svar med frågan de besvarar och länken till posten, och citaten med sida, eller för reglerna
 paragraferna svaret bygger på, som på Regelhjälpen. När underlaget inte svarar har svaret den tonade rutan "Ger
 underlaget inget entydigt svar?" med "Påminn mig" och länken dit frågan ställs formellt, och annars raden "Oklart?
 Ställ frågan i e-Avrop senast 30 okt.". Sist i varje svar verktygen som kördes (`ToolsUsed`, designsystemets
 `ChatToolCalls`): ett verktyg på sin egen rad, flera hopfällda med det sista synligt och antalet, till exempel "Sök i
-underlaget · 12 träffar", "Sök i LOU" eller "Spara profilen". Tomt säger panelen på en dämpad rad vad läsaren kan
-fråga om och vad svaren bygger på: på en upphandlings sida "Fråga om underlaget eller om reglerna: svaren visar var det
-står" med sista dag för frågor, annars att svaren visar vilka paragrafer de bygger på, och för en inloggad företagare
-också "Skriv vad som ska ändras i er profil, så sparar Anbudshjälpen det".
+underlaget · 12 träffar", "Sök i LOU" eller "Spara profilen". Före den första frågan säger en andra bubbla under
+välkomsten vad läsaren kan fråga om och vad svaren bygger på: på en upphandlings sida "Fråga om underlaget eller om
+reglerna: svaren visar var det står" med sista dag för frågor, annars att svaren visar vilka paragrafer de bygger på,
+och för en inloggad företagare också "Skriv vad som ska ändras i er profil, så sparar Anbudshjälpen det".
 
 **Profilen** är ett av ämnena panelen leder ett meddelande till, i samma skrivfält som frågorna. Svaret (`ProfileChatCard`) är motorns svar i fetstil
 och, när något sparades, den gröna tokenen "Sparat i profilen" med länken "Visa profilen", "Det här ändrades" med varje
@@ -257,6 +258,16 @@ Exempelfrågor ovanför skrivfältet tills den första frågan är ställd: på 
 på en rad med skicka-knappen bredvid (fältet växer uppåt med frågan), och under det raden "Svaren är ett stöd, inte
 juridisk rådgivning. Det är alltid förfrågningsunderlaget och lagtexten som gäller." "Spara som PDF" öppnar
 utskriftsvyn.
+
+**Knappen** har en ljusstrimma i accentfärgen som löper ett varv runt kanten var tredje sekund medan panelen är
+stängd, så att läsaren ser att AI-stödet finns. Strimman slutar efter en minut och syns inte alls för den som har valt
+minskad rörelse.
+
+**Välkomsten:** panelen öppnas av sig själv första gången någon kommer till appen i en webbläsare, och första gången
+varje användare loggar in, men aldrig bakom accesskoden. Den flyttar inte fokus, och märket i huvudet vinkar en gång. Vilka som har välkomnats sparas i
+webbläsarens lokala lagring, så en senare inloggning lämnar panelen stängd. Det sparas inte på användaren i databasen,
+eftersom demons personor delas: då skulle bara den första deltagaren som loggar in som Anna se välkomsten. På telefon
+öppnas panelen inte av sig själv, eftersom den då täcker hela sidan; välkomsten väntar i panelen.
 
 Samtalen sparas per plats i webbläsarens sessionslagring, ett per upphandling och ett allmänt, så de finns kvar
 mellan sidorna och efter en omladdning i samma flik. Ett samtal på en upphandlings sida blandar svar ur underlaget

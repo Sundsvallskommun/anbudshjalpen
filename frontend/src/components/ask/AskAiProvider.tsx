@@ -1,13 +1,16 @@
 import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useSearchParams } from "react-router";
-import { useAsk, useSession } from "../../api/queries";
+import { useAsk, useConfig, useSession } from "../../api/queries";
 import type { NoticeDetail } from "../../api/types";
+import { useIsPhone } from "../../lib/usePhone";
 import { errorMessage } from "../states";
 import {
   GENERAL_PLACE,
+  hasBeenWelcomed,
   historyOf,
   latestRulesSession,
   loadConversations,
+  markWelcomed,
   nextTurnId,
   noticePlace,
   placeKey,
@@ -15,6 +18,7 @@ import {
   type AskPlace,
   type Conversations,
   type Turn,
+  VISITOR,
 } from "./askAiState";
 
 export interface OpenOptions {
@@ -24,6 +28,8 @@ export interface OpenOptions {
 
 export interface AskAiApi {
   isOpen: boolean;
+  /** The panel opened by itself with its welcome, and has not been closed since: its mark waves hello. */
+  isWelcoming: boolean;
   /** Where the conversation is held: the notice page the reader is on, or everywhere else. */
   place: AskPlace;
   /** The notice of the page the reader is on, if any: its documents are then a subject the backend can pick. */
@@ -64,6 +70,7 @@ const OLD_STEP = "fraga";
  * the rules or the profile (decision 0026). Mounted once in AppProviders, inside the router and the query client. The
  * conversations are kept in session storage (`askAiState`); each question, with the conversation's earlier turns as
  * history, is the only thing that leaves the browser.
+ * It opens by itself with a welcome once per user and browser (`useWelcome`).
  */
 export function AskAiProvider({ children }: { children: ReactNode }) {
   const [conversations, setConversations] = useState<Conversations>(() => loadConversations());
@@ -80,6 +87,12 @@ export function AskAiProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     saveConversations(conversations);
   }, [conversations]);
+
+  const [isWelcoming, setIsWelcoming] = useState(false);
+  useWelcome(() => {
+    setIsWelcoming(true);
+    setIsOpen(true);
+  });
 
   const place = useMemo<AskPlace>(() => (notice ? noticePlace(notice.id) : GENERAL_PLACE), [notice]);
   const key = placeKey(place);
@@ -139,6 +152,7 @@ export function AskAiProvider({ children }: { children: ReactNode }) {
 
   const close = useCallback(() => {
     setIsOpen(false);
+    setIsWelcoming(false);
     const opener = openerRef.current;
     requestAnimationFrame(() => opener?.focus());
   }, []);
@@ -159,6 +173,7 @@ export function AskAiProvider({ children }: { children: ReactNode }) {
   const api = useMemo<AskAiApi>(
     () => ({
       isOpen,
+      isWelcoming,
       place,
       notice,
       canEditProfile,
@@ -177,10 +192,31 @@ export function AskAiProvider({ children }: { children: ReactNode }) {
       openerRef,
       setNotice: setNoticeState,
     }),
-    [isOpen, place, notice, canEditProfile, turns, conversations, draft, send.isPending, focusField, open, close, toggle, ask, retry, clear],
+    [isOpen, isWelcoming, place, notice, canEditProfile, turns, conversations, draft, send.isPending, focusField, open, close, toggle, ask, retry, clear],
   );
 
   return <AskAiContext value={api}>{children}</AskAiContext>;
+}
+
+/**
+ * Opens the panel with its welcome the first time someone comes to the app in this browser, and the first time each
+ * user logs in, but never behind the access code. The welcome is remembered (`markWelcomed`), so a later page load or
+ * login leaves the panel closed. A phone is not interrupted: there the panel is a sheet over the whole page, so the
+ * welcome waits in the panel until the reader opens it. Opening by itself moves no focus.
+ */
+function useWelcome(openPanel: () => void) {
+  const session = useSession();
+  const config = useConfig();
+  const isPhone = useIsPhone();
+  const who = session.data ? (session.data.user?.id ?? VISITOR) : null;
+  const isBehindGate = config.data?.gate_required ?? true;
+
+  useEffect(() => {
+    if (who === null || isBehindGate || hasBeenWelcomed(who)) return;
+    markWelcomed(who);
+    if (!isPhone) openPanel();
+    // Runs when the reader changes (a login or logout) or the door opens, not on every render.
+  }, [who, isBehindGate]);
 }
 
 /** The panel's state and actions. Throws outside AskAiProvider, which AppProviders always mounts. */

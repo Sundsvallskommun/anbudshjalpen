@@ -5,15 +5,18 @@ import type { AnswerView, AskView, RulesView } from "../../api/types";
 import {
   answerNotInDocument,
   companyUser,
+  config,
   NOTICE_ID,
   noticeBuyers,
   noticeDetail,
   noticeList,
   profileChatView,
   publishedAnswer,
+  session,
 } from "../../test/fixtures";
 import { baseRoutes, mockApi, renderApp, type MockRoute } from "../../test/render";
-import { STORAGE_KEY } from "./askAiState";
+import { READY_TEXT } from "./AskAiPanel";
+import { hasBeenWelcomed, markWelcomed, STORAGE_KEY, VISITOR, WELCOMED_KEY } from "./askAiState";
 
 const ASK = "/api/ask";
 
@@ -281,7 +284,7 @@ describe("Fråga AI (decision 0014)", () => {
     );
 
     await userEvent.click(within(panel).getByRole("button", { name: "Rensa samtalet" }));
-    expect(within(panel).queryByRole("article")).not.toBeInTheDocument();
+    expect(within(panel).queryByRole("article", { name: /^Svar på/u })).not.toBeInTheDocument();
     expect(window.sessionStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 
@@ -347,5 +350,54 @@ describe("Fråga AI (decision 0014)", () => {
     expect(within(panel).getByText("Reglerna för offentlig upphandling")).toBeInTheDocument();
     expect(within(panel).queryByRole("button", { name: "Vi har numera tolv anställda" })).not.toBeInTheDocument();
     expect(within(panel).queryByText(/Skriv vad som ska ändras i er profil/u)).not.toBeInTheDocument();
+  });
+});
+
+describe("Fråga AI's welcome", () => {
+  beforeEach(() => {
+    window.localStorage.removeItem(WELCOMED_KEY);
+  });
+
+  it("opens by itself the first time, says it is there through the whole process, and stays closed after that", async () => {
+    mockApi([...baseRoutes(companyUser), ...listRoutes]);
+    const { unmount } = renderApp("/upphandlingar");
+
+    const panel = await screen.findByRole("dialog", { name: "Fråga AI" });
+    expect(within(panel).getByText(/^Hej Anna! Jag är Anbudshjälpens AI-stöd\. Jag finns alltid här i hörnet/u)).toBeInTheDocument();
+    expect(within(panel).getByText(READY_TEXT)).toBeInTheDocument();
+    // Opening by itself takes no focus from the page.
+    expect(panel).not.toContainElement(document.activeElement as HTMLElement);
+    expect(hasBeenWelcomed(companyUser.id)).toBe(true);
+    // The mark waves hello while the welcome is open, and stops once the reader has closed the panel.
+    expect(panel.querySelector("[data-waving]")).not.toBeNull();
+    await userEvent.click(within(panel).getByRole("button", { name: "Stäng" }));
+    await userEvent.click(screen.getByRole("button", { name: "Fråga AI" }));
+    const reopened = await screen.findByRole("dialog", { name: "Fråga AI" });
+    expect(reopened.querySelector("[data-waving]")).toBeNull();
+    unmount();
+
+    mockApi([...baseRoutes(companyUser), ...listRoutes]);
+    renderApp("/upphandlingar");
+    await screen.findByRole("heading", { level: 1 });
+    expect(screen.queryByRole("dialog", { name: "Fråga AI" })).not.toBeInTheDocument();
+  });
+
+  it("welcomes each user once: a visitor, then the company after its login", async () => {
+    markWelcomed(VISITOR);
+    mockApi([...baseRoutes(companyUser), ...listRoutes]);
+    renderApp("/upphandlingar");
+    expect(await screen.findByRole("dialog", { name: "Fråga AI" })).toBeInTheDocument();
+    expect(hasBeenWelcomed(companyUser.id)).toBe(true);
+  });
+
+  it("does not open behind the access code", async () => {
+    mockApi([
+      { method: "GET", path: "/api/config", body: { ...config, gate_required: true } },
+      { method: "GET", path: "/api/session", body: session(null) },
+    ]);
+    renderApp("/upphandlingar");
+    await screen.findByRole("heading", { level: 1, name: "Ange accesskoden" });
+    expect(screen.queryByRole("dialog", { name: "Fråga AI" })).not.toBeInTheDocument();
+    expect(hasBeenWelcomed(VISITOR)).toBe(false);
   });
 });

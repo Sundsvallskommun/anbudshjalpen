@@ -1,3 +1,4 @@
+import { Avatar } from "@astryxdesign/core/Avatar";
 import { BottomSheet } from "@astryxdesign/core/BottomSheet";
 import { Button } from "@astryxdesign/core/Button";
 import { Card } from "@astryxdesign/core/Card";
@@ -9,9 +10,11 @@ import { Layout, LayoutContent, LayoutFooter, LayoutHeader } from "@astryxdesign
 import { Popover } from "@astryxdesign/core/Popover";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { StackItem } from "@astryxdesign/core/Stack";
+import { StatusDot } from "@astryxdesign/core/StatusDot";
 import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import { Fragment, useEffect, useId, useRef, useState } from "react";
+import { useSession } from "../../api/queries";
 import type { IsoDateTime, Subject } from "../../api/types";
 import { calendarDateOf, formatLongDate, isPassed } from "../../lib/format";
 import { useIsPhone } from "../../lib/usePhone";
@@ -21,11 +24,13 @@ import { RulesAnswerCard } from "../../pages/rules/RulesAnswerCard";
 import { ErrorNotice } from "../states";
 import { ChatIcon, CollapseIcon, DownloadIcon, ExpandIcon, TrashIcon } from "../ui/icons";
 import styles from "./AskAiPanel.module.css";
-import { isAnswered, isPending as isTurnPending, placeKey, questionProblem, subjectOf, type AskPlace, type Turn } from "./askAiState";
+import { isAnswered, isPending as isTurnPending, placeKey, questionProblem, subjectOf, welcomeText, type AskPlace, type Turn } from "./askAiState";
 import { useAskAi, type AskAiApi } from "./AskAiProvider";
 import { ProfileChatCard } from "./ProfileChatCard";
 
 export const ASK_AI_TITLE = "Fråga AI";
+/** The line under the title, beside the green dot: the panel is there and listening. */
+export const READY_TEXT = "Redo att hjälpa dig";
 const RULES_SUBJECT = "Reglerna för offentlig upphandling";
 const RULES_AND_PROFILE_SUBJECT = "Reglerna för upphandling och er profil";
 export const PROFILE_SUBJECT = "Er företagsprofil";
@@ -123,25 +128,39 @@ function Answer({ turn, ai }: { turn: Turn; ai: AskAiApi }) {
   );
 }
 
+/** The panel's own face: Anbudshjälpen's mark, the same as the top bar's. Decorative; the title names the panel. */
+function AssistantAvatar({ size = "sm" }: { size?: "sm" | "md" }) {
+  return <Avatar src="/favicon.svg" alt="" name={ASK_AI_TITLE} size={size} tooltip={false} />;
+}
+
+/** "Anna" for Anna Berg; null for a visitor, who is greeted without a name. */
+function useFirstName(): string | null {
+  const session = useSession();
+  const name = session.data?.user?.name.trim();
+  return name ? (name.split(/\s+/u)[0] ?? null) : null;
+}
+
 /**
- * The conversation as the design system's message list: the reader's bubbles and the answers as cards. Before the
- * first question, only what the answers rest on, as a quiet line: the list's empty state centres it with room to spare.
- * The reader's bubble carries no name: it sits to the right in its own colour, and a name over it only crowded the
- * question; the design system names the message for screen readers.
+ * The conversation as the design system's message list. It starts with the panel's welcome: who it is and that it is
+ * there through the whole process. Before the first question a second message says what the answers rest on. The
+ * reader's bubbles sit to the right in their own colour, without a name; the answers are cards beside the panel's
+ * mark, flush with the panel's edge, since the panel is narrow and an answer carries its sources.
  */
 function Thread({ ai }: { ai: AskAiApi }) {
-  if (ai.turns.length === 0) {
-    return <Text type="supporting">{introOf(ai)}</Text>;
-  }
+  const firstName = useFirstName();
   return (
     <ChatMessageList align="top" density="compact" isStreaming={ai.turns.some(isTurnPending)}>
+      <ChatMessage sender="assistant" avatar={<AssistantAvatar />}>
+        <ChatMessageBubble group={ai.turns.length === 0 ? "first" : undefined}>{welcomeText(firstName)}</ChatMessageBubble>
+        {ai.turns.length === 0 && <ChatMessageBubble group="last">{introOf(ai)}</ChatMessageBubble>}
+      </ChatMessage>
       {ai.turns.map((turn) => (
         <Fragment key={turn.id}>
           <ChatMessage sender="user">
             <ChatMessageBubble>{turn.question}</ChatMessageBubble>
           </ChatMessage>
           {/* The answer card flush with the panel's edge, not in a bubble's text column: the panel is narrow. */}
-          <ChatMessage sender="assistant">
+          <ChatMessage sender="assistant" avatar={<AssistantAvatar />}>
             <VStack as="article" aria-label={`Svar på ”${turn.question}”`} width="100%">
               <Answer turn={turn} ai={ai} />
             </VStack>
@@ -241,7 +260,8 @@ function Writing({ ai }: { ai: AskAiApi }) {
 const NOTE = "Svaren är ett stöd, inte juridisk rådgivning. Det är alltid förfrågningsunderlaget och lagtexten som gäller.";
 
 /**
- * The panel's header: a small title with the subject on one line under it, and the actions on the conversation as
+ * The panel's header on its tinted band, as a chat app's: the panel's mark, a small title, "Redo att hjälpa dig" by a
+ * green dot, and the subject on one line under it, and the actions on the conversation as
  * quiet icon buttons with tooltips: save as PDF and clear once there is something to save or clear, make the panel
  * larger or smaller on wider screens, and close. The title is an h2 in the outline but set at a panel's size. On a
  * phone the sheet has no heading of its own, so the focus moves here (WCAG 3.2.4).
@@ -266,15 +286,20 @@ function PanelHeader({
   const hasAnswers = ai.turns.some(isAnswered);
   const isExpanded = size === "expanded";
   return (
-    <HStack gap={2} vAlign="center">
-      <HStack aria-hidden="true">
-        <Icon icon={ChatIcon} color="accent" size="md" />
+    <HStack gap={2} vAlign="center" padding={3} className={styles.header}>
+      {/* The mark waves hello when the panel opens by itself with its welcome, and only then. */}
+      <HStack className={ai.isWelcoming ? styles.waving : undefined} data-waving={ai.isWelcoming || undefined}>
+        <AssistantAvatar size="md" />
       </HStack>
       <StackItem size="fill">
         <VStack gap={0}>
           <Heading level={5} accessibilityLevel={2} ref={ref} tabIndex={takesFocus ? -1 : undefined}>
             {ASK_AI_TITLE}
           </Heading>
+          <HStack gap={1} vAlign="center">
+            <StatusDot variant="success" label={READY_TEXT} />
+            <Text type="supporting">{READY_TEXT}</Text>
+          </HStack>
           <Text type="supporting" maxLines={1}>
             {subtitle}
           </Text>
@@ -321,7 +346,7 @@ function DockedPanel({
       <Layout
         height="fill"
         header={
-          <LayoutHeader padding={3}>
+          <LayoutHeader padding={0}>
             <PanelHeader ai={ai} subtitle={subtitle} takesFocus={false} size={size} onSizeChange={onSizeChange} />
           </LayoutHeader>
         }
@@ -366,7 +391,7 @@ export function AskAiWidget() {
   if (isPhone) {
     return (
       <>
-        <HStack className={styles.button} data-ask-ai-button="">
+        <HStack className={styles.button} data-ask-ai-button="" data-open={ai.isOpen || undefined}>
           <Button label={ASK_AI_TITLE} variant="primary" icon={<Icon icon={ChatIcon} />} onClick={() => ai.toggle()} />
         </HStack>
         <BottomSheet isOpen={ai.isOpen} onOpenChange={onOpenChange} label={ASK_AI_TITLE} height="tall" hasScrim={false} finalFocusRef={ai.openerRef}>
@@ -381,11 +406,13 @@ export function AskAiWidget() {
     );
   }
   return (
-    <HStack className={styles.button} data-ask-ai-button="">
+    <HStack className={styles.button} data-ask-ai-button="" data-open={ai.isOpen || undefined}>
       <Popover
         isOpen={ai.isOpen}
         onOpenChange={onOpenChange}
         isModal={false}
+        // Opened by itself with its welcome, the panel leaves the focus where the reader is (WCAG 3.2.1).
+        hasAutoFocus={!ai.isWelcoming}
         hasLightDismiss={false}
         hasEscapeDismiss
         placement="above"

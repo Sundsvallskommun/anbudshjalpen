@@ -173,3 +173,57 @@ export function questionProblem(text: string): string | null {
   if (length > MAX_QUESTION_LENGTH) return "Frågan får vara högst 2 000 tecken.";
   return null;
 }
+
+// --- The welcome ---------------------------------------------------------------------------------
+
+/**
+ * Who has been welcomed in this browser: the panel opens by itself with its welcome once per user, and once for a
+ * visitor, and never again on a later login. Kept in local storage and on this device only, because the demo's
+ * personas are shared: a flag on the user in the database would welcome only the first workshop participant who
+ * logs in as Anna.
+ */
+export const WELCOMED_KEY = "anbudsklar.fraga-ai.valkomnad.v1";
+/** The welcome key for someone who has not logged in. */
+export const VISITOR = "besokare";
+
+export function localStorageOrNull(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null; // blocked storage, a private window or no window at all
+  }
+}
+
+function welcomed(storage: Storage | null): string[] {
+  try {
+    const parsed: unknown = JSON.parse(storage?.getItem(WELCOMED_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Whether the panel has already welcomed this user (an id) or a visitor (`VISITOR`) in this browser. */
+export function hasBeenWelcomed(who: string, storage: Storage | null = localStorageOrNull()): boolean {
+  return welcomed(storage).includes(who);
+}
+
+/** Remembers the welcome. Without storage the panel would open on every page load, so it then counts as given. */
+export function markWelcomed(who: string, storage: Storage | null = localStorageOrNull()) {
+  try {
+    const known = welcomed(storage);
+    if (!known.includes(who)) storage?.setItem(WELCOMED_KEY, JSON.stringify([...known, who].slice(-50)));
+  } catch {
+    // Full or blocked storage: the welcome is simply not remembered.
+  }
+}
+
+/** The panel's first message: who it is, that it is there through the whole process, and what it can answer. */
+export function welcomeText(firstName: string | null): string {
+  const greeting = firstName ? `Hej ${firstName}!` : "Hej!";
+  return (
+    `${greeting} Jag är Anbudshjälpens AI-stöd. Jag finns alltid här i hörnet, genom hela processen: när du läser ` +
+    "kraven, granskar ditt utkast och lämnar in. Fråga mig om underlaget i en upphandling eller om reglerna för " +
+    "offentlig upphandling."
+  );
+}
