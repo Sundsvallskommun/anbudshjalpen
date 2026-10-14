@@ -61,3 +61,53 @@ html:has([data-step-nav]) {
 [data-astryx-theme]:has([data-page-width="1344"]) {
   --layout-container: var(--layout-workspace);
 }
+
+/* The look (docs/design.md, "Ytor och pynt"): the page rests on a faded background, soft glows of the accent and a
+   violet that fade into the body colour towards the foot, and stay put while the page scrolls. The top bar lets the
+   glow through a little. Cards get a thin band of the same two colours along their top edge, and a page's h1 a short
+   one under it. All of it is decoration: text keeps its own colours on the card and surface tokens, so contrast is
+   what the theme gives, in light and dark mode. Unlayered, so it wins over the design system's layered styles. */
+.astryx-app-shell {
+  --decoration-from: var(--color-accent);
+  --decoration-to: var(--color-data-categorical-purple);
+  background:
+    radial-gradient(70rem 36rem at 0% -8%, color-mix(in oklab, var(--decoration-from) 16%, transparent), transparent 70%),
+    radial-gradient(60rem 34rem at 100% 4%, color-mix(in oklab, var(--decoration-to) 13%, transparent), transparent 70%),
+    var(--color-background-body);
+  background-attachment: fixed;
+}
+
+.astryx-app-shell-header {
+  background-color: color-mix(in oklab, var(--color-background-surface) 82%, transparent);
+  backdrop-filter: blur(var(--spacing-3));
+}
+
+.astryx-card {
+  background-image: linear-gradient(90deg, var(--decoration-from), var(--decoration-to));
+  background-size: 100% var(--spacing-1);
+  background-repeat: no-repeat;
+  background-position: top;
+}
+
+[data-page-heading]::after {
+  content: "";
+  display: block;
+  inline-size: var(--spacing-12);
+  block-size: var(--spacing-1);
+  margin-block-start: var(--spacing-2);
+  border-radius: var(--spacing-1);
+  background: linear-gradient(90deg, var(--decoration-from), var(--decoration-to));
+}
+
+@media (forced-colors: active) {
+  .astryx-card,
+  [data-page-heading]::after {
+    background-image: none;
+  }
+}
+
+@media print {
+  .astryx-app-shell {
+    background: none;
+  }
+}

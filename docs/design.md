@@ -47,6 +47,14 @@ Hur koden skrivs, till exempel Astryx-komponenter i stället för egen layout oc
 8. **Klarspråk utan expertord.** Företagarens vy har inga tekniska ord och inga CPV-koder utan benämning. Fackord
    förklaras vid klick.
 
+## Ytor och pynt
+
+Sidan vilar på en tonad bakgrund: mjuka sken i accentfärgen uppe till vänster och i lila uppe till höger som tonar ut
+i bakgrundsfärgen och står still när sidan rullar. Toppraden släpper igenom lite av skenet. Korten har en tunn rand i
+samma två färger längs överkanten, och sidans h1 har en kort rand under sig. Allt är pynt: text står på temats egna
+ytor och färger, så kontrasten är den temat ger i ljust och mörkt läge. I tvingade färger och vid utskrift tas pyntet
+bort. Reglerna står i `frontend/src/app.css` och bygger bara på temats tokens.
+
 ## Navigering
 
 | Vem | Huvudmeny | Kontomeny (avataren) | Landar på |
