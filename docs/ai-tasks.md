@@ -139,7 +139,7 @@ mejlet "Ny träff" minns om annonsen kommer tillbaka.
 |---|---|
 | Metod | `review_draft(checklist, draft)` |
 | Indata | Den publicerade checklistan och företagets utkast (`PagedDocument`) |
-| Svar | `ReviewResult`: sammanfattning, en kontroll per krav (`uppfyllt`, `obevisat`, `saknas` eller `oklart`) med kommentar och citat ur utkastet, och en kontroll per bilaga (`bifogad`, `saknas` eller `oklart`). Webbappen säger Ser bra ut, Bevis saknas, Hittades inte och Kontrollera själv, och grupperar kraven som Måste åtgärdas, Kontrollera själv och Ser bra ut |
+| Svar | `ReviewResult`: sammanfattning, en kontroll per krav (`uppfyllt`, `obevisat`, `saknas` eller `oklart`) med kommentar och citat ur utkastet, och en kontroll per bilaga (`bifogad`, `saknas` eller `oklart`). Webbappen säger Ser bra ut, Bevis saknas, Hittades inte och Kontrollera själv, och grupperar kraven som Bör åtgärdas, Kontrollera själv och Ser bra ut |
 | Kontroll | Citaten ur utkastet kontrolleras mot utkastets sidor (`draft_check`) |
 | Körs av | En inloggad företagare som laddar upp ett utkast |
 
