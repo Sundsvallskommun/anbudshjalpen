@@ -171,6 +171,23 @@ def test_cited_sources_match_literal_references() -> None:
     assert cited_sources("Inget citerat.", context) == []
 
 
+def test_cited_sources_match_steering_document_sections_in_their_usual_forms() -> None:
+    sustainable = RuleContext(reference="Inköpsstrategin 5.2", title="Hållbara inköp", text="…")
+    other = RuleContext(reference="Inköpsstrategin 5.21", title="Påhittat avsnitt", text="…")
+    context = [sustainable, other]
+
+    def cited(answer: str) -> list[str | None]:
+        return [source.reference for source in cited_sources(answer, context)]
+
+    assert cited("Kommunen ställer krav på villkor i nivå med kollektivavtal (Inköpsstrategin 5.2).") == [
+        "Inköpsstrategin 5.2"
+    ]
+    assert cited("Det står i inköpsstrategin, avsnitt 5.2.") == ["Inköpsstrategin 5.2"]
+    assert cited("Enligt inköpsstrategins avsnitt 5.2 ska kommunen …") == ["Inköpsstrategin 5.2"]
+    assert cited("Se inköpsstrategin avsnitt 5.21.") == ["Inköpsstrategin 5.21"]
+    assert cited("Avsnitt 5.2 i någon annan text, och LOU 4 kap. 1 §.") == []
+
+
 def test_requires_configuration() -> None:
     settings = Settings(_env_file=None, ai_engine="heuristic")
     with pytest.raises(EngineError, match="OPENAI_BASE_URL"):

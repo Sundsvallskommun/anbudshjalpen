@@ -12,6 +12,7 @@ from mcp_harness import (
     DRAFT_SECRET,
     PAGES,
     PUBLIC_URL,
+    STRATEGY_URL,
     Seeded,
     everything,
     mcp_client,
@@ -34,6 +35,8 @@ EXPECTED_TOOLS = {
     "hamta_fragor_svar",
     "hamta_paragraf",
     "sok_lou",
+    "hamta_avsnitt",
+    "sok_styrdokument",
     "sla_upp_cpv",
     "kommande_upphandlingar",
 }
@@ -65,6 +68,10 @@ async def test_lists_read_only_tools_with_swedish_guidance(db_session: AsyncSess
         assert "Citera ordagrant och ange dokument och sidnummer" in (tools[name].description or "")
     for name in ("hamta_paragraf", "sok_lou"):
         assert "ange kapitel och paragraf" in (tools[name].description or "")
+    for name in ("hamta_avsnitt", "sok_styrdokument"):
+        description = tools[name].description or ""
+        assert "ange dokument och avsnitt" in description
+        assert "binder kommunens egna beställare, inte leverantören" in description
 
 
 async def test_search_filters_notices_and_points_to_the_next_page(
@@ -243,6 +250,48 @@ async def test_law_tools_return_citable_paragraphs(db_session: AsyncSession, see
     assert not missing.isError and "LOU 4 kap. 99 § finns inte" in texts(missing)
     assert resources(unparsable) == [] and resources(missing) == []
     assert [found.meta and found.meta["title"] for found in resources(search)] == ["LOU 20 kap. 1 §"]
+
+
+async def test_steering_document_tools_return_citable_sections_labelled_as_such(
+    db_session: AsyncSession, seeded: Seeded
+) -> None:
+    async with mcp_client(db_session) as client:
+        section = await client.call_tool("hamta_avsnitt", {"referens": "Inköpsstrategin 5.2"})
+        bare_number = await client.call_tool("hamta_avsnitt", {"referens": "5.3"})
+        own_words = await client.call_tool(
+            "hamta_avsnitt", {"referens": "kommunens inköpsstrategi, avsnitt 5.3"}
+        )
+        unknown_document = await client.call_tool("hamta_avsnitt", {"referens": "Miljöpolicyn 2"})
+        missing = await client.call_tool("hamta_avsnitt", {"referens": "Inköpsstrategin 9.9"})
+        law = await client.call_tool("hamta_avsnitt", {"referens": "4 kap. 1 §"})
+        search = await client.call_tool("sok_styrdokument", {"fraga": "småföretag"})
+        nothing = await client.call_tool("sok_styrdokument", {"fraga": "xylofonstämning"})
+
+    [found] = resources(section)
+    assert str(found.uri) == f"{STRATEGY_URL}#page=8"
+    assert found.text.startswith(
+        "Inköpsstrategin 5.2, Inköpsstrategi för Sundsvalls kommun\nAvsnitt 5.2: Hållbara inköp"
+    )
+    assert "Sidorna 8–9 i dokumentet" in found.text
+    assert "Fastställt av Kommunfullmäktige 2023-09-25" in found.text
+    assert "binder kommunens egna beställare, inte leverantören" in found.text
+    assert "underleverantörer i obegränsat antal led" in found.text
+    # No pageRange: Eneo's reference chip must say the section, not "sida 8".
+    assert found.meta == {"title": "Inköpsstrategin 5.2", "section": "Hållbara inköp"}
+    assert resources(bare_number)[0].meta == {
+        "title": "Inköpsstrategin 5.3",
+        "section": "Konkurrensinriktade inköp",
+    }
+    assert resources(own_words)[0].meta["title"] == "Inköpsstrategin 5.3"
+    assert not unknown_document.isError
+    assert "Hittar inget styrdokument som heter 'Miljöpolicyn'" in texts(unknown_document)
+    assert "Kända dokument: 'Inköpsstrategin'" in texts(unknown_document)
+    assert not missing.isError and "Avsnitt 9.9 finns inte" in texts(missing)
+    assert not law.isError and "Kunde inte tolka '4 kap. 1 §' som ett avsnitt" in texts(law)
+    assert resources(unknown_document) == resources(missing) == resources(law) == []
+    assert [hit.meta and hit.meta["title"] for hit in resources(search)] == ["Inköpsstrategin 5.3"]
+    assert texts(search).startswith("1 avsnitt i kommunens styrdokument om 'småföretag'.")
+    assert not nothing.isError and "Inga avsnitt i kommunens styrdokument matchar" in texts(nothing)
 
 
 async def test_cpv_lookup_shows_codes_with_their_broader_levels(

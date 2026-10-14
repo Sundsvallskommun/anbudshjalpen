@@ -35,6 +35,8 @@ from anbudsklar.models import (
     LouSection,
     MatchRecord,
     Notice,
+    PolicyDocument,
+    PolicySection,
     PublishedAnswer,
     QuestionLog,
 )
@@ -214,7 +216,7 @@ async def seed(db_session: AsyncSession) -> Seeded:
             ),
         ]
     )
-    db_session.add_all(_lou_sections() + _cpv_codes() + _agreements(today))
+    db_session.add_all(_lou_sections() + _policy_sections() + _cpv_codes() + _agreements(today))
     company = Company(name="Testföretaget AB", description=COMPANY_SECRET, is_fictitious=True)
     db_session.add(company)
     await db_session.flush()
@@ -275,6 +277,49 @@ def _lou_sections() -> list[LouSection]:
             "får myndigheten inte ingå avtal förrän 10 dagar har gått (avtalsspärr).",
             sort_key=200001,
             consolidated_through=consolidated,
+        ),
+    ]
+
+
+STRATEGY_URL = "https://sundsvall.se/download/strategi.pdf"
+
+
+def _policy_sections() -> list[PolicySection]:
+    """Two sections of the municipality's procurement strategy (a public decision, not fictitious)."""
+
+    strategy = PolicyDocument(
+        slug="inkopsstrategi",
+        title="Inköpsstrategi för Sundsvalls kommun",
+        short_title="Inköpsstrategin",
+        decided_by="Kommunfullmäktige",
+        decided_on=date(2023, 9, 25),
+        diarienummer="KSK-2023-00196",
+        source_url=STRATEGY_URL,
+        retrieved_on=date(2026, 10, 14),
+    )
+    return [
+        PolicySection(
+            document=strategy,
+            number="5.2",
+            heading="Hållbara inköp",
+            text="Sundsvalls kommuns inköp ska vara hållbara.\n\n- Anlita socialt ansvarsfulla "
+            "leverantörer. Minimivillkor motsvarande ett centralt kollektivavtal ska alltid ställas i "
+            "upphandlingar där det finns risk för oskäliga arbetsvillkor, krav på villkor i nivå med "
+            "kollektivavtal ska gälla även för underleverantörer i obegränsat antal led.",
+            page_start=8,
+            page_end=9,
+            sort_key=10,
+        ),
+        PolicySection(
+            document=strategy,
+            number="5.3",
+            heading="Konkurrensinriktade inköp",
+            text="Sundsvalls kommuns inköp ska tillvarata och vårda konkurrensen på de olika marknaderna.\n\n"
+            "- Tillvarata småföretagens konkurrenskraft, t.ex. genom att undanröja hinder såsom "
+            "oproportionerliga krav, krånglig administration och alltför omfattande kontrakt.",
+            page_start=9,
+            page_end=9,
+            sort_key=11,
         ),
     ]
 

@@ -158,15 +158,23 @@ export interface CpvSuggestions {
   suggestions: CpvSuggestion[];
 }
 
+/** A section of the law (LOU), or of one of the municipality's steering documents (decision 0022). */
+export type RuleSourceKind = "law" | "policy";
+
 export interface RuleSource {
   title: string;
+  /** "LOU 20 kap. 1 §" or "Inköpsstrategin 5.2". */
   reference: string | null;
   url: string | null;
   /**
-   * The start of the law text itself, cut after a whole sentence and ending with " …" when shortened. Set by the
-   * backend from its own copy of LOU (never by a model); null for sources that are not a LOU section it holds.
+   * The start of the source's own text, cut after a whole sentence and ending with " …" when shortened. Set by the
+   * backend from its own copy of LOU or the steering document (never by a model); null for sources it does not hold.
    */
   excerpt: string | null;
+  /** Set by the backend; null for guidance and web pages. */
+  kind: RuleSourceKind | null;
+  /** Set by the backend for a steering document: "Kommunens styrdokument, fastställt av kommunfullmäktige 2023-09-25." */
+  note: string | null;
 }
 
 export interface RulesAnswer {

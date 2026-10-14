@@ -126,6 +126,7 @@ function RulesAnswer({ view }: { view: RulesView }) {
             {view.answer.sources.map((source, index) => (
               <li key={index}>
                 <Text weight="semibold">{sourceTitle(source)}</Text>
+                {source.note && <Text type="supporting">{source.note}</Text>}
                 {source.excerpt && <Text>{source.excerpt}</Text>}
                 {source.url && <Text type="supporting">{source.url}</Text>}
               </li>

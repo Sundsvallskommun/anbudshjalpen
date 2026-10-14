@@ -33,6 +33,7 @@ Hör ihop med: [Dokumentationsindex](../README.md), [Arkitektur](../architecture
 | [0019](0019-utan-granskning-ingen-ogranskad-och-checklista-pa-vag.md) | När granskningen är av säger ingen vy "inte granskad", och en checklista på väg visas som på väg | Accepterat | 2026-10-12 |
 | [0020](0020-checklistan-lases-ur-alla-dokument.md) | Checklistan tolkas ur alla dokument i upphandlingen, och det som inte lästs in syns | Accepterat | 2026-10-13 |
 | [0021](0021-eavrop-gar-fore-ted.md) | En upphandling som finns i både TED och e-Avrop visas som e-Avrops annons | Accepterat | 2026-10-13 |
+| [0022](0022-kommunens-styrdokument-som-kalla.md) | Kommunens styrdokument för inköp är en egen källa i Regelhjälpen, skild från lagen | Accepterat | 2026-10-14 |
 
 ## Så skriver du ett beslut
 

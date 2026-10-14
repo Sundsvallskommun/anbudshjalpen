@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
 
 import httpx
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.contracts import (
@@ -33,6 +34,8 @@ from anbudsklar.models import (
     DocumentPage,
     LouSection,
     Notice,
+    PolicyDocument,
+    PolicySection,
     User,
 )
 from anbudsklar.services.dates import STOCKHOLM
@@ -274,6 +277,40 @@ async def add_lou_section(
         )
     )
     await session.flush()
+
+
+STRATEGY_URL = "https://sundsvall.se/download/strategi.pdf"
+
+
+async def add_policy_section(
+    session: AsyncSession, *, number: str, heading: str, text: str, page: int = 8
+) -> PolicySection:
+    """A section of the municipality's procurement strategy, creating the document the first time."""
+
+    strategy = await session.scalar(select(PolicyDocument).where(PolicyDocument.slug == "inkopsstrategi"))
+    if strategy is None:
+        strategy = PolicyDocument(
+            slug="inkopsstrategi",
+            title="Inköpsstrategi för Sundsvalls kommun",
+            short_title="Inköpsstrategin",
+            decided_by="Kommunfullmäktige",
+            decided_on=date(2023, 9, 25),
+            source_url=STRATEGY_URL,
+        )
+        session.add(strategy)
+        await session.flush()
+    section = PolicySection(
+        document_id=strategy.id,
+        number=number,
+        heading=heading,
+        text=text,
+        page_start=page,
+        page_end=page,
+        sort_key=int(number.replace(".", "")),
+    )
+    session.add(section)
+    await session.flush()
+    return section
 
 
 # --- A complete demo ----------------------------------------------------------------

@@ -30,7 +30,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from anbudsklar.cpv import CPV_CODE, cpv_digits, cpv_prefix
 from anbudsklar.documents.citations import HIGHLIGHT, PageIndex, QuoteMatch, excerpt, match_quote
 from anbudsklar.documents.store import is_current
-from anbudsklar.models import CpvCode, Document, DocumentPage, LouSection, Notice, PublishedAnswer
+from anbudsklar.models import (
+    CpvCode,
+    Document,
+    DocumentPage,
+    LouSection,
+    Notice,
+    PolicyDocument,
+    PolicySection,
+    PublishedAnswer,
+)
+from anbudsklar.policy_refs import parse_policy_reference
 from anbudsklar.search.types import BuyerCount, NoticeOrder, PageHit, PageText, QuoteCheck
 from anbudsklar.visibility import shown_notices
 
@@ -42,7 +52,16 @@ NOTICE_TITLE_SIMILARITY = 0.3
 
 PAGE_TEXT_SIMILARITY = 0.4
 LOU_TEXT_SIMILARITY = 0.4
+POLICY_TEXT_SIMILARITY = 0.4
 CPV_LABEL_SIMILARITY = 0.5
+
+# How a rule text was found, best first: the reference itself, every word of the question,
+# any word of it, or the trigram fallback. Hits are ranked by tier before score, since a
+# section with every word says more than one with a single word, and a fuzzy match on a
+# compound word says less than a stemmed hit (`search_rule_texts`).
+REFERENCE_TIER = 0
+FULLTEXT_TIER = 1  # + the variant: 1 for the question as typed, 2 for its words OR-ed
+TRIGRAM_TIER = 3
 
 MAX_LIMIT = 100
 MAX_SEARCH_TERMS = 12
@@ -741,40 +760,184 @@ async def get_lou_section(session: AsyncSession, chapter: str | int, section: st
     )
 
 
+@dataclass(frozen=True, slots=True)
+class RankedRuleText:
+    """A law or steering-document section found for a question, with how and how well it matched.
+
+    `score` orders hits within one tier only: `ts_rank_cd` for full-text hits, trigram
+    similarity for fallbacks, 1.0 for the section a reference named.
+    """
+
+    row: LouSection | PolicySection
+    tier: int
+    score: float
+
+
+_LOU_ORDER = (LouSection.chapter, LouSection.sort_key, LouSection.id)
+_POLICY_ORDER = (PolicySection.document_id, PolicySection.sort_key, PolicySection.id)
+
+
+async def _ranked_fulltext(
+    session: AsyncSession,
+    model: type[LouSection] | type[PolicySection],
+    search: Any,
+    query: str,
+    limit: int,
+    order: Sequence[Any],
+) -> list[RankedRuleText]:
+    """Full-text hits with their rank: the query as typed, then its words OR-ed (a tier lower)."""
+
+    for offset, variant in enumerate(_fulltext_variants(query)):
+        tsquery = _tsquery(variant)
+        rank = func.ts_rank_cd(search, tsquery)
+        stmt = (
+            select(model, rank)
+            .where(search.op("@@")(tsquery))
+            .order_by(rank.desc(), *order)
+            .limit(_clamp(limit))
+        )
+        rows = (await session.execute(stmt)).all()
+        if rows:
+            return [RankedRuleText(row[0], FULLTEXT_TIER + offset, float(row[1])) for row in rows]
+    return []
+
+
+async def _ranked_trigram(
+    session: AsyncSession,
+    model: type[LouSection] | type[PolicySection],
+    columns: Sequence[Any],
+    query: str,
+    limit: int,
+    order: Sequence[Any],
+    threshold: float,
+) -> list[RankedRuleText]:
+    """Trigram fallback for what the stemmer cannot match, mainly compound words and misspellings."""
+
+    similarity = func.greatest(*(func.word_similarity(query, column) for column in columns))
+    stmt = (
+        select(model, similarity)
+        .where(similarity >= threshold)
+        .order_by(similarity.desc(), *order)
+        .limit(_clamp(limit))
+    )
+    rows = (await session.execute(stmt)).all()
+    return [RankedRuleText(row[0], TRIGRAM_TIER, float(row[1])) for row in rows]
+
+
+async def _ranked_lou(session: AsyncSession, query: str, limit: int) -> list[RankedRuleText]:
+    reference = parse_lou_reference(query)
+    if reference is not None:
+        section = await get_lou_section(session, *reference)
+        if section is not None:
+            return [RankedRuleText(section, REFERENCE_TIER, 1.0)]
+    hits = await _ranked_fulltext(session, LouSection, LouSection.search, query, limit, _LOU_ORDER)
+    if hits:
+        return hits
+    columns = (func.coalesce(LouSection.heading, ""), LouSection.text)
+    return await _ranked_trigram(session, LouSection, columns, query, limit, _LOU_ORDER, LOU_TEXT_SIMILARITY)
+
+
 async def search_lou(session: AsyncSession, query: str, limit: int = 5) -> list[LouSection]:
     """LOU sections for a reference ("20 kap. 1 §") or a question, most relevant first."""
 
     query = query.strip()
     if not query:
         return []
-    reference = parse_lou_reference(query)
+    return [hit.row for hit in await _ranked_lou(session, query, limit) if isinstance(hit.row, LouSection)]
+
+
+# --- The municipality's steering documents (decision 0022) ----------------------------------
+
+
+async def list_policy_documents(session: AsyncSession) -> list[PolicyDocument]:
+    return list(await session.scalars(select(PolicyDocument).order_by(PolicyDocument.id)))
+
+
+_NAME_WORD = re.compile(r"\w{4,}")
+
+
+def _names_document(name: str, document: PolicyDocument) -> bool:
+    """Whether a reference's name ("kommunens inköpsstrategi", "strategin") means this document.
+
+    The whole title or short title in the name is a match, and so is any word of the name
+    that is part of a word of the short title or contains one ("inköpsstrategi" against
+    "Inköpsstrategin"), so the model's own wording of the name still finds the document.
+    Words of the full title are not used: "kommunens" would name every document.
+    """
+
+    wanted = name.casefold()
+    if document.title.casefold() in wanted or document.short_title.casefold() in wanted:
+        return True
+    known = {*_NAME_WORD.findall(document.short_title.casefold()), document.slug}
+    return any(word in title or title in word for word in _NAME_WORD.findall(wanted) for title in known)
+
+
+async def find_policy_document(session: AsyncSession, name: str | None) -> PolicyDocument | None:
+    """The document a reference names, or the only one there is when no name was given."""
+
+    documents = await list_policy_documents(session)
+    if name is None:
+        return documents[0] if len(documents) == 1 else None
+    return next((document for document in documents if _names_document(name, document)), None)
+
+
+async def get_policy_section(
+    session: AsyncSession, number: str, document: str | None = None
+) -> PolicySection | None:
+    """One section ("5.2", "5.2.") of the named document, or of the only document when none is named."""
+
+    found = await find_policy_document(session, document)
+    if found is None:
+        return None
+    key = number.strip().rstrip(".")
+    return await session.scalar(
+        select(PolicySection).where(PolicySection.document_id == found.id, PolicySection.number == key)
+    )
+
+
+async def _ranked_policy(session: AsyncSession, query: str, limit: int) -> list[RankedRuleText]:
+    reference = parse_policy_reference(query)
     if reference is not None:
-        section = await get_lou_section(session, *reference)
+        section = await get_policy_section(session, reference[1], reference[0])
         if section is not None:
-            return [section]
-    in_law_order = (LouSection.chapter, LouSection.sort_key, LouSection.id)
-    for variant in _fulltext_variants(query):
-        tsquery = _tsquery(variant)
-        stmt = (
-            select(LouSection)
-            .where(LouSection.search.op("@@")(tsquery))
-            .order_by(func.ts_rank_cd(LouSection.search, tsquery).desc(), *in_law_order)
-            .limit(_clamp(limit))
-        )
-        sections = list(await session.scalars(stmt))
-        if sections:
-            return sections
-    similarity = func.greatest(
-        func.word_similarity(query, func.coalesce(LouSection.heading, "")),
-        func.word_similarity(query, LouSection.text),
+            return [RankedRuleText(section, REFERENCE_TIER, 1.0)]
+    hits = await _ranked_fulltext(session, PolicySection, PolicySection.search, query, limit, _POLICY_ORDER)
+    if hits:
+        return hits
+    columns = (PolicySection.heading, PolicySection.text)
+    return await _ranked_trigram(
+        session, PolicySection, columns, query, limit, _POLICY_ORDER, POLICY_TEXT_SIMILARITY
     )
-    stmt = (
-        select(LouSection)
-        .where(similarity >= LOU_TEXT_SIMILARITY)
-        .order_by(similarity.desc(), *in_law_order)
-        .limit(_clamp(limit))
-    )
-    return list(await session.scalars(stmt))
+
+
+async def search_policy_sections(session: AsyncSession, query: str, limit: int = 5) -> list[PolicySection]:
+    """Steering-document sections for a reference ("Inköpsstrategin 5.2") or a question, best first."""
+
+    query = query.strip()
+    if not query:
+        return []
+    hits = await _ranked_policy(session, query, limit)
+    return [hit.row for hit in hits if isinstance(hit.row, PolicySection)]
+
+
+async def search_rule_texts(
+    session: AsyncSession, query: str, limit: int = 5
+) -> list[LouSection | PolicySection]:
+    """Law and steering-document sections for a question, best first, whichever table holds them.
+
+    Both sources are ranked together so that a question about the municipality's aims
+    gets the strategy first and one about a deadline gets the law first (decision 0022).
+    The section a reference names wins, then sections with every word of the question,
+    then sections with any of its words, then trigram fallbacks; within a tier the higher
+    score wins and the law breaks ties.
+    """
+
+    query = query.strip()
+    if not query:
+        return []
+    hits = [*await _ranked_lou(session, query, limit), *await _ranked_policy(session, query, limit)]
+    hits.sort(key=lambda hit: (hit.tier, -hit.score))
+    return [hit.row for hit in hits[: _clamp(limit)]]
 
 
 # --- Published questions and answers ----------------------------------------------

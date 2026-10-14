@@ -49,6 +49,7 @@ from anbudsklar.contracts import (
     Task,
     model_output_schema,
 )
+from anbudsklar.policy_refs import parse_policy_reference
 
 logger = logging.getLogger(__name__)
 
@@ -65,14 +66,33 @@ def _law_keys(text: str) -> set[tuple[str, str]]:
     return {(chapter, section.replace(" ", "").lower()) for chapter, section in _LAW_REFERENCE.findall(text)}
 
 
+def _cites_policy(answer: str, reference: str) -> bool:
+    """True when the answer names a steering-document section in any of the usual forms.
+
+    "Inköpsstrategin 5.2", "inköpsstrategin, avsnitt 5.2" and "inköpsstrategins avsnitt 5.2"
+    all count; "5.21" does not count for 5.2.
+    """
+
+    parsed = parse_policy_reference(reference)
+    if parsed is None:
+        return False
+    name, number = parsed
+    if name is None:
+        return False
+    pattern = rf"{re.escape(name)}s?\W{{0,20}}?(?:avsnitt\s*)?{re.escape(number)}(?!\.?\d)"
+    return re.search(pattern, answer, re.IGNORECASE) is not None
+
+
 def cited_sources(answer: str, context: list[RuleContext]) -> list[RuleSource]:
-    """The rule texts an answer refers to, matched on "N kap. M §" or the literal reference."""
+    """The rule texts an answer refers to: "N kap. M §" for the law, the document's name and
+    section number for a steering document, or the literal reference."""
 
     cited_keys = _law_keys(answer)
     sources: list[RuleSource] = []
     for item in context:
         keys = _law_keys(item.reference)
-        if (keys and keys <= cited_keys) or item.reference in answer:
+        cited = (keys and keys <= cited_keys) or item.reference in answer
+        if cited or _cites_policy(answer, item.reference):
             sources.append(RuleSource(title=item.title, reference=item.reference, url=item.url))
     return sources
 

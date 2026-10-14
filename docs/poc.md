@@ -45,8 +45,10 @@ loggar man in som Anna Berg på firman ([beslut 0007](decisions/0007-poc-login-p
    bra ut" redan är förbockat, och en länk till e-Avrop.
 8. **Tilldelning:** Anbudshjälpen förklarar beslutet och vad avtalsspärren innebär.
 
-Regelhjälpen svarar på allmänna frågor om upphandling med hänvisning till LOU och vägledningar. Varje paragraf som
-svaret bygger på visas med lagens egna ord.
+Regelhjälpen svarar på allmänna frågor om upphandling med hänvisning till LOU, kommunens inköpsstrategi och
+vägledningar. Varje paragraf eller avsnitt som svaret bygger på visas med källans egna ord, och ett avsnitt ur
+strategin är märkt som kommunens styrdokument, inte lag
+([beslut 0022](decisions/0022-kommunens-styrdokument-som-kalla.md)).
 
 För den som visar demon finns växeln "Visa hur underlaget lästes" under "Om demon och AI". Upphandlingens sida får då
 knappen "Så lästes underlaget", som visar vad som hände med varje fil från hämtningen till checklistan, se
@@ -86,6 +88,7 @@ AI-motorn är en Eneo-testinstans som nås via API. Utan Eneo används motorn `o
 | Annonser | Riktiga från TED, och från e-Avrops API när kommunens nyckel är inlagd, se [Datakällor](data-sources.md) |
 | Underlag | Tre påhittade underlag med facit, tills inköp kan lämna 3–5 avslutade upphandlingar |
 | LOU | Riktig, från Riksdagens öppna data |
+| Kommunens inköpsstrategi | Riktig, kommunfullmäktiges beslut 2023-09-25 återgivet i repot |
 | Vägledningar och sundsvall.se | Riktiga, som kunskap i Eneo för Regelhjälpen |
 | CPV-koder | Riktiga: EU:s officiella lista med svenska benämningar |
 | Avtalskatalog | Påhittad och märkt, tills inköp kan lämna ett utdrag |

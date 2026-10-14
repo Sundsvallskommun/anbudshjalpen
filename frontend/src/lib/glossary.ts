@@ -23,6 +23,18 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     forms: ["LOU"],
   },
   {
+    term: "Styrdokument",
+    explanation:
+      "Ett dokument som kommunens politiker har beslutat om och som styr kommunens egen verksamhet, till exempel inköpsstrategin. Det binder kommunens beställare, inte leverantören. Vad som gäller för leverantören står i lagen och i förfrågningsunderlaget.",
+    forms: ["styrdokument", "styrdokumentet", "styrdokumenten"],
+  },
+  {
+    term: "Inköpsstrategi",
+    explanation:
+      "Kommunfullmäktiges strategi för kommunens inköp (2023-09-25): inköpen ska vara effektiva, rättssäkra och hållbara. Den säger bland annat att kommunen ska ta tillvara småföretagens konkurrenskraft och ställa krav på hållbarhet och på villkor i nivå med kollektivavtal.",
+    forms: ["inköpsstrategi", "inköpsstrategin", "inköpsstrategins"],
+  },
+  {
     term: "Förfrågningsunderlag",
     explanation:
       "Dokumenten som beskriver vad kommunen vill köpa och vilka krav som gäller. Lagen kallar dem upphandlingsdokument. Det är alltid underlaget som gäller.",

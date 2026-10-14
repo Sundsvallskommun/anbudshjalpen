@@ -34,7 +34,7 @@ make setup                 # uv sync och npm ci
 cp .env.example .env
 make services              # Postgres och Mailpit
 make migrate
-make seed                  # demodata och CPV-koder
+make seed                  # demodata, CPV-koder och kommunens styrdokument
 cd backend && uv run anbudsklar ingest lou    # LOU från Riksdagen (kräver internet)
 ```
 
@@ -94,8 +94,8 @@ Kommandot `anbudsklar` körs från `backend/` med `uv run anbudsklar …`, eller
 | Kommando | Gör |
 |---|---|
 | `migrate` | Kör databasmigreringarna |
-| `seed` | Läser in påhittade annonser, underlag, företag, demopersoner och avtal, och CPV-koderna om de saknas. Går att köra flera gånger. Har en fixtur-PDF byggts om ersätts underlaget som seed lade in tidigare, och checklistor som tolkats från den gamla filen tas bort med det. Underlag som inköpare laddat upp ligger kvar. Utskriften visar antalet i `replaced_documents` |
-| `ingest ted`, `ingest eavrop`, `ingest lou`, `ingest cpv`, `ingest agreements` | Hämtar eller läser in en källa. `ingest cpv` och `ingest agreements` tar `--path` till en annan CSV-fil |
+| `seed` | Läser in påhittade annonser, underlag, företag, demopersoner och avtal, CPV-koderna om de saknas, och kommunens styrdokument från `data/styrdokument/` varje gång. Går att köra flera gånger. Har en fixtur-PDF byggts om ersätts underlaget som seed lade in tidigare, och checklistor som tolkats från den gamla filen tas bort med det. Underlag som inköpare laddat upp ligger kvar. Utskriften visar antalet i `replaced_documents` |
+| `ingest ted`, `ingest eavrop`, `ingest lou`, `ingest styrdokument`, `ingest cpv`, `ingest agreements` | Hämtar eller läser in en källa. `ingest cpv` och `ingest agreements` tar `--path` till en annan CSV-fil, och `ingest styrdokument` till en annan mapp med styrdokument |
 | `interpret --notice <id>` eller `interpret --pending` | Tolkar alla underlag i en annons på nytt (nya utkast), eller kör jobbet `interpret_pending` en gång |
 | `reextract` | Läser om sparade underlag med det senaste textuttaget (jobbet `reextract_outdated`) |
 | `match` | Bedömer annonser mot företagens profiler |

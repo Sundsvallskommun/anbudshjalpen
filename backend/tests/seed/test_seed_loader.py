@@ -88,6 +88,7 @@ async def test_load_demo_data_is_idempotent(db_session: AsyncSession, calls: Cal
         "companies": 2,
         "users": 2,
         "agreements": 26,
+        "policy_sections": 18,  # the committed procurement strategy, refreshed on every seed
         "replaced_documents": 0,
     }
     assert {key: value for key, value in second.items() if key != "cpv_codes"} == without_cpv

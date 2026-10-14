@@ -40,6 +40,7 @@ När en fråga är avgjord flyttas svaret till ett beslut i [decisions/](decisio
 | Frågor och svar läses ur loggfilen `LoggfilOrginalFragor.txt`, som inte är dokumenterad ([beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md)). Får den användas så, håller formatet, och kan svar som inköp bara skickar till frågeställaren hamna där? Bäst vore ett fält i API:t. Se [e-Avrops API](eavrop.md#frågor-och-svar) | Antirio och inköp |
 | Ska inköparen godkänna checklistorna innan de publiceras? Det kostar tid per upphandling och gör checklistan till kommunens sammanfattning. Båda sätten går att pröva: inställningen finns under Inköp › Inställningar ([beslut 0011](decisions/0011-installningar-granskning-valfri.md)) | Inköp |
 | Vilken verksamhet ska piloten gälla? | Näringslivsenheten och inköp |
+| Finns en handlingsplan för inköpsstrategin eller riktlinjer för inköp som Regelhjälpen också bör ha som källa? Strategin är övergripande; riktlinjer med konkreta krav skulle ge företagen mer. Ett nytt dokument är en ny fil i `data/styrdokument/` ([beslut 0022](decisions/0022-kommunens-styrdokument-som-kalla.md)) | Inköp |
 
 ## Juridik
 

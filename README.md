@@ -72,15 +72,16 @@ kontrollerat. Webbappen säger vilken motor som tog fram innehållet.
   - **4 Lämna in:** en lista att bocka av och en länk till e-Avrop.
 - **Mejl:** påminnelser före sista dag för frågor och sista anbudsdag, och besked om nya träffar.
 - **Företagsprofil:** företaget beskriver sig med egna ord och får förslag på CPV-koder med skäl.
-- **Regelhjälpen:** svar på allmänna frågor om upphandling, med paragraferna i lagen om offentlig upphandling (LOU).
+- **Regelhjälpen:** svar på allmänna frågor om upphandling, med paragraferna i lagen om offentlig upphandling (LOU)
+  och avsnitten i kommunens inköpsstrategi, tydligt märkta som lag respektive kommunens styrdokument.
 - **Granskning för inköp:** ett granskningsbord där checklistan står bredvid källan i underlaget, med automatiska
   kontroller, och där inköparen godkänner och publicerar.
 - **Företagens frågor och Drift:** inköp ser företagens frågor sammanställda utan namn, och på sidan Drift ser
   inköparen de schemalagda jobben och kan köra dem.
 - **Utseende och tillgänglighet:** ljust, mörkt eller automatiskt läge. Webbappen är byggd för WCAG 2.2 AA och testas
   med Playwright och axe.
-- **MCP-server för Eneo:** en MCP-server som bara läser, med tio verktyg som låter Eneos assistenter söka i
-  upphandlingar, underlag och LOU.
+- **MCP-server för Eneo:** en MCP-server som bara läser, med tretton verktyg som låter Eneos assistenter söka i
+  upphandlingar, underlag, LOU och kommunens styrdokument för inköp.
 
 ---
 
@@ -226,6 +227,7 @@ svara, står i [Öppna frågor](docs/open-questions.md).
 - **Öppna data:**
   - annonser från [TED](https://ted.europa.eu/), Europeiska unionens publikationsbyrå
   - lagen (2016:1145) om offentlig upphandling från [Riksdagens öppna data](https://data.riksdagen.se/)
+  - kommunens inköpsstrategi, fastställd av kommunfullmäktige 2023-09-25, från sundsvall.se
   - CPV-koderna: CPV 2008, Europeiska unionens publikationsbyrå (ted.europa.eu)
 
 ---

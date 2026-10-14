@@ -262,9 +262,13 @@ tillbaka till länken när dialogen stängs.
 - **Regelhjälpen** har samma samtalsform som Fråga AI, med "Fråga" bredvid skrivfältet och, när ett samtal har börjat,
   "Börja om" under det. Ett svar har ursprungsraden, en fet slutsats när motorn skrev en, förklaringen och ett kort per
   paragraf: "LOU 20 kap. 1 § · Avtalsspärr", början av lagtexten ur Anbudshjälpens egen kopia av LOU och "Läs hela
-  paragrafen". Korten står under rubriken "Svaret bygger på", eller "Paragrafer som kan handla om din fråga" när den
-  regelbaserade motorn svarar utan slutsats. Ursprungsraden förklarar att svaret bygger på lagen och att det alltid är
-  lagtexten som gäller. Exempelfrågorna står kvar efter svaret, utom de som redan har ställts.
+  paragrafen". Ett avsnitt ur kommunens inköpsstrategi har samma kort, "Inköpsstrategin 5.2 · Hållbara inköp", med
+  raden "Kommunens styrdokument, fastställt av kommunfullmäktige 2023-09-25." under rubriken och "Läs hela
+  avsnittet", så att ingen läser det som lag ([beslut 0022](decisions/0022-kommunens-styrdokument-som-kalla.md)).
+  Korten står under rubriken "Svaret bygger på", eller "Paragrafer som kan handla om din fråga" (med "och avsnitt"
+  när ett styrdokument är med) när den regelbaserade motorn svarar utan slutsats. Ursprungsraden förklarar att svaret
+  bygger på lagen och kommunens styrdokument, att ett styrdokument binder kommunens beställare och inte läsaren, och
+  att det alltid är lagtexten som gäller. Exempelfrågorna står kvar efter svaret, utom de som redan har ställts.
 - **Företagsprofil** är ett formulär på 640 px. Det börjar med ett kort som säger vad profilen styr och hur många
   träffar som verkar passa just nu, samma antal som på Start. Under "Vad ni gör (CPV-koder)" står först beskrivningen
   med egna ord, sedan sökfältet "Lägg till kod" och de valda koderna i en tabell grupperad under sin huvudgrupp
@@ -343,7 +347,7 @@ Byggstenarna som omgörningen lade till ligger i `frontend/src/components/ui/`. 
 | Komponent | Till för |
 |---|---|
 | `AccentCard` | Ett kort med en accentkant på 4 px i startkanten, för det enda kortet i en vy som leder vidare: "Nästa steg" och Starts "Nästa frist". Tar samma props som Astryx `Card` |
-| `AiProvenance` | Ursprungsraden överst i varje automatiskt block, en gång. Granskat innehåll: "Granskad av inköp 5 okt 2026 · Alla 86 källhänvisningar hittades i underlaget". Annars "Automatiskt framtaget · inte granskat av inköp", eller bara "Automatiskt framtaget" med källkontrollen medan inköp inte granskar något (beslut 0019). Popovern "Hur togs det här fram?" namnger motorn: regelbaserat, AI via Eneo eller en AI-modell. `basis` säger vad innehållet bygger på: underlaget (standard), där popovern slutar med "Det är alltid förfrågningsunderlaget som gäller", eller lagen (`basis="law"`, Regelhjälpen), där den säger "Läs alltid hela paragrafen" och "Det är alltid lagtexten som gäller". När motorn räknar tokens säger popovern också vad svaret kostade: "Språkmodellen använde 9 400 tokens för det här: 8 950 in och 450 ut. Uppskattad kostnad 0,12 kr." På telefon heter länken "Mer" |
+| `AiProvenance` | Ursprungsraden överst i varje automatiskt block, en gång. Granskat innehåll: "Granskad av inköp 5 okt 2026 · Alla 86 källhänvisningar hittades i underlaget". Annars "Automatiskt framtaget · inte granskat av inköp", eller bara "Automatiskt framtaget" med källkontrollen medan inköp inte granskar något (beslut 0019). Popovern "Hur togs det här fram?" namnger motorn: regelbaserat, AI via Eneo eller en AI-modell. `basis` säger vad innehållet bygger på: underlaget (standard), där popovern slutar med "Det är alltid förfrågningsunderlaget som gäller", eller lagen (`basis="law"`, Regelhjälpen), där den säger att ett styrdokument binder kommunens beställare och inte läsaren, "Läs alltid hela paragrafen eller avsnittet" och "Det är alltid lagtexten som gäller". När motorn räknar tokens säger popovern också vad svaret kostade: "Språkmodellen använde 9 400 tokens för det här: 8 950 in och 450 ut. Uppskattad kostnad 0,12 kr." På telefon heter länken "Mer" |
 | `CollapsibleSection` | En grupp som kort, där rubriken är knappen. Antalet står i en Badge och ingår i knappens namn ("Skallkrav, 11 krav"), med en hjälprad och ett startläge. En länk till gruppen ("#skallkrav") eller till en rad i den öppnar gruppen och rullar sedan fram till målet och ger det fokus, även när man kommer från en annan sida. Innehållet ligger kvar när gruppen är stängd, så att ankarna fungerar |
 | `DeadlineBlock` | Fristblocket: "9 nov" stort i tabellsiffror, "kl. 23:59" och "om 35 dagar". Vid 7 dagar eller färre blir den relativa tiden en gul token med klocka, och ett passerat datum blir grått med "passerat". Varianterna `inline`, `stack` och `compact`. `note` sätter ett ord ovanför datumet där etiketten inte syns, till exempel "Anbudsansökan" |
 | `NextStepCard` | "Nästa steg" sist i varje steg: en mening och en eller två knappar, på ett `AccentCard` |
