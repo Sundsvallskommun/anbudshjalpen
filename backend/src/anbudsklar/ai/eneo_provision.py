@@ -59,6 +59,8 @@ TASK_TITLES: dict[Task, str] = {
     Task.ANSWER_QUESTION: "Besvara fråga om underlaget",
     Task.SUGGEST_CPV: "Föreslå CPV-koder",
     Task.ANSWER_RULES: "Regelhjälpen",
+    Task.UPDATE_PROFILE: "Uppdatera profilen",
+    Task.CHOOSE_SUBJECT: "Välj ämne",
 }
 TASK_DESCRIPTIONS: dict[Task, str] = {
     Task.INTERPRET_DOCUMENT: "Gör om ett förfrågningsunderlag till en checklista med citat och sidnummer.",
@@ -67,6 +69,8 @@ TASK_DESCRIPTIONS: dict[Task, str] = {
     Task.ANSWER_QUESTION: "Svarar på frågor om ett förfrågningsunderlag med citat.",
     Task.SUGGEST_CPV: "Föreslår CPV-koder utifrån ett företags beskrivning.",
     Task.ANSWER_RULES: "Svarar på allmänna frågor om upphandlingsregler med källor.",
+    Task.UPDATE_PROFILE: "Läser vad ett företag vill ändra i sin profil i Fråga AI. Appen sparar ändringen.",
+    Task.CHOOSE_SUBJECT: "Avgör om ett meddelande i Fråga AI gäller underlaget, reglerna eller profilen.",
 }
 MCP_TASKS: frozenset[Task] = frozenset({Task.ANSWER_RULES, Task.ANSWER_QUESTION})
 KNOWLEDGE_WEBSITES: tuple[tuple[str, str], ...] = (

@@ -107,12 +107,14 @@ gemensamma kvot. Appen har därför gränser, som ligger i processens minne (`ba
 | Vad | Gräns | Över gränsen |
 |---|---|---|
 | Inloggning med demoperson | 300 per IP-adress och tio minuter | 429 med `Retry-After` |
+| Fråga AI (`/api/ask`, som väljer ämne själv) | 60 per IP-adress och tio minuter | 429 med `Retry-After` |
 | Frågor om ett underlag | 60 per IP-adress och tio minuter | 429 med `Retry-After` |
 | Regelhjälpen | 60 per IP-adress och tio minuter | 429 med `Retry-After` |
 | Granskning av anbudsutkast | 20 per IP-adress och tio minuter | 429 med `Retry-After` |
 | CPV-förslag | 30 per IP-adress och tio minuter | 429 med `Retry-After` |
+| Meddelanden till profilen i Fråga AI | 30 per IP-adress och tio minuter | 429 med `Retry-After` |
 | Inköparens uppladdningar och nya tolkningar | 30 per IP-adress och tio minuter | 429 med `Retry-After` |
-| Samtidiga AI-anrop från webbappen (frågor, Regelhjälpen, granskning och CPV-förslag) | 4. Ett anrop väntar högst 30 sekunder på en ledig plats | 503 med `Retry-After: 30` |
+| Samtidiga AI-anrop från webbappen (frågor, Regelhjälpen, granskning, CPV-förslag och meddelanden till profilen) | 4. Ett anrop väntar högst 30 sekunder på en ledig plats | 503 med `Retry-After: 30` |
 | Storlek på en begäran, till exempel JSON | 1 MB | 413 |
 | Uppladdat underlag (inköpare) | 50 MB | 413 |
 | Anbudsutkast för granskning | 20 MB | 413 |

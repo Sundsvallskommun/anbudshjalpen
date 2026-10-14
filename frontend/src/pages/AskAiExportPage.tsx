@@ -6,11 +6,13 @@ import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useNavigate, useSearchParams } from "react-router";
 import { useNotice } from "../api/queries";
-import type { AnswerCitation, AnswerView, Citation, DocumentInfo, PublishedAnswerView, RulesView } from "../api/types";
+import type { AnswerCitation, AnswerView, Citation, DocumentInfo, ProfileChatView, PublishedAnswerView, RulesView } from "../api/types";
 import { useAskAi } from "../components/ask/AskAiProvider";
-import { isAnswered, parseScopeKey, scopeKey, type AskScope, type Turn } from "../components/ask/askAiState";
+import { isAnswered, parsePlaceKey, placeKey, subjectOf, type AskPlace, type Turn } from "../components/ask/askAiState";
 import { formalQuestionSentence } from "../components/FormalQuestionAdvice";
+import { fittingLine } from "../components/ask/ProfileChatCard";
 import { answerMeta, findPublishedAnswer } from "../components/ui/PublishedAnswerQuote";
+import { toolLabel } from "../components/ui/ToolsUsed";
 import { formatDateTime } from "../lib/format";
 import { citationPage, engineLabel } from "../lib/labels";
 import { usePageTitle } from "../shell/Page";
@@ -20,6 +22,12 @@ import { readLine } from "./notice/steps/question/AnswerCard";
 import { parseRulesAnswer, sourceTitle } from "./rules/rulesAnswer";
 
 const RULES_SUBJECT = "Reglerna för offentlig upphandling";
+
+/** "Verktyg: Sök i LOU · Hämta paragraf i LOU", for the printed answer; nothing when no tool ran. */
+export function toolsLine(view: { tools?: ProfileChatView["tools"] }): string | null {
+  const tools = view.tools ?? [];
+  return tools.length > 0 ? `Verktyg: ${tools.map(toolLabel).join(" · ")}` : null;
+}
 
 /** "s. 5", "s. 6 (AI angav 5)" or "s. 5, hittades inte i underlaget", with the file when there are several. */
 export function citationLine(citation: Citation, documents: readonly DocumentInfo[] = []): string {
@@ -138,6 +146,31 @@ function RulesAnswer({ view }: { view: RulesView }) {
   );
 }
 
+function ProfileAnswer({ view }: { view: ProfileChatView }) {
+  return (
+    <VStack gap={2}>
+      <Text as="p" weight="semibold">
+        {view.reply}
+      </Text>
+      {view.applied && (
+        <VStack gap={2}>
+          <Text type="supporting">Det här ändrades i profilen:</Text>
+          <VStack as="ul" role="list" gap={2}>
+            {view.changes.map((item) => (
+              <li key={item.field}>
+                <Text weight="semibold">{item.label}</Text>
+                <Text>{item.after ?? "–"}</Text>
+                <Text type="supporting">{`Förut: ${item.before ?? "–"}`}</Text>
+              </li>
+            ))}
+          </VStack>
+          {fittingLine(view.fitting_notices) && <Text type="supporting">{fittingLine(view.fitting_notices)}</Text>}
+        </VStack>
+      )}
+    </VStack>
+  );
+}
+
 function PrintedTurn({
   turn,
   number,
@@ -149,21 +182,36 @@ function PrintedTurn({
   documents: readonly DocumentInfo[];
   answers: readonly PublishedAnswerView[];
 }) {
-  const engine = turn.answer?.engine ?? turn.rules?.engine ?? "";
+  const view = turn.answer ?? turn.rules ?? turn.profile;
+  const engine = view?.engine ?? "";
+  const tools = view ? toolsLine(view) : null;
   return (
     <VStack as="li" gap={3} className={styles.turn}>
-      <Heading level={2}>{`Fråga ${number}`}</Heading>
+      <Heading level={2}>{turn.profile ? `Meddelande ${number}` : `Fråga ${number}`}</Heading>
       <Text weight="semibold">{turn.question}</Text>
       <Text type="supporting">{`Svar, ${engineLabel(engine)}, inte granskat av inköp`}</Text>
       {turn.answer && <NoticeAnswer view={turn.answer} documents={documents} answers={answers} />}
       {turn.rules && <RulesAnswer view={turn.rules} />}
+      {turn.profile && <ProfileAnswer view={turn.profile} />}
+      {tools && <Text type="supporting">{tools}</Text>}
     </VStack>
   );
 }
 
-function subjectOf(scope: AskScope | null, title: string | undefined): string {
-  if (!scope) return "Inget samtal";
-  return scope.kind === "notice" ? (title ?? "Upphandlingen") : RULES_SUBJECT;
+/** The conversation's heading: the notice on its page, else the general conversation. */
+function headingOf(place: AskPlace | null, title: string | undefined): string {
+  if (!place) return "Inget samtal";
+  return place.kind === "notice" ? (title ?? "Upphandlingen") : RULES_SUBJECT;
+}
+
+/** What counts in the end, for the subjects that answered in this conversation. */
+function appliesOf(turns: readonly Turn[]): string {
+  const subjects = new Set(turns.map(subjectOf));
+  const parts: string[] = [];
+  if (subjects.has("underlag")) parts.push("Det är alltid förfrågningsunderlaget som gäller.");
+  if (subjects.has("regler") || parts.length === 0) parts.push("Det är alltid lagtexten som gäller.");
+  if (subjects.has("profil")) parts.push("Ändringarna är sparade i profilen och går att ändra på profilsidan.");
+  return parts.join(" ");
 }
 
 /**
@@ -176,12 +224,12 @@ export default function AskAiExportPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const ai = useAskAi();
-  const scope = parseScopeKey(params.get("amne"));
-  const turns = (scope ? (ai.conversations[scopeKey(scope)] ?? []) : []).filter(isAnswered);
-  const notice = useNotice(scope?.kind === "notice" ? scope.noticeId : "");
+  const place = parsePlaceKey(params.get("amne"));
+  const turns = (place ? (ai.conversations[placeKey(place)] ?? []) : []).filter(isAnswered);
+  const notice = useNotice(place?.kind === "notice" ? place.noticeId : "");
   usePageTitle("Frågor och svar");
-  const subject = subjectOf(scope, notice.data?.title);
-  const applies = scope?.kind === "notice" ? "Det är alltid förfrågningsunderlaget som gäller." : "Det är alltid lagtexten som gäller.";
+  const subject = headingOf(place, notice.data?.title);
+  const applies = appliesOf(turns);
   return (
     <VStack gap={6} padding={6} hAlign="center">
       <HStack gap={2} hAlign="between" vAlign="center" wrap="wrap" className={`${styles.paper} ${styles.toolbar}`}>

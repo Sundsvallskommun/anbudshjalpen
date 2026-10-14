@@ -22,8 +22,9 @@ Anbudshjälpen /mcp ◀──(MCP-nyckel, https)──────────�
 I Eneo finns:
 
 - spacet "Anbudsklar (PoC)", med lagringstiden en dag
-- en assistent per AI-uppgift (`tolka_underlag`, `bedom_matchning`, `granska_utkast`, `besvara_fraga`, `foresla_cpv`
-  och `regelhjalpen`), med namn som "Anbudsklar (PoC) – Tolka underlag", Insights avstängt och lagringstiden en dag
+- en assistent per AI-uppgift (`tolka_underlag`, `bedom_matchning`, `granska_utkast`, `besvara_fraga`, `foresla_cpv`,
+  `regelhjalpen`, `uppdatera_profil` och `valj_amne`), med namn som "Anbudsklar (PoC) – Tolka underlag", Insights
+  avstängt och lagringstiden en dag
 - MCP-servern `anbudsklar_poc` (namnet kommer från spacet), kopplad till assistenterna för Regelhjälpen och frågor om
   ett underlag
 - kunskap för Regelhjälpen: Upphandlingsmyndighetens sidor om att göra affärer med offentlig sektor och kommunens sida
@@ -103,6 +104,10 @@ Kommandot gör det här, i ordning:
 Kommandot hittar befintliga objekt på namnet och går att köra flera gånger. Kör det igen efter varje ändring av en
 instruktion, ett kontrakt eller ett MCP-verktyg.
 
+> **Kör det igen efter ändringen 2026-10-14.** Uppgiften `uppdatera_profil` ([beslut 0025](decisions/0025-profilen-uppdateras-via-fraga-ai.md))
+> är ny och får en egen assistent, "Uppdatera profilen". Utan den svarar profilchatten i Fråga AI med "AI-motorn är
+> inte rätt inställd just nu", och loggen säger att assistenten saknas.
+
 > **Kör det igen efter ändringen 2026-10-05.** Instruktionerna för `besvara_fraga`, `regelhjalpen` och
 > `bedom_matchning` ändrades: svaren börjar med slutsatsen i en mening, och bedömningen skrivs till företaget med
 > webbappens ord för passform (verkar passa, passar delvis, verkar inte passa) och med CPV-kodernas benämningar. En
@@ -177,9 +182,15 @@ rensar.
 Ett sessions-id måste vara ett UUID innan det hamnar i adressen. Regelhjälpens `session_id` kommer från webbläsaren och
 används i ett anrop med spacets admin-nyckel. API:t tar bara emot ett UUID (annars 422), och motorn kontrollerar det
 igen innan värdet läggs i adressen. Ett samtal fortsätter dessutom bara i webbläsaren som startade det: appen minns
-vilket samtal den gav vilken webbläsare, med en egen cookie (`anbudsklar_regelhjalpen`, bara för `/api/rules`)
+vilket samtal den gav vilken webbläsare, med en egen cookie (`anbudsklar_regelhjalpen`, bara för `/api`, så att
+samtalet fortsätter både genom `/api/rules/ask` och genom Fråga AI:s `/api/ask`)
 eftersom Regelhjälpen är öppen utan inloggning. Ett id som appen inte gav just den webbläsaren, eller ett samtal som
 Eneo inte har kvar, startar ett nytt samtal.
+
+Verktygen som visas under ett svar ("Sök i LOU", "Hämta paragraf i LOU") läses ur samma `mcp_tool_references`:
+varje referens bär `mcp_tool_name`, med spacets namn som prefix (`anbudsklar_poc__sok_lou`), och motorn tar namnet efter
+det sista `__`. Bara verktyg vars svar Eneo behöll som referens syns, alltså de som svarar med källor. Eneo strömmar
+också händelsen `tool_call` medan verktygen körs, men appen läser bara det färdiga svaret ([beslut 0025](decisions/0025-profilen-uppdateras-via-fraga-ai.md)).
 
 Regelhjälpens källor kommer från Eneos kunskapsreferenser och från MCP-verktygens referenser. En paragraf i LOU blir en
 källa med hänvisningen "LOU 20 kap. 1 §" och paragrafens rubrik som titel. En sida ur ett underlag får hänvisningen

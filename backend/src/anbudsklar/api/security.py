@@ -26,7 +26,8 @@ from anbudsklar.config import Settings
 
 SESSION_COOKIE = "anbudsklar_session"
 RULES_COOKIE = "anbudsklar_regelhjalpen"
-RULES_COOKIE_PATH = "/api/rules"
+# Sent to every /api route: both Regelhjälpen's own endpoint and Fråga AI's continue a conversation.
+RULES_COOKIE_PATH = "/api"
 SESSION_MAX_AGE_SECONDS = 8 * 60 * 60
 # Far above any demo; beyond it the oldest sessions are signed out instead of memory growing.
 MAX_SESSIONS = 10_000
@@ -146,7 +147,7 @@ def set_session_cookie(response: Response, token: str, settings: Settings) -> No
 
 
 def set_rules_cookie(response: Response, owner: str, settings: Settings) -> None:
-    """Regelhjälpen's owner token; only sent to /api/rules, renewed on every question."""
+    """Regelhjälpen's owner token; only sent to the API, renewed on every question."""
 
     response.set_cookie(
         RULES_COOKIE,

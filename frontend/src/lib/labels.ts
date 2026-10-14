@@ -196,6 +196,8 @@ const AI_TASKS: Record<string, string> = {
   besvara_fraga: "Besvara fråga",
   foresla_cpv: "Föreslå CPV-koder",
   regelhjalpen: "Regelhjälpen",
+  uppdatera_profil: "Uppdatera profilen",
+  valj_amne: "Välj ämne",
 };
 
 export function aiTaskLabel(task: string): string {

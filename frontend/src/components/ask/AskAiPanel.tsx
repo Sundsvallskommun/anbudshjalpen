@@ -8,7 +8,6 @@ import { HStack } from "@astryxdesign/core/HStack";
 import { Icon } from "@astryxdesign/core/Icon";
 import { Layout, LayoutContent, LayoutFooter, LayoutHeader } from "@astryxdesign/core/Layout";
 import { Popover } from "@astryxdesign/core/Popover";
-import { SegmentedControl, SegmentedControlItem } from "@astryxdesign/core/SegmentedControl";
 import { Spinner } from "@astryxdesign/core/Spinner";
 import { StackItem } from "@astryxdesign/core/Stack";
 import { StatusDot } from "@astryxdesign/core/StatusDot";
@@ -16,7 +15,7 @@ import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import { Fragment, useEffect, useId, useRef, useState } from "react";
 import { useSession } from "../../api/queries";
-import type { IsoDateTime, NoticeDetail } from "../../api/types";
+import type { IsoDateTime, Subject } from "../../api/types";
 import { calendarDateOf, formatLongDate, isPassed } from "../../lib/format";
 import { useIsPhone } from "../../lib/usePhone";
 import { AnswerCard } from "../../pages/notice/steps/question/AnswerCard";
@@ -25,22 +24,16 @@ import { RulesAnswerCard } from "../../pages/rules/RulesAnswerCard";
 import { ErrorNotice } from "../states";
 import { ChatIcon, CollapseIcon, DownloadIcon, ExpandIcon, TrashIcon } from "../ui/icons";
 import styles from "./AskAiPanel.module.css";
-import {
-  isPending as isTurnPending,
-  noticeScope,
-  questionProblem,
-  RULES_SCOPE,
-  scopeKey,
-  welcomeText,
-  type AskScope,
-  type Turn,
-} from "./askAiState";
+import { isAnswered, isPending as isTurnPending, placeKey, questionProblem, subjectOf, welcomeText, type AskPlace, type Turn } from "./askAiState";
 import { useAskAi, type AskAiApi } from "./AskAiProvider";
+import { ProfileChatCard } from "./ProfileChatCard";
 
 export const ASK_AI_TITLE = "Fråga AI";
 /** The line under the title, beside the green dot: the panel is there and listening. */
 export const READY_TEXT = "Redo att hjälpa dig";
 const RULES_SUBJECT = "Reglerna för offentlig upphandling";
+const RULES_AND_PROFILE_SUBJECT = "Reglerna för upphandling och er profil";
+export const PROFILE_SUBJECT = "Er företagsprofil";
 /**
  * The panel's sizes on wider screens. Compact by default, a column beside the page's content that leaves most of
  * the page in view; expanded for reading long answers with their quotes. Never the whole window.
@@ -59,9 +52,12 @@ export const NOTICE_EXAMPLES: readonly string[] = [
   "Får vi anlita underleverantörer?",
 ];
 
-/** What the answers about a notice rest on, and where an open question goes (likabehandling). */
+/**
+ * What the answers rest on and where an open question goes (likabehandling), before the first question on a notice
+ * page. The reader asks about the documents or about the rules in the same field: the app tells which (decision 0026).
+ */
 export function questionIntro(questionDeadline: IsoDateTime | null): string {
-  const lead = "Svaren bygger bara på underlaget och visar var det står.";
+  const lead = "Fråga om underlaget eller om reglerna: svaren visar var det står.";
   if (!questionDeadline) {
     return `${lead} Är något oklart? Ställ frågan i e-Avrop före sista dag för frågor, så får alla leverantörer samma svar.`;
   }
@@ -70,34 +66,35 @@ export function questionIntro(questionDeadline: IsoDateTime | null): string {
   return `${lead} Är något oklart? Ställ frågan i e-Avrop senast ${date}, så får alla leverantörer samma svar.`;
 }
 
-const RULES_INTRO = "Svaren visar vilka paragrafer de bygger på. Det är alltid lagtexten som gäller.";
+const RULES_INTRO = "Fråga om reglerna för upphandling: svaren visar vilka paragrafer de bygger på.";
+/** What a message to the profile does (decision 0025), added to the intro for a signed-in company. */
+export const PROFILE_INTRO = "Skriv vad som ska ändras i er profil, så sparar Anbudshjälpen det.";
+
+/** Changes most companies make, to send with one press: what the rule-based engine reads as well. */
+export const PROFILE_EXAMPLES: readonly string[] = ["Vi har numera tolv anställda", "Vi är också verksamma i Härnösand"];
+/** One general question among the examples on a notice page, so the reader sees that the rules are at hand too. */
+const RULES_EXAMPLE_ON_NOTICE = "Vad är ett kvalificeringskrav?";
 
 /** The address of the print view for a conversation: the browser prints it or saves it as PDF. */
-export function exportHref(scope: AskScope): string {
-  return `/fraga-ai/utskrift?amne=${encodeURIComponent(scopeKey(scope))}`;
+export function exportHref(place: AskPlace): string {
+  return `/fraga-ai/utskrift?amne=${encodeURIComponent(placeKey(place))}`;
 }
 
-function subjectOf(scope: AskScope, notice: NoticeDetail | null): string {
-  return scope.kind === "notice" && notice ? notice.title : RULES_SUBJECT;
+/** The line under the title: the notice on its page, else what the panel answers about everywhere else. */
+function subtitleOf(ai: AskAiApi): string {
+  if (ai.notice) return ai.notice.title;
+  return ai.canEditProfile ? RULES_AND_PROFILE_SUBJECT : RULES_SUBJECT;
 }
 
-/** "Underlaget" or "Reglerna", on a notice page where both are at hand; elsewhere only the rules are. */
-function Subject({ ai }: { ai: AskAiApi }) {
-  const { notice, scope } = ai;
-  if (!notice) return null;
-  return (
-    <HStack hAlign="start">
-      <SegmentedControl
-        label="Vad frågan gäller"
-        value={scope.kind}
-        onChange={(value) => ai.chooseScope(value === "rules" ? RULES_SCOPE : noticeScope(notice.id))}
-        size="sm"
-      >
-        <SegmentedControlItem value="notice" label="Underlaget" />
-        <SegmentedControlItem value="rules" label="Reglerna" />
-      </SegmentedControl>
-    </HStack>
-  );
+/**
+ * A quiet line over an answer whose subject is not the page's own, so the reader sees that the app answered about
+ * something else than the documents: the rules in general, or a change to the profile. The answer's own tools row
+ * says what decided it.
+ */
+function subjectNote(subject: Subject | null, ai: AskAiApi): string | null {
+  if (subject === "profil") return "Ändring i er profil";
+  if (subject === "regler" && ai.notice) return "Allmänt om reglerna, inte om just den här upphandlingen";
+  return null;
 }
 
 function Pending() {
@@ -107,21 +104,28 @@ function Pending() {
         <HStack aria-hidden="true">
           <Spinner size="sm" />
         </HStack>
-        <Text color="secondary">Letar i underlaget …</Text>
+        <Text color="secondary">Tar fram svaret …</Text>
       </HStack>
     </Card>
   );
 }
 
-/** The answer to one turn, by what the conversation is about; a failed turn says so and offers to ask again. */
+/** The answer to one turn, by the subject that answered it; a failed turn says so and offers to ask again. */
 function Answer({ turn, ai }: { turn: Turn; ai: AskAiApi }) {
   if (turn.error !== null) {
     return <ErrorNotice title="Frågan kunde inte besvaras" error={turn.error} onRetry={ai.isPending ? undefined : () => ai.retry(turn.id)} />;
   }
-  if (ai.scope.kind === "rules") return <RulesAnswerCard question={turn.question} view={turn.rules} />;
-  if (!turn.answer) return <Pending />;
-  if (!ai.notice) return <Text>Öppna upphandlingen för att läsa svaret.</Text>;
-  return <AnswerCard view={turn.answer} question={turn.question} notice={ai.notice} />;
+  const subject = subjectOf(turn);
+  const note = subjectNote(subject, ai);
+  return (
+    <VStack gap={1}>
+      {note && <Text type="supporting">{note}</Text>}
+      {subject === "regler" && <RulesAnswerCard question={turn.question} view={turn.rules} />}
+      {subject === "profil" && <ProfileChatCard view={turn.profile} />}
+      {subject === "underlag" && turn.answer && (ai.notice ? <AnswerCard view={turn.answer} question={turn.question} notice={ai.notice} /> : <Text>Öppna upphandlingen för att läsa svaret.</Text>)}
+      {subject === null && <Pending />}
+    </VStack>
+  );
 }
 
 /** The panel's own face: Anbudshjälpen's mark, the same as the top bar's. Decorative; the title names the panel. */
@@ -144,12 +148,11 @@ function useFirstName(): string | null {
  */
 function Thread({ ai }: { ai: AskAiApi }) {
   const firstName = useFirstName();
-  const intro = ai.scope.kind === "notice" && ai.notice ? questionIntro(ai.notice.question_deadline) : RULES_INTRO;
   return (
     <ChatMessageList align="top" density="compact" isStreaming={ai.turns.some(isTurnPending)}>
       <ChatMessage sender="assistant" avatar={<AssistantAvatar />}>
         <ChatMessageBubble group={ai.turns.length === 0 ? "first" : undefined}>{welcomeText(firstName)}</ChatMessageBubble>
-        {ai.turns.length === 0 && <ChatMessageBubble group="last">{intro}</ChatMessageBubble>}
+        {ai.turns.length === 0 && <ChatMessageBubble group="last">{introOf(ai)}</ChatMessageBubble>}
       </ChatMessage>
       {ai.turns.map((turn) => (
         <Fragment key={turn.id}>
@@ -168,6 +171,18 @@ function Thread({ ai }: { ai: AskAiApi }) {
   );
 }
 
+/** What the answers rest on, before the first question: by where the reader is, and who they are. */
+function introOf(ai: AskAiApi): string {
+  const lead = ai.notice ? questionIntro(ai.notice.question_deadline) : RULES_INTRO;
+  return ai.canEditProfile ? `${lead} ${PROFILE_INTRO}` : lead;
+}
+
+/** Questions to ask with one press: about the documents on a notice page, the rules elsewhere, and a change when signed in. */
+function examplesOf(ai: AskAiApi): readonly string[] {
+  const questions = ai.notice ? [...NOTICE_EXAMPLES, RULES_EXAMPLE_ON_NOTICE] : RULES_EXAMPLES;
+  return ai.canEditProfile ? [...questions, ...PROFILE_EXAMPLES] : questions;
+}
+
 /**
  * Questions to ask with one press, offered until the first question is asked: a reader with a conversation going
  * knows what to ask, and the examples only pushed the answers up.
@@ -175,7 +190,7 @@ function Thread({ ai }: { ai: AskAiApi }) {
 function Suggestions({ ai }: { ai: AskAiApi }) {
   const labelId = useId();
   if (ai.turns.length > 0) return null;
-  const examples = ai.scope.kind === "notice" ? NOTICE_EXAMPLES : RULES_EXAMPLES;
+  const examples = examplesOf(ai);
   return (
     <VStack gap={2}>
       <Text type="supporting" weight="semibold" id={labelId}>
@@ -221,7 +236,6 @@ function Writing({ ai }: { ai: AskAiApi }) {
     ai.ask(value);
   };
 
-  const note = ai.scope.kind === "notice" ? "Svaren är ett stöd. Det är alltid förfrågningsunderlaget som gäller." : "Svaren är ett stöd, inte juridisk rådgivning. Det är alltid lagtexten som gäller.";
   return (
     <VStack gap={2} ref={area}>
       <ChatComposer
@@ -237,10 +251,13 @@ function Writing({ ai }: { ai: AskAiApi }) {
         elevation="none"
         status={problem ? { type: "error", message: problem } : undefined}
       />
-      <Text type="supporting">{note}</Text>
+      <Text type="supporting">{NOTE}</Text>
     </VStack>
   );
 }
+
+/** The line under the field: the answers are a support, and what counts in the end. */
+const NOTE = "Svaren är ett stöd, inte juridisk rådgivning. Det är alltid förfrågningsunderlaget och lagtexten som gäller.";
 
 /**
  * The panel's header on its tinted band, as a chat app's: the panel's mark, a small title, "Redo att hjälpa dig" by a
@@ -266,7 +283,7 @@ function PanelHeader({
   useEffect(() => {
     if (takesFocus && ai.isOpen) ref.current?.focus();
   }, [takesFocus, ai.isOpen]);
-  const hasAnswers = ai.turns.some((turn) => turn.answer !== null || turn.rules !== null);
+  const hasAnswers = ai.turns.some(isAnswered);
   const isExpanded = size === "expanded";
   return (
     <HStack gap={2} vAlign="center" padding={3} className={styles.header}>
@@ -290,7 +307,7 @@ function PanelHeader({
       </StackItem>
       <HStack gap={0.5} vAlign="center">
         {hasAnswers && (
-          <Button label="Spara som PDF" tooltip="Spara som PDF" variant="ghost" size="sm" isIconOnly href={exportHref(ai.scope)} icon={<Icon icon={DownloadIcon} />} />
+          <Button label="Spara som PDF" tooltip="Spara som PDF" variant="ghost" size="sm" isIconOnly href={exportHref(ai.place)} icon={<Icon icon={DownloadIcon} />} />
         )}
         {ai.turns.length > 0 && (
           <Button label="Rensa samtalet" tooltip="Rensa samtalet" variant="ghost" size="sm" isIconOnly onClick={ai.clear} icon={<Icon icon={TrashIcon} />} />
@@ -336,7 +353,6 @@ function DockedPanel({
         content={
           <LayoutContent padding={3}>
             <VStack gap={3}>
-              <Subject ai={ai} />
               <Thread ai={ai} />
               <Suggestions ai={ai} />
             </VStack>
@@ -356,14 +372,15 @@ function DockedPanel({
  * "Fråga AI" (decision 0014): the button that follows the reader at the end of the viewport, and the panel it opens.
  * On wider screens the panel is a non-modal Astryx Popover anchored to the button, so the page stays readable and
  * usable while it is open and the source dialog can open above it; on a phone a tall bottom sheet without a scrim.
- * Both hold the same content: the subject, the conversation as a message list, example questions and the composer.
+ * Both hold the same content: the conversation as a message list, example questions and the composer. The reader
+ * never picks what a question is about: the backend does (decision 0026), and the answer says which subject it took.
  * The popover opens compact and can be made larger for long answers.
  * Rendered once by AppFrame; open it from anywhere with useAskAi().
  */
 export function AskAiWidget() {
   const ai = useAskAi();
   const isPhone = useIsPhone();
-  const subtitle = subjectOf(ai.scope, ai.notice);
+  const subtitle = subtitleOf(ai);
   // Kept while the panel is closed, so it opens at the size the reader chose.
   const [size, setSize] = useState<PanelSize>("compact");
   const onOpenChange = (open: boolean) => {
@@ -380,7 +397,6 @@ export function AskAiWidget() {
         <BottomSheet isOpen={ai.isOpen} onOpenChange={onOpenChange} label={ASK_AI_TITLE} height="tall" hasScrim={false} finalFocusRef={ai.openerRef}>
           <VStack gap={4} padding={4}>
             <PanelHeader ai={ai} subtitle={subtitle} takesFocus />
-            <Subject ai={ai} />
             <Thread ai={ai} />
             <Suggestions ai={ai} />
             <Writing ai={ai} />

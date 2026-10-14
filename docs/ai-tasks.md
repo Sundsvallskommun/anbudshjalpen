@@ -204,6 +204,36 @@ webbsidor, inte på sidor. Lagen och styrdokumenten är två slags källor: lage
 kommunens egna beställare. Prompten säger att svaret ska ange vilket slag källan är, använda båda när frågan gäller ett
 krav, och aldrig dra slutsatser ur styrdokumenten om hur ett visst anbud eller en viss upphandling bedöms.
 
+### Uppdatera profilen (`uppdatera_profil`)
+
+| | |
+|---|---|
+| Metod | `update_profile(profile, candidates, history, message)` |
+| Indata | Företagets profil (`CompanyProfile`), CPV-kandidater som vår ordsökning hittat för meddelandets ord (samma sökning som CPV-förslagen använder som komplement), tidigare meddelanden i samtalet och meddelandet i `<meddelande>` |
+| Svar | `ProfileChange`: `reply` till företaget, `needs_clarification` när meddelandet inte går att tillämpa, och ett fält per del av profilen som är null när den inte ändras. Text byts i sin helhet (`description`, `municipalities`, `certifications`), en tom sträng tar bort `insurance` eller `public_references`, och CPV-koder anges som `cpv_add` (bara ur kandidaterna) och `cpv_remove` (bara koder i profilen) |
+| Kontroll | Appen tillämpar ändringen, aldrig modellen: `services.profiles.chat_update` bygger en `CompanyUpdate` av profilen och ändringen och sparar den genom `update_profile`, med samma validering som formuläret. Koder utanför kandidaterna tas bort tyst, och det som faktiskt sparades visas som "Det här ändrades" med orden före och efter. En motfråga, eller ett meddelande som inte ändrar något, sparar ingenting |
+| Körs av | Fråga AI när ämnesvalet ([beslut 0026](decisions/0026-fraga-ai-valjer-amne-sjalv.md)) läser ett meddelande som en ändring av profilen, bara för en inloggad företagare ([beslut 0025](decisions/0025-profilen-uppdateras-via-fraga-ai.md)), och `POST /api/profile/chat`. Efter en sparad ändring bedöms träffarna på nytt som efter formuläret |
+| Med `heuristic` | Enkla mönster i `backend/src/anbudsklar/ai/profile_rules.py`: "tolv anställda", "omsätter 6,5 miljoner", "ISO 14001", orter efter "i" (och "ta bort", "inte längre" för att ta bort), meningar om försäkring och referensuppdrag, "beskrivning: …" och CPV-kandidater vars benämning meddelandet nämner. Allt annat ger motfrågan |
+
+### Välj ämne (`valj_amne`)
+
+| | |
+|---|---|
+| Metod | `choose_subject(question, subjects, history)` |
+| Indata | Ämnena som finns på sidan (`SubjectOption`, blocket `<amnen>`: `underlag` bara på en upphandlings sida, med dess titel; `regler` alltid; `profil` bara för en inloggad företagare), samtalets tidigare frågor och svar med det ämne som svarade på var och en (`<tidigare_fragor>` med raden "Ämne: …"), och frågan |
+| Svar | `SubjectChoice`: `subject` (ett av ämnena) och `reason`, en mening om vad som avgjorde |
+| Förval | Orden först, utan modell (`backend/src/anbudsklar/ai/subject_rules.py`): ord för underlaget ("underlaget", "bilagor", "kravet", "K3", "sida 4", "anbudet", "måste vi"), ord för reglerna ("LOU", "§", "avtalsspärr", "direktupphandling", "inköpsstrategin", "vad är ett …", "i allmänhet") och påståenden om företaget för profilen ("vi har numera …", "vi är ISO …", "lägg till …", aldrig en fråga). En kort uppföljning utan egna ord stannar hos förra frågans ämne. Bara när orden pekar åt två håll eller ingetstans anropas modellen |
+| Kontroll | `services.ask.decide_subject` godtar bara ett ämne som finns på sidan. Fallerar eller saknas modellen svarar sidans eget ämne: underlaget på en upphandlings sida, annars reglerna, med en varning i loggen. Svaret (`AskView`) säger ämnet och vad som avgjorde (`decided_by`: `rule`, `model` eller `default`), och det första verktyget under svaret säger detsamma: "Välj ämne · Reglerna, på frågans ord" |
+| Körs av | `POST /api/ask`, som panelen Fråga AI använder för varje fråga ([beslut 0026](decisions/0026-fraga-ai-valjer-amne-sjalv.md)). Frågan går sedan till `besvara_fraga`, `regelhjalpen` eller `uppdatera_profil` med bara det ämnets tidigare frågor som historik |
+| Med `heuristic` | Samma ord som förvalet, och sidans eget ämne för resten |
+
+**Verktygen bakom ett svar.** Svaren om ett underlag, från Regelhjälpen och från profilen bär `tools`: de MCP-verktyg
+som Eneos assistent anropade, lästa ur `mcp_tool_references` i Eneos svar (`EngineRun.tools`), och appens egna steg
+runt anropet ("Välj ämne · Underlaget, på frågans ord", "Sök i underlaget · 12 träffar", "Läs underlaget · 17 av 17 sidor", "Hämta inköps publicerade svar",
+"Sök i LOU och styrdokumenten", "Hämta profilen", "Sök CPV-koder", "Tolka meddelandet", "Spara profilen", "Bedöm
+upphandlingarna på nytt"). Etiketterna står i `backend/src/anbudsklar/services/tools.py`, och ett test ser till att
+MCP-verktygens etiketter är samma titlar som servern registrerar. Panelen visar dem under svaret.
+
 ## Den heuristiska motorn
 
 `heuristic` (`backend/src/anbudsklar/ai/heuristic.py`) använder ingen språkmodell. Allt den visar är ordagranna utdrag

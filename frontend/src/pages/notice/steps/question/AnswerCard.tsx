@@ -10,6 +10,7 @@ import type { AnswerCitation, AnswerView, Citation, NoticeDetail, ReadSummary } 
 import { FormalQuestionAdvice } from "../../../../components/FormalQuestionAdvice";
 import { AiProvenance } from "../../../../components/ui/AiProvenance";
 import { PublishedAnswerQuote } from "../../../../components/ui/PublishedAnswerQuote";
+import { ToolsUsed } from "../../../../components/ui/ToolsUsed";
 import { SourceLink } from "../../../../components/ui/source/SourceLink";
 import { calendarDateOf, formatShortDate, isPassed } from "../../../../lib/format";
 import { formalQuestionLink, procurementLink } from "../../../../lib/links";
@@ -148,6 +149,7 @@ export function AnswerCard({ view, question, notice }: { view: AnswerView; quest
           <Quotes citations={answer.citations} notice={notice} documentId={documentId} question={question} />
         )}
         <Text type="supporting">{readLine(view.read)}</Text>
+        <ToolsUsed tools={view.tools ?? []} />
         {needsFormalQuestion ? (
           <FormalQuestionAdvice
             noticeId={notice.id}

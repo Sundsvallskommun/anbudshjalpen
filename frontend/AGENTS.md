@@ -35,13 +35,15 @@ The design as built is in `docs/design.md`. Comments that cite "direction.md, se
   komponenter"): `DeadlineBlock`, `ReminderState`, `SourceLink` and the source dialog (`source/`: `SourceDialog`,
   `PageText`, and `sourceTarget.ts`, the address that opens a source), `AiProvenance` (with `basis="law"` for
   Regelhjälpen), `StatTile`, `ResultSummary`, `NextStepCard` and `AccentCard`, `RequirementRow`, `CollapsibleSection`,
-  `StepNav`, `PublishedAnswerQuote` (inköp's answer in e-Avrop and its quote, decision 0018), and the app's own glyphs (`icons.tsx`, among them `DownloadIcon` and `UploadIcon`).
+  `StepNav`, `PublishedAnswerQuote` (inköp's answer in e-Avrop and its quote, decision 0018), `ToolsUsed` (the tools
+  behind an answer, on Astryx `ChatToolCalls`), and the app's own glyphs (`icons.tsx`, among them `DownloadIcon` and `UploadIcon`).
 - `public/favicon.svg` is the mark (Toppen), shown by the top bar's `Brand` and the browser tab. `npm run icons`
   (`scripts/icons.mjs`) builds `favicon.ico`, the home-screen and manifest icons and the README logo from it; rerun it
   after changing the mark, and never edit the generated files by hand.
 - `src/components/ask/` is "Fråga AI" (decision 0014): `AskAiProvider` owns the panel and the conversations
   (`askAiState.ts`, session storage), `AskAiPanel` holds `AskAiWidget`, the button that follows the reader and the
-  panel it opens (a non-modal Astryx Popover, or a BottomSheet on a phone, with the Chat components). `useAskAi().open({ question })` opens it anywhere.
+  panel it opens (a non-modal Astryx Popover, or a BottomSheet on a phone, with the Chat components), and
+  `ProfileChatCard` the answer to a message to the profile (decision 0025). `useAskAi().open({ question })` opens it anywhere.
 - `src/components/` also holds the status tokens (`tokens.tsx`), `states.tsx` (loading and errors), `TermText`,
   `RowList`, `UrlTabs`, `NoticeRow`, `FormalQuestionAdvice`, `DocumentUpload` and the checklist's sections
   (`checklist/`). `src/lib/` has pure helpers: dates and numbers (`format.ts`), the Swedish words for the contract's

@@ -1,6 +1,7 @@
 # 0014: AI-stödet är en panel som följer läsaren, och samtalet går att spara som PDF
 
-- **Status:** Accepterat, stegens antal och namn ersatta av [0024](0024-granska-ar-sista-steget.md)
+- **Status:** Accepterat, stegens antal och namn ersatta av [0024](0024-granska-ar-sista-steget.md), valet av ämne
+  ersatt av [0026](0026-fraga-ai-valjer-amne-sjalv.md)
 - **Datum:** 2026-10-12
 - **Gäller:** var företagaren ställer frågor till AI-stödet, hur ett samtal följer med mellan sidorna och hur det
   exporteras

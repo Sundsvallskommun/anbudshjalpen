@@ -24,6 +24,7 @@ from anbudsklar.services.contexts import notice_context, unread_filenames
 from anbudsklar.services.dates import utcnow
 from anbudsklar.services.errors import ConflictError
 from anbudsklar.services.notices import first_document, formal_question_url, get_notice, question_deadline
+from anbudsklar.services.tools import engine_tools, tool_use
 
 # Earlier turns sent to the engine, newest first, until this many characters. The model
 # needs the recent context of the conversation, not every word of it, and an anonymous
@@ -75,6 +76,15 @@ async def ask_question(
     await record_call(session, Task.ANSWER_QUESTION, run, notice_id=notice.id)
     verified = verify_answer(answer, documents, answers)
 
+    read = read_summary(document_set)
+    tools = [
+        tool_use("sok_underlag", _counted(len(hits), "träff", "träffar")),
+        tool_use("las_underlag", f"{read.pages_read} av {read.pages_total} sidor"),
+    ]
+    if answers:
+        tools.append(tool_use("hamta_svar", _counted(len(answers), "svar", "svar")))
+    tools += engine_tools(run)
+
     payload = checklist_payload(checklist) if checklist else None
     if not viewer.is_buyer and _tender_period_running(notice, payload, utcnow()):
         session.add(
@@ -92,11 +102,16 @@ async def ask_question(
         answer=verified,
         engine=run.engine,
         usage=usage_view(run, prices),
+        tools=tools,
         document_id=main.id,
-        read=read_summary(document_set),
+        read=read,
         question_deadline=question_deadline(notice, payload),
         formal_question_url=formal_question_url(notice, eavrop_url),
     )
+
+
+def _counted(count: int, one: str, many: str) -> str:
+    return f"{count} {one if count == 1 else many}"
 
 
 def read_summary(document_set: DocumentSet) -> ReadSummary:
