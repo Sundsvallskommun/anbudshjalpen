@@ -690,3 +690,104 @@ async def test_a_question_inkop_has_answered_in_eavrop_is_answered_from_that_ans
     assert answer["found_in_document"] is True
     [cited] = answer["answer_citations"]
     assert (cited["answer"], cited["check"], cited["answer_key"]) == (1, "verified", "c" * 64)
+
+
+async def test_the_detail_names_unread_files_and_empty_pages_and_hides_replaced_documents(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    """The documents shown are never taken for the whole set (data review 2026-10-12)."""
+
+    demo.notice.unread_files = [{"filename": "Ritningar.zip", "reason": "Filformatet .zip stöds inte"}]
+    demo.document.empty_pages = 2
+    old = await add_document(db_session, demo.notice, ["Gammal version."], filename="gammal.txt")
+    old.superseded_by = demo.document.id
+    await db_session.flush()
+
+    body = (await client.get(f"/api/notices/{demo.notice.id}")).json()
+
+    assert body["unread_files"] == [{"filename": "Ritningar.zip", "reason": "Filformatet .zip stöds inte"}]
+    assert [(item["filename"], item["empty_pages"]) for item in body["documents"]] == [("underlag.txt", 2)]
+
+
+async def test_the_detail_links_teds_notice_of_a_procurement_from_eavrop(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    """e-Avrop's notice is the one shown, and TED's is a link from it (decision 0021)."""
+
+    ted = "https://ted.europa.eu/sv/notice/-/detail/900001-2026"
+    assert (await client.get(f"/api/notices/{demo.notice.id}")).json()["ted_url"] is None
+    demo.notice.source = "eavrop"
+    demo.notice.raw = {"ted": {"url": ted}}
+    await db_session.flush()
+
+    assert (await client.get(f"/api/notices/{demo.notice.id}")).json()["ted_url"] == ted
+
+
+async def test_the_sources_question_deadline_goes_before_the_checklists(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    from_source = end_of_local_day(demo.fragestopp + timedelta(days=2))
+    demo.notice.question_deadline_at = from_source
+    await db_session.flush()
+
+    items = {item["id"]: item for item in (await client.get("/api/notices")).json()["items"]}
+    assert datetime.fromisoformat(items[str(demo.notice.id)]["question_deadline"]) == from_source
+    answer = (
+        await client.post(f"/api/notices/{demo.notice.id}/questions", json={"question": "Krävs försäkring?"})
+    ).json()
+    assert datetime.fromisoformat(answer["question_deadline"]) == from_source
+
+
+async def test_the_reading_report_traces_every_file_from_its_source_to_its_text(
+    client: httpx.AsyncClient, db_session: AsyncSession, demo: Demo
+) -> None:
+    """The demo panel "Så lästes underlaget" is read off what is stored: nothing is logged for it."""
+
+    demo.notice.unread_files = [{"filename": "Foto entré.jpg", "reason": "Filformatet .jpg stöds inte"}]
+    demo.document.layout = "eavrop"
+    demo.document.empty_pages = 1
+    old = await add_document(db_session, demo.notice, ["Gammal version."], filename="gammal.txt")
+    old.superseded_by = demo.document.id
+    old.created_at = demo.document.created_at - timedelta(hours=1)
+    member_name = "Ritningar.zip › plan.txt"
+    member = await add_document(db_session, demo.notice, ["Planritning."], filename=member_name)
+    member.auto_interpret = False
+    member.created_at = demo.document.created_at + timedelta(hours=1)
+    upload = await add_document(db_session, demo.notice, ["Bilaga."], filename="bilaga.txt")
+    upload.uploaded_by = demo.buyer.id
+    upload.auto_interpret = False
+    upload.created_at = demo.document.created_at + timedelta(hours=2)
+    await db_session.flush()
+
+    response = await client.get(f"/api/notices/{demo.notice.id}/reading")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source"] == "fixture"
+    assert body["budget_chars"] == 150_000
+    assert body["extraction_version"] == 3
+    assert body["unread_files"] == [{"filename": "Foto entré.jpg", "reason": "Filformatet .jpg stöds inte"}]
+    # Oldest first, the replaced version included.
+    assert [item["filename"] for item in body["documents"]] == [
+        "gammal.txt",
+        "underlag.txt",
+        member_name,
+        "bilaga.txt",
+    ]
+    by_name = {item["filename"]: item for item in body["documents"]}
+    main = by_name["underlag.txt"]
+    assert main["origin"] == "fixture"
+    assert main["archive"] is None
+    assert main["is_main"] is True
+    assert main["layout"] == "eavrop"
+    assert main["empty_pages"] == 1
+    assert main["characters"] == sum(len(page) for page in document_pages(demo.fragestopp, demo.deadline))
+    assert main["superseded_by"] is None
+    replaced = by_name["gammal.txt"]
+    assert replaced["superseded_by"] == str(demo.document.id)
+    assert replaced["superseded_at"] == main["stored_at"]
+    assert by_name[member_name]["origin"] == "archive"
+    assert by_name[member_name]["archive"] == "Ritningar.zip"
+    assert by_name["bilaga.txt"]["origin"] == "upload"
+    assert by_name["bilaga.txt"]["is_main"] is False
+    assert (await client.get(f"/api/notices/{uuid.uuid4()}/reading")).status_code == 404

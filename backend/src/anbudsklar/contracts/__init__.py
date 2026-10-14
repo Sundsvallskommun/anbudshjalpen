@@ -9,6 +9,9 @@ from anbudsklar.contracts.common import (
 )
 from anbudsklar.contracts.inputs import (
     DEADLINE_LABELS,
+    EAVROP_LAYOUT,
+    EMPTY_PAGE_TEXT,
+    LAYOUT_NOTES,
     CompanyProfile,
     CpvCandidate,
     DeadlineKind,
@@ -45,6 +48,9 @@ from anbudsklar.contracts.tasks import (
 __all__ = [
     "CONTRACT_VERSION",
     "DEADLINE_LABELS",
+    "EAVROP_LAYOUT",
+    "EMPTY_PAGE_TEXT",
+    "LAYOUT_NOTES",
     "TASK_OUTPUTS",
     "Answer",
     "AnswerCitation",

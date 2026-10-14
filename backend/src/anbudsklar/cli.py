@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.config import get_settings
 from anbudsklar.db import get_engine, session_scope
-from anbudsklar.ingest import load_agreements, load_cpv
+from anbudsklar.ingest import load_agreements, load_cpv, load_policies
 from anbudsklar.models import JobRun
 from anbudsklar.services.checklists import interpret_notice
 from anbudsklar.services.jobs import (
@@ -26,6 +26,7 @@ from anbudsklar.services.jobs import (
     cpv_csv_path,
     ingest_eavrop_full,
     open_job_context,
+    policies_dir,
     run_job,
 )
 
@@ -139,6 +140,20 @@ def ingest_cpv(
     _run_job("load_cpv", load)
 
 
+@ingest_app.command("styrdokument")
+def ingest_policies(
+    path: Annotated[
+        Path | None, typer.Option(help="Mapp med styrdokument; standard är data/styrdokument")
+    ] = None,
+) -> None:
+    """Läs in kommunens styrdokument för inköp (inköpsstrategin) från repots filer."""
+
+    async def load(session: AsyncSession, context: JobContext) -> Mapping[str, int]:
+        return await load_policies(session, path or policies_dir(context.settings))
+
+    _run_job("load_policies", load)
+
+
 @ingest_app.command("agreements")
 def ingest_agreements(
     path: Annotated[
@@ -170,6 +185,13 @@ def interpret(
         return {"interpreted": len(await interpret_notice(session, context.engine, notice))}
 
     _run_job("interpret_notice", interpret_one)
+
+
+@app.command()
+def reextract() -> None:
+    """Läs om sparade underlag vars text ett äldre textuttag gjorde (jobbet reextract_outdated)."""
+
+    _run_job("reextract_outdated")
 
 
 @lab_app.command("purge")

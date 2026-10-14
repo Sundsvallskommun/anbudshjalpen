@@ -253,6 +253,11 @@ def _render_notice(
         lines.append("Läs sidor med lasa_sidor och sök i texten med sok_i_underlag.")
     else:
         lines.append("Inga dokument är inlästa. Hänvisa till annonsen för förfrågningsunderlaget.")
+    unread = [item for item in notice.unread_files or [] if item.get("filename")]
+    if unread:
+        lines.append("Filer hos köparen som inte kunde läsas in här, och som verktygen därför inte ser:")
+        lines += [f"- {item['filename']} ({item.get('reason') or 'kunde inte läsas'})" for item in unread]
+        lines.append("Säg att de finns i annonsen när en fråga kan gälla dem.")
     lines += ["", "## Checklista"]
     lines.append(
         "Inköp har publicerat en checklista: hämta den med hamta_checklista."

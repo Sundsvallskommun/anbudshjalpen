@@ -238,3 +238,95 @@ def test_safe_filename_shortens_long_names_but_keeps_the_extension() -> None:
     name = safe_filename("x" * 500 + ".pdf")
     assert len(name) == store.MAX_FILENAME_CHARS
     assert name.endswith(".pdf")
+
+
+# --- Current documents, superseding and re-extraction -------------------------------------
+
+
+async def test_store_keeps_the_layout_of_an_eavrop_export(
+    db_session: AsyncSession, make_pdf: MakeFile
+) -> None:
+    footer = (
+        "Sundsvalls kommun\nUpphandling\nFiktiv\nDokument\nKrav\n"
+        "Diarienummer\nUH-2026-1\nDatum\n2026-10-07\n1"
+    )
+    notice = await _notice(db_session)
+    document = await store_document(
+        db_session,
+        notice_id=notice.id,
+        filename="Krav på Leverantör.pdf",
+        mimetype=PDF_MIMETYPE,
+        data=make_pdf([f"Leverantören ska ha F-skatt.\n{footer}"]),
+    )
+    assert document.layout == "eavrop"
+    paged = await load_paged_document(db_session, document.id)
+    assert paged.layout == "eavrop" and paged.pages == ["Leverantören ska ha F-skatt."]
+
+
+async def test_store_counts_empty_pages_and_records_the_extraction_version(
+    db_session: AsyncSession, make_pdf: MakeFile
+) -> None:
+    notice = await _notice(db_session)
+    document = await store_document(
+        db_session,
+        notice_id=notice.id,
+        filename="skannad.pdf",
+        mimetype=PDF_MIMETYPE,
+        data=make_pdf(["Sida med text.", "", "Mer text."]),
+    )
+    assert (document.page_count, document.empty_pages) == (3, 1)
+    assert document.extraction_version == extract.EXTRACTION_VERSION
+
+
+async def test_current_documents_leave_out_replaced_and_empty_files_and_put_the_main_one_first(
+    db_session: AsyncSession, make_pdf: MakeFile, tender_pages: list[str]
+) -> None:
+    notice = await _notice(db_session)
+
+    async def add(filename: str, pages: list[str]) -> Document:
+        return await store_document(
+            db_session, notice_id=notice.id, filename=filename, mimetype=PDF_MIMETYPE, data=make_pdf(pages)
+        )
+
+    old = await add("AF.pdf", tender_pages)
+    attachment = await add("Bilaga.pdf", ["Bilagans text."])
+    new = await add("AF.pdf", [*tender_pages, "Rättad sida."])
+    store.supersede(old, new)
+    await db_session.flush()
+
+    current = await store.current_documents(db_session, notice.id)
+    assert [document.id for document in current] == [new.id, attachment.id]  # stored together: by name
+    first = await store.current_documents(db_session, notice.id, main=attachment)
+    assert [document.id for document in first] == [attachment.id, new.id]
+    paged = await store.load_paged_documents(db_session, first)
+    assert [document.filename for document in paged] == ["Bilaga.pdf", "AF.pdf"]
+
+
+async def test_reextract_replaces_the_pages_from_the_stored_file(
+    db_session: AsyncSession, make_pdf: MakeFile, tender_pages: list[str]
+) -> None:
+    notice = await _notice(db_session)
+    document = await store_document(
+        db_session, notice_id=notice.id, filename="u.pdf", mimetype=PDF_MIMETYPE, data=make_pdf(tender_pages)
+    )
+    # Pages an older extraction left behind: wrong text and an extra page.
+    await db_session.execute(
+        DocumentPage.__table__.update()
+        .where(DocumentPage.document_id == document.id, DocumentPage.page_no == 1)
+        .values(text="gammal text")
+    )
+    db_session.add(DocumentPage(document_id=document.id, page_no=5, text="överbliven sida"))
+    document.extraction_version = 1
+    await db_session.flush()
+
+    assert await store.reextract_document(db_session, document) == 4
+
+    rows = list(
+        await db_session.scalars(
+            select(DocumentPage.text)
+            .where(DocumentPage.document_id == document.id)
+            .order_by(DocumentPage.page_no)
+        )
+    )
+    assert len(rows) == 4 and "Administrativa föreskrifter" in rows[0]
+    assert (document.page_count, document.extraction_version) == (4, extract.EXTRACTION_VERSION)

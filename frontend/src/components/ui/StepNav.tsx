@@ -14,15 +14,19 @@ export type { StepValue } from "../../lib/labels";
 /** The address parameter that holds the step; its values are kept from before the redesign. */
 export const STEP_PARAM = "flik";
 
-/** The step an address asks for: one of the four, else the first (Krav). */
+/** The address of the step "Lämna in" from before decision 0024; it opens Granska, the last step. */
+const OLD_SUBMIT_STEP = "inlamning";
+
+/** The step an address asks for: one of the two, the old "Lämna in" as Granska, else the first (Krav). */
 export function parseStep(value: string | null): StepValue {
+  if (value === OLD_SUBMIT_STEP) return "granska";
   return STEPS.find((step) => step.value === value)?.value ?? "checklista";
 }
 
 /** A mark on a step: a warning when the review found gaps, a check when everything looks fine. */
 export type StepMark = "warning" | "success";
 
-const MARK_WORDS: Record<StepMark, string> = { warning: "behöver åtgärdas", success: "ser bra ut" };
+const MARK_WORDS: Record<StepMark, string> = { warning: "bör åtgärdas", success: "ser bra ut" };
 
 export interface StepNavApi {
   step: StepValue;
@@ -75,10 +79,10 @@ export interface StepNavProps {
 }
 
 /**
- * The notice page's three numbered steps (1 Krav · 2 Granska · 3 Lämna in) as a sticky tab bar. The step lives in
- * the address (`?flik=checklista|granska|inlamning`), so it can be linked to and survives a reload; the old step
- * `fraga` now opens the "Fråga AI" panel (decision 0014). On a phone the labels drop their numbers and fill three
- * equal cells. WAI-ARIA tabs: each tab controls its panel.
+ * The notice page's two numbered steps (1 Krav · 2 Granska) as a sticky tab bar. The step lives in the address
+ * (`?flik=checklista|granska`), so it can be linked to and survives a reload; the old step `fraga` now opens the
+ * "Fråga AI" panel (decision 0014) and the old step `inlamning` opens Granska (decision 0024). On a phone the labels
+ * drop their numbers and fill two equal cells. WAI-ARIA tabs: each tab controls its panel.
  */
 export function StepNav({ panels, marks = {}, end, idPrefix = "steg" }: StepNavProps) {
   const [params, setParams] = useSearchParams();
@@ -121,7 +125,7 @@ export function StepNav({ panels, marks = {}, end, idPrefix = "steg" }: StepNavP
     [selected, select],
   );
 
-  // A step opened from its own content ("Ställ en fråga") takes the focus to its panel, with the bar in view.
+  // A step opened from its own content ("Granska utkastet") takes the focus to its panel, with the bar in view.
   useEffect(() => {
     if (pendingFocus.current !== selected) return;
     pendingFocus.current = null;

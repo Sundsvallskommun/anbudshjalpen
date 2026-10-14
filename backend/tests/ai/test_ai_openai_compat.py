@@ -132,14 +132,14 @@ async def test_usage_is_unknown_when_the_endpoint_sends_no_count() -> None:
 async def test_maps_authentication_errors_to_swedish() -> None:
     endpoint = FakeEndpoint(httpx2.Response(401, json={"error": {"message": "no"}}))
     with pytest.raises(EngineConfigError, match="OPENAI_API_KEY"):
-        await _engine(endpoint).interpret_document(NOTICE, DOCUMENT)
+        await _engine(endpoint).interpret_document(NOTICE, DOCUMENTS)
 
 
 async def test_a_request_rejected_in_every_format_is_permanent() -> None:
     rejected = {"error": {"message": "maximum context length exceeded"}}
     endpoint = FakeEndpoint(*(httpx2.Response(400, json=rejected) for _ in range(3)))
     with pytest.raises(EngineError, match="avvisade förfrågan") as raised:
-        await _engine(endpoint).interpret_document(NOTICE, DOCUMENT)
+        await _engine(endpoint).interpret_document(NOTICE, DOCUMENTS)
     assert raised.value.retryable is False
     assert len(endpoint.bodies) == 3  # json_schema, json_object, plain
 
@@ -147,7 +147,7 @@ async def test_a_request_rejected_in_every_format_is_permanent() -> None:
 async def test_server_errors_stay_retryable() -> None:
     endpoint = FakeEndpoint(httpx2.Response(500, json={"error": {"message": "boom"}}))
     with pytest.raises(EngineError, match="fel 500") as raised:
-        await _engine(endpoint).interpret_document(NOTICE, DOCUMENT)
+        await _engine(endpoint).interpret_document(NOTICE, DOCUMENTS)
     assert raised.value.retryable is True
 
 
@@ -171,7 +171,36 @@ def test_cited_sources_match_literal_references() -> None:
     assert cited_sources("Inget citerat.", context) == []
 
 
+def test_cited_sources_match_steering_document_sections_in_their_usual_forms() -> None:
+    sustainable = RuleContext(reference="Inköpsstrategin 5.2", title="Hållbara inköp", text="…")
+    other = RuleContext(reference="Inköpsstrategin 5.21", title="Påhittat avsnitt", text="…")
+    context = [sustainable, other]
+
+    def cited(answer: str) -> list[str | None]:
+        return [source.reference for source in cited_sources(answer, context)]
+
+    assert cited("Kommunen ställer krav på villkor i nivå med kollektivavtal (Inköpsstrategin 5.2).") == [
+        "Inköpsstrategin 5.2"
+    ]
+    assert cited("Det står i inköpsstrategin, avsnitt 5.2.") == ["Inköpsstrategin 5.2"]
+    assert cited("Enligt inköpsstrategins avsnitt 5.2 ska kommunen …") == ["Inköpsstrategin 5.2"]
+    assert cited("Se inköpsstrategin avsnitt 5.21.") == ["Inköpsstrategin 5.21"]
+    assert cited("Avsnitt 5.2 i någon annan text, och LOU 4 kap. 1 §.") == []
+
+
 def test_requires_configuration() -> None:
     settings = Settings(_env_file=None, ai_engine="heuristic")
     with pytest.raises(EngineError, match="OPENAI_BASE_URL"):
         OpenAICompatEngine(settings)
+
+
+async def test_a_cut_off_answer_is_a_permanent_error_without_retries() -> None:
+    """A JSON the model could not finish would be cut off again; the retries are not spent on it."""
+
+    body = json.loads(_completion('{"summary": "Allt som ryms').content)
+    body["choices"][0]["finish_reason"] = "length"
+    endpoint = FakeEndpoint(httpx2.Response(200, json=body))
+    with pytest.raises(EngineError, match="höggs av") as raised:
+        await _engine(endpoint).interpret_document(NOTICE, DOCUMENTS)
+    assert raised.value.retryable is False
+    assert len(endpoint.bodies) == 1

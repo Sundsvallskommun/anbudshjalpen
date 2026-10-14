@@ -4,6 +4,11 @@ Files are content-addressed (`documents_dir/<sha256>`), so the same file uploade
 several notices is stored once and a re-upload to the same notice is a no-op. Text is
 extracted before anything is written, so an unsupported or unreadable upload leaves no
 trace. The page rows carry the section label used to narrow searches.
+
+A document row is never deleted by the app: a file the source replaced is marked
+superseded (`supersede`), so that the source links of older checklists keep working, and
+every reader of a notice's documents asks for the current ones (`current_documents`).
+The stored file lets an improved extraction run again (`reextract_document`).
 """
 
 from __future__ import annotations
@@ -14,15 +19,16 @@ import os
 import re
 import tempfile
 import uuid
+from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.config import get_settings
 from anbudsklar.contracts import PagedDocument
-from anbudsklar.documents.extract import extract_pages, resolve_mimetype
+from anbudsklar.documents.extract import EXTRACTION_VERSION, extract_document, resolve_mimetype
 from anbudsklar.documents.sections import classify_pages
 from anbudsklar.models import Document, DocumentPage
 
@@ -93,7 +99,7 @@ async def store_document(
         return existing
 
     canonical_mimetype = resolve_mimetype(mimetype, filename, data)
-    pages = await asyncio.to_thread(extract_pages, data, canonical_mimetype, filename)
+    pages, layout = await asyncio.to_thread(extract_document, data, canonical_mimetype, filename)
     await asyncio.to_thread(_write_file, _documents_dir(), digest, data)
 
     document = Document(
@@ -103,15 +109,15 @@ async def store_document(
         sha256=digest,
         size_bytes=len(data),
         page_count=len(pages),
+        empty_pages=count_empty(pages),
+        layout=layout,
+        extraction_version=EXTRACTION_VERSION,
         storage_path=digest,
         is_fictitious=is_fictitious,
         uploaded_by=uploaded_by,
         auto_interpret=auto_interpret,
     )
-    document.pages = [
-        DocumentPage(page_no=page_no, text=text, section=section)
-        for page_no, (text, section) in enumerate(zip(pages, classify_pages(pages), strict=True), start=1)
-    ]
+    document.pages = _page_rows(pages)
     try:
         async with session.begin_nested():
             session.add(document)
@@ -122,6 +128,46 @@ async def store_document(
             raise
         return concurrent
     return document
+
+
+def _page_rows(pages: Sequence[str]) -> list[DocumentPage]:
+    return [
+        DocumentPage(page_no=page_no, text=text, section=section)
+        for page_no, (text, section) in enumerate(zip(pages, classify_pages(pages), strict=True), start=1)
+    ]
+
+
+def count_empty(pages: Sequence[str]) -> int:
+    """Pages without readable text: scans and images, which the engines never see."""
+
+    return sum(1 for page in pages if not page.strip())
+
+
+def is_current() -> ColumnElement[bool]:
+    """The condition that keeps the documents a notice has now: not replaced by a newer file."""
+
+    return Document.superseded_by.is_(None)
+
+
+async def current_documents(
+    session: AsyncSession, notice_id: uuid.UUID, *, main: Document | None = None
+) -> list[Document]:
+    """A notice's current, readable documents, `main` first, then in the order they were stored.
+
+    What the engines, the search and MCP read: a file the source replaced is left out, and
+    so is one without text. `main` is the document a checklist or a question starts from.
+    """
+
+    documents = list(
+        await session.scalars(
+            select(Document)
+            .where(Document.notice_id == notice_id, is_current(), Document.page_count > 0)
+            .order_by(Document.created_at, Document.filename, Document.id)
+        )
+    )
+    if main is None:
+        return documents
+    return [main, *(document for document in documents if document.id != main.id)]
 
 
 async def load_paged_document(session: AsyncSession, document_id: uuid.UUID) -> PagedDocument:
@@ -137,7 +183,49 @@ async def load_paged_document(session: AsyncSession, document_id: uuid.UUID) -> 
     )
     texts = {page_no: text for page_no, text in rows}
     pages = [texts.get(page_no, "") for page_no in range(1, max(texts, default=0) + 1)]
-    return PagedDocument(document_id=str(document.id), filename=document.filename, pages=pages)
+    return PagedDocument(
+        document_id=str(document.id), filename=document.filename, pages=pages, layout=document.layout
+    )
+
+
+async def load_paged_documents(session: AsyncSession, documents: Sequence[Document]) -> list[PagedDocument]:
+    """The documents as the engines see them, in the order given."""
+
+    return [await load_paged_document(session, document.id) for document in documents]
+
+
+def supersede(old: Document, new: Document) -> None:
+    """Mark `old` as replaced by `new`, the source's newer file under the same name.
+
+    The old row and its pages stay: a checklist interpreted from it still shows its sources.
+    """
+
+    if old.id != new.id:
+        old.superseded_by = new.id
+
+
+async def reextract_document(session: AsyncSession, document: Document) -> int:
+    """Read the stored file again with the current extraction and replace the pages.
+
+    Returns the new page count. Raises `DocumentError` when the file can no longer be
+    read, in which case nothing is changed. A changed text changes the pages a checklist
+    cites, so the caller's digest check interprets the notice again.
+    """
+
+    data = await read_file(document)
+    pages, layout = await asyncio.to_thread(extract_document, data, document.mimetype, document.filename)
+    await session.execute(delete(DocumentPage).where(DocumentPage.document_id == document.id))
+    session.add_all(DocumentPage(document_id=document.id, **_page_values(row)) for row in _page_rows(pages))
+    document.page_count = len(pages)
+    document.empty_pages = count_empty(pages)
+    document.layout = layout
+    document.extraction_version = EXTRACTION_VERSION
+    await session.flush()
+    return len(pages)
+
+
+def _page_values(row: DocumentPage) -> dict[str, object]:
+    return {"page_no": row.page_no, "text": row.text, "section": row.section}
 
 
 def _stored_path(document: Document) -> Path:

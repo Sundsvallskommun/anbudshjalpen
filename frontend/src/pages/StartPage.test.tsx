@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CompanyView, MatchView, UpcomingProcurement } from "../api/types";
+import type { CompanyView, MatchingStatus, MatchView, UpcomingProcurement } from "../api/types";
 import { PHONE_QUERY } from "../lib/usePhone";
 import { companyUser, matchView, noticeSummary, reminder } from "../test/fixtures";
 import { baseRoutes, mockApi, renderApp, type MockRoute } from "../test/render";
@@ -51,10 +51,14 @@ const interpreting: UpcomingProcurement = {
   announcement_overdue: true,
 };
 
-function startRoutes({ matches = [matchView] }: { matches?: MatchView[] } = {}): MockRoute[] {
+function startRoutes({
+  matches = [matchView],
+  status = () => ({ is_assessing: false }),
+}: { matches?: MatchView[] | (() => MatchView[]); status?: () => MatchingStatus } = {}): MockRoute[] {
   return [
     ...baseRoutes(companyUser),
-    { method: "GET", path: "/api/matches", body: matches },
+    { method: "GET", path: "/api/matches", body: typeof matches === "function" ? () => matches() : matches },
+    { method: "GET", path: "/api/matches/status", body: () => status() },
     { method: "GET", path: "/api/reminders", body: [reminder] },
     { method: "GET", path: "/api/upcoming", body: [interpreting, painting] },
     { method: "GET", path: "/api/profile", body: profile },
@@ -230,6 +234,36 @@ describe("StartPage", () => {
     expect(within(list).getByText("Verkar inte passa")).toBeInTheDocument();
   });
 
+  it("says the engine is at work after a profile save instead of showing no matches, then shows the new ones", async () => {
+    let assessing = true;
+    let matches: MatchView[] = [];
+    const calls = mockApi(
+      startRoutes({ matches: () => matches, status: () => ({ is_assessing: assessing }) }),
+    );
+    renderApp("/start");
+
+    expect(await screen.findByText("Anbudshjälpen bedömer upphandlingarna mot er profil …")).toBeInTheDocument();
+    expect(screen.getByText("Det tar ungefär en halv minut per upphandling. Träffarna visas här så snart bedömningen är klar.")).toBeInTheDocument();
+    expect(screen.queryByText("Inga nya träffar just nu")).not.toBeInTheDocument();
+    expect(screen.getByText("Målerifirman i Matfors AB · träffarna bedöms")).toBeInTheDocument();
+
+    // The page keeps asking; when the run is done, the matches are fetched anew without a reload.
+    assessing = false;
+    matches = [matchView];
+    expect(await screen.findByRole("heading", { name: "Nya träffar, 1 träff" }, { timeout: 8000 })).toBeInTheDocument();
+    expect(screen.queryByText("Anbudshjälpen bedömer upphandlingarna mot er profil …")).not.toBeInTheDocument();
+    expect(calls.filter((call) => call.path === "/api/matches/status").length).toBeGreaterThan(1);
+  }, 10_000);
+
+  it("keeps the cards while a changed profile is assessed anew, and says so above them", async () => {
+    mockApi(startRoutes({ status: () => ({ is_assessing: true }) }));
+    renderApp("/start");
+
+    expect(await screen.findByRole("heading", { name: "Nya träffar, 1 träff" })).toBeInTheDocument();
+    expect(screen.getByText("Profilen är ändrad. Träffarna bedöms på nytt och kan ändras om en stund.")).toBeInTheDocument();
+    expect(screen.getByText("Målerifirman i Matfors AB · 1 ny träff · nästa frist om 11 dagar")).toBeInTheDocument();
+  });
+
   it("shows what is coming for the company as a timeline, and everything on Alla", async () => {
     mockApi(startRoutes());
     renderApp("/start");
@@ -286,6 +320,22 @@ describe("StartPage", () => {
     expect(within(card).getByText("Inte angivet")).toBeInTheDocument();
     expect(within(card).queryByText("45442100")).not.toBeInTheDocument();
     expect(within(card).getByRole("link", { name: "Ändra profil" })).toHaveAttribute("href", "/profil");
+  });
+
+  it("shows the whole label of an activity cut off with an ellipsis on hover", async () => {
+    // jsdom has no layout: "Målning av byggnader" is wider than its token, "Målning" fits.
+    vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(function (this: HTMLElement) {
+      return this.textContent === "Målning av byggnader" ? 200 : 0;
+    });
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(100);
+    mockApi(startRoutes());
+    renderApp("/start");
+
+    const card = await screen.findByRole("region", { name: "Träffarna bygger på er profil" });
+    const [cutToken] = await within(card).findAllByText("Målning av byggnader");
+    await userEvent.hover(cutToken!);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent("Målning av byggnader");
+    expect(within(card).getAllByText("Målning")).toHaveLength(1);
   });
 
   it("offers Regelhjälpen with an example question that it answers on arrival", async () => {

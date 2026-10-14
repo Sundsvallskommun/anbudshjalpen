@@ -1,6 +1,6 @@
 # 0014: AI-stödet är en panel som följer läsaren, och samtalet går att spara som PDF
 
-- **Status:** Accepterat
+- **Status:** Accepterat, stegens antal och namn ersatta av [0024](0024-granska-ar-sista-steget.md)
 - **Datum:** 2026-10-12
 - **Gäller:** var företagaren ställer frågor till AI-stödet, hur ett samtal följer med mellan sidorna och hur det
   exporteras
@@ -33,7 +33,8 @@ senaste svaren som historik. "Rensa samtalet" tar bort det.
 
 **Ingångarna öppnar panelen:** "Ställ en fråga" i steg 1, "Fråga om kravet" i Granska (med frågan ifylld, också via
 adressen `?fraga=` i en ny flik), "Fråga underlaget" på en upphandling utan checklista och knappen själv. Den gamla
-adressen `?flik=fraga` öppnar panelen.
+adressen `?flik=fraga` öppnar panelen. (2026-10-13: "Ställ en fråga" i steg 1 togs bort, eftersom steget då slutade i
+panelen i stället för att leda vidare; dess "Nästa steg" leder till 2 Granska, och knappen räcker som ingång.)
 
 **Steg 2 försvinner.** Stegen är 1 Krav, 2 Granska och 3 Lämna in. Inköps publicerade svar ([beslut 0013](0013-fragor-och-svar-fran-eavrop.md))
 står i steg 1, och under kortet för en upphandling utan checklista. Panelens inledning säger vad svaren bygger på och

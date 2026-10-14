@@ -7,7 +7,8 @@ Läs detta när: Du ska ändra insamlingen, lägga till en källa, förklara fö
 
 Hör ihop med: [PoC](poc.md), [Drift](operations.md), [Öppna frågor](open-questions.md), [Ordlista](glossary.md)
 
-> Kontrollerat 2026-10-05, e-Avrop 2026-10-08. Koden ligger i `backend/src/anbudsklar/ingest/`.
+> Kontrollerat 2026-10-05, e-Avrop 2026-10-08, kommunens styrdokument 2026-10-14. Koden ligger i
+> `backend/src/anbudsklar/ingest/`.
 
 ## Översikt
 
@@ -16,6 +17,7 @@ Hör ihop med: [PoC](poc.md), [Drift](operations.md), [Öppna frågor](open-ques
 | TED | Annonser över EU:s tröskelvärden | Öppet API, varje dag 06:15 | Fri återanvändning | Riktiga |
 | e-Avrop | Kommunens annonserade upphandlingar, även under tröskelvärdena, och deras underlag | Kommunens Projekt-API, varje dag 06:30 | Kommunens nyckel. Bara publicerat sparas ([beslut 0009](decisions/0009-eavrop-projekt-api.md)) | Riktiga när nyckeln är inlagd |
 | Riksdagen | LOU (SFS 2016:1145), paragraf för paragraf | Öppna data, varje måndag 05:00 | Lagtext är fri | Riktig |
+| Kommunens styrdokument | Inköpsstrategin (kommunfullmäktige 2023-09-25), avsnitt för avsnitt | Fil i repot, läses in när worker startar | Beslut av kommunfullmäktige, fritt att återge | Riktig |
 | EU:s CPV-lista | 9 454 CPV-koder med svenska benämningar | Fil i repot | EU:s regler för återanvändning | Riktig |
 | Avtalskatalog | Avtal och när de löper ut | CSV-fil | – | Påhittad |
 | Underlag och demoföretag | Förfrågningsunderlag, facit, ett anbudsutkast och två företag | Filer i repot | – | Påhittade |
@@ -36,6 +38,8 @@ Kontaktpersoners namn, e-post och telefonnummer i annonser sparas inte.
   och motorernas annonsblock kallar den "Sista dag för anbudsansökan". Sista anbudsdag kommer först i inbjudan till de
   utvalda och finns bara om en publicerad checklista anger den. Kontrollerat 2026-10-07 på annonsen 680702-2026
   (Hedbergska skolan, Sundsvalls kommun).
+- **Beskrivning:** förfarandets beskrivning (`description-proc`), annars alla delområdenas (`description-lot`)
+  efter varandra, så att ett delområde aldrig faller bort ur sökningen, matchningen och det modellen läser.
 - **Status:** en sista dag i framtiden ger `open`, tilldelning ger `awarded`, förhandsannons ger `planned` och resten
   blir `closed`. Hela svaret från TED sparas i `raw`. När sista dagen passerar sparar jobbet `close_expired` `closed`
   på annonsen inom en kvart, för annonser från alla källor, och API:t visar den som stängd redan från den dagen. Det
@@ -72,12 +76,17 @@ Anbudshjälpen läser kommunens upphandlingar via e-Avrops Projekt-API med kommu
 
 - Nyckeln läser allt i kommunens projekt. Insamlaren sparar bara publicerade upphandlingar och fälten i en vitlista
   ([beslut 0009](decisions/0009-eavrop-projekt-api.md)).
+- Underlagets filer hämtas i PDF, Word, Excel och text, och zip-arkiv packas upp. Andra filer står med namn och skäl
+  på annonsen, och en fil som e-Avrop publicerat på nytt ersätter den gamla
+  ([beslut 0020](decisions/0020-checklistan-lases-ur-alla-dokument.md)). De flesta av kommunens dokument är exporter
+  ur e-Avrop, som tjänsten känner igen, se [e-Avrops egna dokument](eavrop.md#e-avrops-egna-dokument).
 - Inköps publicerade svar på leverantörernas frågor läses ur annonsens frågelogg, bara besvarade frågor och aldrig
   vem som frågade ([beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md)). De visas i steg 1 Krav och via
   MCP-verktyget `hamta_fragor_svar`, och Fråga AI och tolkningen läser dem ([beslut 0018](decisions/0018-publicerade-svar-i-ai-uppgifterna.md)).
 - e-Avrops webbplats hämtas inte automatiskt. Dess `robots.txt` förbjuder det, och API:t gör det onödigt.
 - Samma upphandling i TED och e-Avrop känns igen på länken: TED:s länk till underlaget är e-Avrops annonslänk med
-  upphandlingens id. Den blir en annons, och underlaget från e-Avrop läggs på den.
+  upphandlingens id. Den blir e-Avrops annons, med köpare, uppskattat värde, ort och länk från TED
+  ([beslut 0021](decisions/0021-eavrop-gar-fore-ted.md)).
 
 ## LOU från Riksdagen
 
@@ -86,6 +95,23 @@ Anbudshjälpen läser kommunens upphandlingar via e-Avrops Projekt-API med kommu
   Den 2026-10-05 var lagen ändrad till och med SFS 2026:880 och hade 422 paragrafer i 22 kapitel med paragrafer.
 - **Villkor:** författningar omfattas inte av upphovsrätt (1 kap. 9 § upphovsrättslagen).
 - **Används av:** MCP-verktygen `sok_lou` och `hamta_paragraf`, och Regelhjälpen med motorerna `openai` och `heuristic`.
+
+## Kommunens styrdokument för inköp
+
+- **Källa:** `data/styrdokument/inkopsstrategi.md`, kommunens inköpsstrategi återgiven ordagrant från PDF:en på
+  sundsvall.se (adressen står i filen). [data/styrdokument/README.md](../data/styrdokument/README.md) säger vad
+  återgivningen ändrar och hur en ny version eller ett nytt dokument läggs in.
+- **Innehåll:** 18 avsnitt med nummer, rubrik, text och PDF-sidor i tabellerna `policy_documents` och
+  `policy_sections`. Fastställd av kommunfullmäktige 2023-09-25 (KSK-2023-00196); inköp bekräftade 2026-10-14 att
+  den versionen gäller.
+- **Villkor:** beslut av myndigheter omfattas inte av upphovsrätt (1 kap. 9 § upphovsrättslagen), och dokumentet är
+  kommunens eget.
+- **Används av:** MCP-verktygen `sok_styrdokument` och `hamta_avsnitt`, och Regelhjälpen med motorerna `openai` och
+  `heuristic`, som rangordnar lagen och styrdokumenten tillsammans
+  ([beslut 0022](decisions/0022-kommunens-styrdokument-som-kalla.md)). Aldrig av tolkningen, matchningen eller
+  granskningen. Källan märks "Kommunens styrdokument": den binder kommunens beställare, inte leverantören.
+- **Uppdateras:** jobbet `load_policies` läser in filerna varje gång worker startar, och `anbudsklar seed` gör
+  detsamma. `anbudsklar ingest styrdokument` kör det direkt.
 
 ## CPV-koder
 

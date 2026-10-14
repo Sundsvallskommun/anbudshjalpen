@@ -49,8 +49,10 @@ _EXTRA_HOSTS = ("localhost:*", "127.0.0.1:*", "[::1]:*", "app:*", "anbudsklar:*"
 _EXPLICIT_PORT = re.compile(r"^(?:[^:\[\]]+|\[[^\]]+\]):\d+$")
 
 _INSTRUCTIONS = (
-    "Offentliga upphandlingar, förfrågningsunderlag sida för sida, publicerade checklistor, LOU och CPV. "
-    "Endast läsning. Hänvisa alltid till källan: dokument och sida, eller LOU kapitel och paragraf."
+    "Offentliga upphandlingar, förfrågningsunderlag sida för sida, publicerade checklistor, LOU, Sundsvalls "
+    "kommuns styrdokument för inköp och CPV. Endast läsning. Hänvisa alltid till källan: dokument och sida, "
+    "LOU kapitel och paragraf, eller styrdokument och avsnitt. Ett styrdokument binder kommunens egna "
+    "beställare, inte leverantören: säg vilket slag källan är."
 )
 
 

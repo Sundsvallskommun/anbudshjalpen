@@ -91,7 +91,7 @@ function ReviewRow({
 }
 
 /**
- * One group of the review as a section card with its count ("Måste åtgärdas, 3 krav"). A comment all its rows share is
+ * One group of the review as a section card with its count ("Bör åtgärdas, 3 krav"). A comment all its rows share is
  * said once, under the heading. `value` lets the result's filters open the group.
  */
 export function ReviewGroupSection({ group, noticeId, documentId }: { group: ReviewGroup; noticeId: string; documentId?: string }) {

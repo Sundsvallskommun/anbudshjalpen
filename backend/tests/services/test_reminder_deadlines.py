@@ -25,6 +25,17 @@ def _notice(deadline_at: datetime | None = NOTICE_DEADLINE, deadline_kind: str =
     return Notice(title="Ommålning (fiktiv)", deadline_at=deadline_at, deadline_kind=deadline_kind)
 
 
+SOURCE_QUESTIONS = datetime(2026, 10, 28, 23, 59, 59, tzinfo=STOCKHOLM)
+
+
+def _from_eavrop() -> Notice:
+    """A notice whose source states the last day for questions (e-Avrop's time table)."""
+
+    notice = _notice()
+    notice.question_deadline_at = SOURCE_QUESTIONS
+    return notice
+
+
 def _restricted() -> Notice:
     """A restricted procedure: the notice's deadline is the last day for anbudsansökan."""
 
@@ -39,7 +50,9 @@ def _checklist(tenders: date = TENDERS) -> Checklist:
     ("kind", "notice", "checklist", "expected"),
     [
         ("fragestopp", _notice(), _checklist(), end_of_local_day(QUESTIONS)),
-        ("fragestopp", _notice(), None, None),  # only a published checklist knows frågestopp
+        ("fragestopp", _notice(), None, None),  # without a source date, only a published checklist knows it
+        ("fragestopp", _from_eavrop(), _checklist(), SOURCE_QUESTIONS),  # the source's date beats the model's
+        ("fragestopp", _from_eavrop(), None, SOURCE_QUESTIONS),
         ("sista_anbudsdag", _notice(), _checklist(), NOTICE_DEADLINE),  # same day: the notice's time
         (
             "sista_anbudsdag",

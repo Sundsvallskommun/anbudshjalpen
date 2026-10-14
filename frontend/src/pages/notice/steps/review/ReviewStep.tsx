@@ -7,16 +7,16 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 import type { ChecklistView, NoticeDetail, ReviewView, UserView } from "../../../../api/types";
 import { ErrorNotice } from "../../../../components/states";
-import { ArrowRightIcon, UploadIcon } from "../../../../components/ui/icons";
+import { UploadIcon } from "../../../../components/ui/icons";
 import { NextStepCard } from "../../../../components/ui/NextStepCard";
-import { useStepNav } from "../../../../components/ui/StepNav";
 import { StepLayout } from "../StepLayout";
+import { HandInCard } from "./HandInCard";
 import { ReviewRail } from "./ReviewRail";
 import { ReviewResult } from "./ReviewResult";
 import { reviewGroups, reviewVerdict } from "./reviewModel";
 import { ReviewedFile, ReviewInProgress, ReviewUpload } from "./ReviewUpload";
 
-/** The latest reviewed draft: kept above the steps, so step 4 can tick what it found. The file itself is gone. */
+/** The latest reviewed draft: kept above the steps, so it survives a step change. The file itself is gone. */
 export interface ReviewedDraft {
   view: ReviewView;
   fileName: string;
@@ -45,58 +45,40 @@ function NotYet({ title, description, action }: { title: string; description: st
 }
 
 /**
- * "Nästa steg": without a review, on to step 4; with things to fix, a new version first (one primary button per view,
- * so not while the upload form, with its own, is open).
+ * The end of the last step (decision 0024): with things to fix, "Nästa steg" asks for a new version first, and in
+ * every state "Lämna anbudet" says where and by when the tender is handed in. Its link is the view's primary action
+ * only after a review that found nothing to fix: the upload form and "Granska en ny version" have theirs (one primary
+ * button per view).
  */
 function StepEnd({
+  notice,
   mustFix,
   isUploadOpen,
   onNewVersion,
 }: {
-  /** How many things the latest review says must be fixed, or null before a review. */
+  notice: NoticeDetail;
+  /** How many things the latest review says should be fixed, or null before a review. */
   mustFix: number | null;
   isUploadOpen: boolean;
   onNewVersion: () => void;
 }) {
-  const { goTo } = useStepNav();
-  const toSubmit = (variant: "primary" | "secondary") => (
-    <Button
-      label="Nästa: 4 Lämna in"
-      variant={variant}
-      endContent={<Icon icon={ArrowRightIcon} />}
-      onClick={() => goTo("inlamning")}
-    />
-  );
-  if (mustFix === null || isUploadOpen) {
-    return (
-      <NextStepCard
-        text={
-          mustFix === null
-            ? "Har du inget utkast än? Du kan gå vidare och bocka av kraven inför inlämningen."
-            : "Gå igenom listan inför inlämningen. Det som såg bra ut i utkastet är redan förbockat."
-        }
-        action={toSubmit("secondary")}
-      />
-    );
-  }
-  if (mustFix === 0) {
-    return <NextStepCard text="Gå igenom listan inför inlämningen. Det som såg bra ut i utkastet är redan förbockat." action={toSubmit("primary")} />;
-  }
+  const hasGaps = mustFix !== null && mustFix > 0;
   return (
-    <NextStepCard
-      text="Åtgärda det som saknas och granska sedan den nya versionen, så ser du att allt kom med."
-      action={
-        <>
-          <Button label="Granska en ny version" variant="primary" icon={<Icon icon={UploadIcon} />} onClick={onNewVersion} />
-          {toSubmit("secondary")}
-        </>
-      }
-    />
+    <>
+      {hasGaps && !isUploadOpen && (
+        <NextStepCard
+          text="Gå igenom det granskningen pekar på. Åtgärda det som faktiskt saknas och granska sedan den nya versionen, så ser du att allt kom med."
+          action={<Button label="Granska en ny version" variant="primary" icon={<Icon icon={UploadIcon} />} onClick={onNewVersion} />}
+        />
+      )}
+      <HandInCard notice={notice} variant={mustFix === 0 && !isUploadOpen ? "primary" : "secondary"} />
+    </>
   );
 }
 
 /**
- * Step 3 Granska (direction.md, section 4): the draft is checked against the published checklist and never stored.
+ * Step 2 Granska, the last step (direction.md, section 4, and decision 0024): the draft is checked against the
+ * published checklist and never stored.
  * Before a review the upload area, with the privacy rules beside it; choosing the file starts the review, and a card
  * shows the work while it runs. After it the form folds into a row with "Granska en ny version", and the result
  * follows and takes the focus, so the answer is where the reader lands. Only a company can review, and only a
@@ -179,6 +161,7 @@ export function ReviewStep({
       )}
       {!isReviewing && (
         <StepEnd
+          notice={notice}
           mustFix={reviewed ? reviewVerdict(reviewGroups(reviewed.view, view.checklist)).mustFix : null}
           isUploadOpen={showsUpload}
           onNewVersion={() => setIsUploadOpen(true)}

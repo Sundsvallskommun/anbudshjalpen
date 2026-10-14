@@ -103,6 +103,14 @@ class Notice(Base):
     place: Mapped[str | None] = mapped_column(Text)
     url: Mapped[str | None] = mapped_column(Text)
     documents_url: Mapped[str | None] = mapped_column(Text)
+    # The last day for questions to the buyer as the source states it (e-Avrop's time table),
+    # stored as the end of that day. None when the source gives none; the published checklist's
+    # frågestopp then stands in (`services.notices`). A source's date goes before a model's.
+    question_deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Files the source lists for the notice that were not read in, as [{"filename", "reason"}]:
+    # a format the extraction does not read, a file too large or unreadable. Shown to people and
+    # to the engines, so nobody takes the documents here for the whole set.
+    unread_files: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list, server_default="[]")
     is_fictitious: Mapped[bool] = mapped_column(Boolean, default=False)
     raw: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     search: Mapped[Any] = mapped_column(
@@ -149,6 +157,18 @@ class Document(Base):
     interpret_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     interpret_error: Mapped[str | None] = mapped_column(Text)
     interpret_retry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Set when the source published a newer file under the same name: the row and its pages stay,
+    # so source links into old checklists keep working, but only current documents reach the
+    # engines, the search, MCP and the document list.
+    superseded_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("documents.id", ondelete="SET NULL"))
+    # The text extraction that made the pages (`documents.extract.EXTRACTION_VERSION`), so that an
+    # improved extraction reaches stored documents (job `reextract_outdated`).
+    extraction_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    # Pages without readable text (scans, images), counted at extraction and shown to inköp.
+    empty_pages: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # How the file was produced when that matters for reading it: "eavrop" for an export from
+    # e-Avrop's forms (`documents.eavrop_export`), else None.
+    layout: Mapped[str | None] = mapped_column(String(32))
     created_at: Mapped[datetime] = _created_at()
 
     notice: Mapped[Notice] = relationship(back_populates="documents")
@@ -230,6 +250,9 @@ class ChecklistRecord(Base):
     verification: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)  # summary counts
     # The published answers the checklist was interpreted with (decision 0018); empty when there were none.
     answers_digest: Mapped[str | None] = mapped_column(String(64))
+    # The documents it was interpreted from, ids and extraction versions (decision 0020). None on
+    # checklists made before the decision, which read one document.
+    documents_digest: Mapped[str | None] = mapped_column(String(64))
     # When inköp last saved the checklist; a saved draft is never replaced by a new interpretation.
     edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reviewer_note: Mapped[str | None] = mapped_column(Text)
@@ -287,6 +310,58 @@ class LouSection(Base):
             persisted=True,
         ),
     )
+
+
+class PolicyDocument(Base):
+    """One of the municipality's steering documents for purchasing (styrdokument), from data/styrdokument/.
+
+    Decision 0022: a source class of its own next to LOU. A steering document binds the
+    municipality's own purchasers, not the supplier, so everything that shows one labels
+    it "Kommunens styrdokument", never as law.
+    """
+
+    __tablename__ = "policy_documents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    slug: Mapped[str] = mapped_column(String(64), unique=True)  # the file name without .md
+    title: Mapped[str] = mapped_column(Text)
+    short_title: Mapped[str] = mapped_column(String(64))  # "Inköpsstrategin": the reference prefix
+    decided_by: Mapped[str | None] = mapped_column(Text)
+    decided_on: Mapped[date | None] = mapped_column(Date)
+    diarienummer: Mapped[str | None] = mapped_column(String(64))
+    validity: Mapped[str | None] = mapped_column(Text)
+    source_url: Mapped[str] = mapped_column(Text)  # the public PDF; sections link to it with #page=N
+    retrieved_on: Mapped[date | None] = mapped_column(Date)
+
+
+class PolicySection(Base):
+    """One numbered section ("5.2 Hållbara inköp") of a steering document, with its PDF pages."""
+
+    __tablename__ = "policy_sections"
+    __table_args__ = (
+        UniqueConstraint("document_id", "number", name="uq_policy_sections_document_number"),
+        Index("ix_policy_sections_search", "search", postgresql_using="gin"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("policy_documents.id", ondelete="CASCADE"))
+    number: Mapped[str] = mapped_column(String(16))  # "5.2"
+    heading: Mapped[str] = mapped_column(Text)
+    text: Mapped[str] = mapped_column(Text)
+    page_start: Mapped[int] = mapped_column(Integer)
+    page_end: Mapped[int] = mapped_column(Integer)
+    sort_key: Mapped[int] = mapped_column(Integer, default=0)
+    search: Mapped[Any] = mapped_column(
+        TSVECTOR,
+        Computed(
+            "setweight(to_tsvector('swedish', coalesce(heading, '')), 'A') || "
+            "setweight(to_tsvector('swedish', coalesce(text, '')), 'B')",
+            persisted=True,
+        ),
+    )
+    # Loaded with the section: references and links need the document, and the async
+    # session cannot load it lazily.
+    document: Mapped[PolicyDocument] = relationship(lazy="joined")
 
 
 class CpvCode(Base):

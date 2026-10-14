@@ -43,7 +43,7 @@ hittas med hänvisningar och ord.
 ## Konsekvenser
 
 - Svaren kan nu peka in i bilagor, och ursprungsraden visar vilket dokument ett citat kommer från.
-- Tolkningen till checklista läser fortfarande bara huvuddokumentet. Samma paketbyggare är tänkt att ge
-  `tolka_underlag` bilagorna med krav; det är nästa steg.
+- Tolkningen till checklista läste fortfarande bara huvuddokumentet. Sedan [beslut 0020](0020-checklistan-lases-ur-alla-dokument.md)
+  ger samma paketbyggare `tolka_underlag` alla dokument.
 - Budgeten är en konstant i koden, inte en inställning: den beror på modellen, inte på verksamheten.
 - Nya tester: `backend/tests/documents/test_document_bundle.py` och fall i citat-, motor- och API-testerna.

@@ -7,6 +7,7 @@ import os
 import zipfile
 from collections.abc import Callable
 
+import docx
 import pytest
 from fpdf import FPDF
 
@@ -355,3 +356,187 @@ def test_docx_with_too_much_text_is_rejected(make_docx: MakeFile, monkeypatch: p
     data = _docx_with_body(make_docx, _paragraphs(10))  # 340 characters
     with pytest.raises(DocumentTooLarge, match="för mycket text"):
         extract_pages(data, DOCX_MIMETYPE, "underlag.docx")
+
+
+# --- Word: content controls, text boxes, footnotes and nested tables ----------------------
+
+W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+MC_NS = "http://schemas.openxmlformats.org/markup-compatibility/2006"
+FOOTNOTES_TYPE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes"
+FOOTNOTES_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"
+
+
+def _run(text: str) -> str:
+    return f"<w:r><w:t xml:space='preserve'>{text}</w:t></w:r>"
+
+
+def _docx_with_xml(*body_xml: str) -> bytes:
+    """A Word file whose body holds the given WordprocessingML, as a template or a form would."""
+
+    from docx.oxml.ns import qn
+    from docx.oxml.parser import parse_xml
+
+    document = docx.Document()
+    body = document.element.body
+    section = body.find(qn("w:sectPr"))
+    for xml in body_xml:
+        element = parse_xml(f'<w:body xmlns:w="{W_NS}" xmlns:mc="{MC_NS}">{xml}</w:body>')[0]
+        body.insert(list(body).index(section), element)
+    buffer = io.BytesIO()
+    document.save(buffer)
+    return buffer.getvalue()
+
+
+def _with_footnotes(data: bytes, notes: dict[int, str]) -> bytes:
+    """Add a footnotes part the way Word writes it: the part, its relationship and its content type."""
+
+    footnotes = "".join(
+        f'<w:footnote w:id="{number}"><w:p>{_run(text)}</w:p></w:footnote>' for number, text in notes.items()
+    )
+    separators = (
+        '<w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>'
+        '<w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p>'
+        "</w:footnote>"
+    )
+    part = (
+        f'<?xml version="1.0" encoding="UTF-8"?>'
+        f'<w:footnotes xmlns:w="{W_NS}">{separators}{footnotes}</w:footnotes>'
+    )
+    source = zipfile.ZipFile(io.BytesIO(data))
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as target:
+        for member in source.infolist():
+            content = source.read(member)
+            if member.filename == "word/_rels/document.xml.rels":
+                relationship = f'<Relationship Id="rIdFn" Type="{FOOTNOTES_TYPE}" Target="footnotes.xml"/>'
+                content = content.replace(b"</Relationships>", f"{relationship}</Relationships>".encode())
+            elif member.filename == "[Content_Types].xml":
+                part_name = "/word/footnotes.xml"
+                override = f'<Override PartName="{part_name}" ContentType="{FOOTNOTES_CONTENT_TYPE}"/>'
+                content = content.replace(b"</Types>", (override + "</Types>").encode())
+            target.writestr(member, content)
+        target.writestr("word/footnotes.xml", part)
+    return buffer.getvalue()
+
+
+def test_extraction_version_names_this_reader() -> None:
+    assert extract.EXTRACTION_VERSION == 3
+
+
+EAVROP_FOOTER = (
+    "Sundsvalls kommun\nUpphandling\nFiktiv upphandling\nDokument\nKrav på Leverantör UH-2026-999\n"
+    "Diarienummer\nUH-2026-999\nDatum\n2026-10-07\n{page}"
+)
+
+
+def test_an_eavrop_export_loses_its_footer_and_is_marked(make_pdf: MakeFile) -> None:
+    pages = [
+        "1 Krav på Leverantör\nLeverantören ska ha F-skatt.\n" + EAVROP_FOOTER.format(page=1),
+        "1.2 Försäkring\nLeverantören ska ha ansvarsförsäkring.\n" + EAVROP_FOOTER.format(page=2),
+    ]
+    extraction = extract.extract_document(make_pdf(pages), PDF_MIMETYPE, "Krav på Leverantör.pdf")
+    assert extraction.layout == "eavrop"
+    assert extraction.pages == [
+        "1 Krav på Leverantör\nLeverantören ska ha F-skatt.",
+        "1.2 Försäkring\nLeverantören ska ha ansvarsförsäkring.",
+    ]
+    plain = extract.extract_document(make_pdf(["Ett vanligt underlag."]), PDF_MIMETYPE, "u.pdf")
+    assert (plain.layout, plain.pages) == (None, ["Ett vanligt underlag."])
+
+
+def test_docx_content_controls_are_read_in_the_body_and_inside_paragraphs() -> None:
+    """A municipal template keeps the diary number and whole clauses in content controls."""
+
+    inline = f"<w:sdt><w:sdtContent>{_run('UH-2026-120')}</w:sdtContent></w:sdt>"
+    data = _docx_with_xml(
+        f"<w:p>{_run('Diarienummer: ')}{inline}</w:p>",
+        f"<w:sdt><w:sdtContent><w:p>{_run('Anbudsgivaren ska ha F-skatt.')}</w:p></w:sdtContent></w:sdt>",
+    )
+    assert extract_pages(data, DOCX_MIMETYPE, "mall.docx") == [
+        "Diarienummer: UH-2026-120\nAnbudsgivaren ska ha F-skatt."
+    ]
+
+
+def test_docx_text_boxes_are_read_once_and_deleted_text_is_not() -> None:
+    """A drawing carries its text box twice (Choice and Fallback); a tracked deletion is not the text."""
+
+    text_box = (
+        "<w:p><w:r><mc:AlternateContent><mc:Choice Requires='wps'><w:drawing><w:txbxContent>"
+        f"<w:p>{_run('Anbudet ska vara giltigt i 90 dagar.')}</w:p></w:txbxContent></w:drawing></mc:Choice>"
+        f"<mc:Fallback><w:pict><w:txbxContent><w:p>{_run('Anbudet ska vara giltigt i 90 dagar.')}</w:p>"
+        "</w:txbxContent></w:pict></mc:Fallback></mc:AlternateContent></w:r></w:p>"
+    )
+    tracked = (
+        f"<w:p>{_run('Priset gäller ')}<w:del><w:r><w:delText>tolv</w:delText></w:r></w:del>"
+        f"<w:ins>{_run('tjugofyra')}</w:ins>{_run(' månader.')}</w:p>"
+    )
+    pages = extract_pages(_docx_with_xml(text_box, tracked), DOCX_MIMETYPE, "formulär.docx")
+    assert pages == ["Anbudet ska vara giltigt i 90 dagar.\nPriset gäller tjugofyra månader."]
+
+
+def test_docx_nested_tables_and_tabs_keep_their_text() -> None:
+    cell_with_table = (
+        f"<w:p>{_run('Krav')}</w:p><w:tbl><w:tr><w:tc><w:p>{_run('Inre A')}</w:p></w:tc>"
+        f"<w:tc><w:p>{_run('Inre B')}</w:p></w:tc></w:tr></w:tbl>"
+    )
+    table = f"<w:tbl><w:tr><w:tc>{cell_with_table}</w:tc><w:tc><w:p>{_run('Ja')}</w:p></w:tc></w:tr></w:tbl>"
+    tabbed = f"<w:p>{_run('Pris')}<w:r><w:tab/></w:r>{_run('450 kr/tim')}</w:p>"
+    pages = extract_pages(_docx_with_xml(table, tabbed), DOCX_MIMETYPE, "tabell.docx")
+    assert pages == ["Krav Inre A | Inre B | Ja\nPris 450 kr/tim"]
+
+
+def test_docx_footnotes_come_after_the_body(make_docx: MakeFile) -> None:
+    data = _with_footnotes(
+        make_docx(["Leverantören ska ha ansvarsförsäkring."]),
+        {1: "Kravet gäller inte vid uppdrag under 50 000 kronor."},
+    )
+    assert extract_pages(data, DOCX_MIMETYPE, "noter.docx") == [
+        "Leverantören ska ha ansvarsförsäkring.\nFotnoter\n"
+        "[1] Kravet gäller inte vid uppdrag under 50 000 kronor."
+    ]
+
+
+# --- Excel ------------------------------------------------------------------------------
+
+
+def _xlsx(sheets: dict[str, list[list[object]]]) -> bytes:
+    import openpyxl
+
+    workbook = openpyxl.Workbook()
+    first = workbook.active
+    assert first is not None
+    workbook.remove(first)
+    for title, rows in sheets.items():
+        sheet = workbook.create_sheet(title)
+        for row in rows:
+            sheet.append(row)
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+
+def test_xlsx_sheets_become_pages_of_rows() -> None:
+    import datetime as dt
+
+    data = _xlsx(
+        {
+            "Priser": [
+                ["Post", "Pris per timme", "Giltig från"],
+                ["Målning", 450.0, dt.datetime(2026, 11, 1)],
+            ],
+            "Krav": [["Krav", "Ska-krav"], ["ISO 14001", True], [None, None], ["Vite", 2.5]],
+            "Tomt": [[None, None]],
+        }
+    )
+    pages = extract_pages(data, "application/octet-stream", "Bilaga 1 Prisbilaga.xlsx")
+    assert pages == [
+        "Blad: Priser\nPost | Pris per timme | Giltig från\nMålning | 450 | 2026-11-01",
+        "Blad: Krav\nKrav | Ska-krav\nISO 14001 | Ja\nVite | 2,5",
+    ]
+
+
+def test_xlsx_is_detected_by_mimetype_and_damaged_workbooks_are_unreadable() -> None:
+    assert resolve_mimetype(extract.XLSX_MIMETYPE, "x", b"PK") == extract.XLSX_MIMETYPE
+    assert resolve_mimetype("application/octet-stream", "makro.xlsm", b"PK") == extract.XLSX_MIMETYPE
+    with pytest.raises(UnreadableDocument, match="Excel-filen"):
+        extract_pages(b"PK\x03\x04 not a workbook", extract.XLSX_MIMETYPE, "trasig.xlsx")

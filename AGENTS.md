@@ -51,7 +51,7 @@ code comments are English. User-facing text is Swedish.
 | `backend/alembic/` | Migrations |
 | `backend/tests/` | Tests; recorded HTTP samples in `backend/tests/data/<area>/` |
 | `frontend/` | The SPA; UI rules in `frontend/AGENTS.md` |
-| `data/` | CPV list and fictitious fixtures |
+| `data/` | CPV list, the municipality's steering documents for purchasing (`styrdokument/`, decision 0022) and fictitious fixtures |
 | `deploy/dokploy/` | Compose files and env templates for Dokploy |
 | `.github/workflows/ci.yml` | CI |
 | `.github/ISSUE_TEMPLATE/`, `.github/pull_request_template.md` | Issue forms and the pull request template (Swedish) |
@@ -100,6 +100,10 @@ Each test session creates its own database (`backend/tests/conftest.py`); use th
   that way carries `reviewed=false`, and the UI must never call it reviewed.
 - Equal treatment: the coach never gives one supplier advice that goes beyond the procurement documents; open
   questions go to the formal question function in e-Avrop.
+- The municipality's steering documents (decision 0022) are a source class of their own next to LOU, transcribed
+  verbatim in `data/styrdokument/`. They bind the municipality's purchasers, not the supplier: label them
+  "Kommunens styrdokument" (`kind="policy"`), never as law, and never let the coach infer from them how a tender is
+  judged. Regelhjälpen and the MCP tools use them; interpretation, matching and review do not.
 - The UI is React with Astryx (decision 0002), built with Vite and served by FastAPI (decision 0006).
 
 ## Code rules

@@ -6,6 +6,8 @@ import {
   needsSourceWarning,
   parseRulesAnswer,
   questionError,
+  sourceKind,
+  sourceLinkLabel,
   sourcesHeading,
   sourceTitle,
   splitFirstSentence,
@@ -16,12 +18,24 @@ const spärr: RuleSource = {
   reference: "LOU 20 kap. 1 §",
   url: "https://data.riksdagen.se/dokument/sfs-2016-1145.html#K20P1",
   excerpt: "Om underrättelsen har skickats med ett elektroniskt medel får avtal inte ingås förrän 10 dagar har gått. …",
+  kind: "law",
+  note: null,
 };
 const förlängd: RuleSource = {
   title: "Förlängd avtalsspärr",
   reference: "LOU 20 kap. 8 §",
   url: "https://data.riksdagen.se/dokument/sfs-2016-1145.html#K20P8",
   excerpt: "Om en ansökan om överprövning har gjorts, fortsätter avtalsspärren att gälla.",
+  kind: "law",
+  note: null,
+};
+const hållbara: RuleSource = {
+  title: "Hållbara inköp",
+  reference: "Inköpsstrategin 5.2",
+  url: "https://sundsvall.se/download/strategi.pdf#page=8",
+  excerpt: "Sundsvalls kommuns inköp ska vara hållbara.",
+  kind: "policy",
+  note: "Kommunens styrdokument, fastställt av kommunfullmäktige 2023-09-25.",
 };
 
 function view(answer: string, sources: RuleSource[], engine = "heuristic", sessionId: string | null = null): RulesView {
@@ -92,7 +106,19 @@ describe("the answer's sources", () => {
     );
     expect(sourceTitle({ reference: "LOU 4 kap. 1 §", title: "LOU 4 kap. 1 §" })).toBe("LOU 4 kap. 1 §");
     expect(isLawSource(spärr)).toBe(true);
-    expect(isLawSource({ reference: null })).toBe(false);
+    expect(isLawSource({ reference: null, kind: null })).toBe(false);
+  });
+
+  it("tells a steering document from the law and names the link after the kind", () => {
+    expect(sourceTitle(hållbara)).toBe("Inköpsstrategin 5.2 · Hållbara inköp");
+    expect(sourceKind(hållbara)).toBe("policy");
+    expect(isLawSource(hållbara)).toBe(false);
+    expect(sourceLinkLabel(hållbara)).toBe("Läs hela avsnittet");
+    expect(sourceLinkLabel(spärr)).toBe("Läs hela paragrafen");
+    expect(sourceLinkLabel({ reference: null, kind: null })).toBe("Läs källan");
+    // An answer kept from before the backend said the kind is read from its reference.
+    expect(sourceKind({ reference: "LOU 4 kap. 1 §", kind: null })).toBe("law");
+    expect(sourceKind({ reference: "Upphandlingsmyndigheten: Lämna anbud", kind: null })).toBe("other");
   });
 
   it("flags a language model's answer without sources, not the rule-based engine's", () => {

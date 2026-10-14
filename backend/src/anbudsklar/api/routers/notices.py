@@ -27,6 +27,7 @@ from anbudsklar.api.schemas import (
     NoticeStatus,
     PageView,
     QuestionRequest,
+    ReadingReport,
     ReminderRequest,
     ReminderView,
     ReviewView,
@@ -108,6 +109,13 @@ async def list_notice_buyers(
 @router.get("/notices/{notice_id}")
 async def get_notice(notice_id: uuid.UUID, session: SessionDep, viewer: ViewerDep) -> NoticeDetail:
     return await notices.notice_detail(session, notice_id, viewer)
+
+
+@router.get("/notices/{notice_id}/reading")
+async def get_reading(notice_id: uuid.UUID, session: SessionDep) -> ReadingReport:
+    """How the notice's files were read in. The documents are public, so no sign-in is needed."""
+
+    return await notices.reading_report(session, notice_id)
 
 
 @router.get("/notices/{notice_id}/documents/{document_id}/pages/{page}")

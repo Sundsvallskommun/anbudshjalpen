@@ -7,7 +7,7 @@ Läs detta när: Du ändrar insamlingen från e-Avrop, felsöker en upphandling 
 förbereder ett samtal med Antirio eller inköp.
 
 Hör ihop med: [Beslut 0009](decisions/0009-eavrop-projekt-api.md),
-[Beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md), [Datakällor](data-sources.md), [Drift](operations.md),
+[Beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md), [Beslut 0021](decisions/0021-eavrop-gar-fore-ted.md), [Datakällor](data-sources.md), [Drift](operations.md),
 [Öppna frågor](open-questions.md)
 
 > Kontrollerat mot API:t 2026-10-08 och, för frågeloggen, 2026-10-12. Koden ligger i
@@ -35,7 +35,8 @@ Jobbet `ingest_eavrop` körs varje dag 06:30:
    (se [Frågor och svar](#frågor-och-svar)).
 
 Provkörningen 2026-10-08 gav 458 projekt. 115 av dem var publicerade: 77 blev egna annonser och 38 fanns redan som
-TED-annonser och fick underlaget där. 12 var öppna.
+TED-annonser och fick underlaget där. 12 var öppna. Den 2026-10-13 var 12 projekt öppna, och 5 av dem fanns också i TED. Sedan
+[beslut 0021](decisions/0021-eavrop-gar-fore-ted.md) visas alla 12 som e-Avrops annonser.
 
 ## Reglerna som skyddar sekretessen
 
@@ -61,24 +62,36 @@ Markeringen `IsClassified` används inte som skydd. Den saknades på utvärderin
 | Referensnummer | `DiaryNumber`, till exempel "UH-2026-120" |
 | Förfarande | `ProcurementType` med LOU:s namn. Nationella förfaranden blir "Upphandling under tröskelvärdena (19 kap. LOU)" |
 | Sista dag | `LastBid`. I första steget av ett tvåstegsförfarande `LastApplication`, alltså sista dag för ansökan |
-| Sista dag för frågor | `LastQuestion`, eller `LastQuestionApplication` i första steget. Sparas i `raw` men används ännu inte |
+| Sista dag för frågor | `LastQuestion`, eller `LastQuestionApplication` i första steget, som slutet av den dagen (`question_deadline_at`). Listor, Fråga AI och påminnelser använder det före checklistans datum ([beslut 0020](decisions/0020-checklistan-lases-ur-alla-dokument.md)) |
 | Status | Avbruten (`Aborted`) blir stängd, tilldelad (`Assigned`, `ContractAssigned`) blir tilldelad, annars efter sista dag |
 | Länk | `NoticeLink.aspx?id=<ProcurementId>` under `EAVROP_BASE_URL`, samma länk som TED ger |
-| Köpare | `ORGANIZATION_NAME`, eftersom API:t inte anger köpare |
+| Köpare, uppskattat värde, ort | Från TED när upphandlingen finns där, eftersom API:t inte anger köpare och e-Avrops värde kan vara en intern uppskattning. Annars `ORGANIZATION_NAME` som köpare och inget värde eller ort |
 
 **Midnatt är slutet av samma dag.** Tidsplanen (`TimeTable`) anger datum som midnatt i början av sista dagen:
 `LastBid` "2026-11-06T00:00:00+01:00" visas som sista anbudsdag 2026-11-06 på e-Avrops annonssida (kontrollerat
 2026-10-12). Appen sparar 23:59:59 samma dag, så att datumet stämmer med e-Avrops webbplats och med TED. Fram till
 2026-10-12 sparades dagen före, så att annonserna visade en dag för tidig sista dag och stängdes en dag för tidigt.
 
-**TED och e-Avrop.** TED:s länk till underlaget innehåller e-Avrops `ProcurementId`. Finns upphandlingen redan som
-TED-annons får den underlaget, och ingen ny annons skapas. Kommer den från e-Avrop först skapar TED-insamlaren ingen
-egen annons.
+**TED och e-Avrop.** TED:s länk till underlaget innehåller e-Avrops `ProcurementId`. e-Avrops annons blir kvar,
+eftersom den har underlaget, sista dag för frågor och inköps svar ([beslut 0021](decisions/0021-eavrop-gar-fore-ted.md)).
+Finns upphandlingen redan som TED-annons blir den raden e-Avrops annons, så att dokument, checklistor, matchningar och
+påminnelser följer med. TED:s köpare, uppskattade värde, ort och länk sparas på den (`raw["ted"]`) och behålls vid
+varje ny läsning. Kommer upphandlingen från e-Avrop först lägger TED-insamlaren samma uppgifter på e-Avrops annons i
+stället för att skapa en egen. En förhandsannons i TED med samma länk förblir en egen TED-annons. Annonser som sparats
+före beslutet ändras när projektet läses igen, så efter driftsättningen körs `anbudsklar ingest eavrop --full` en gång.
 
-**Underlaget.** Filer i PDF, Word (`.docx`) och text hämtas, högst 50 MB per fil. Excel, bilder och film hoppas över.
-En fil hämtas igen när annonsen eller filen har ändrats efter att vi sparade den. Samma innehåll sparas inte två gånger.
+**Underlaget.** Filer i PDF, Word (`.docx`), Excel (`.xlsx`, `.xlsm`) och text hämtas, högst 50 MB per fil. Ett
+zip-arkiv packas upp, och de filer i det som går att läsa blir egna dokument med arkivets namn först
+("11.4 Ritningar.zip › plan.pdf"), aldrig tolkade för sig; det i arkivet som inte går att läsa sägs på en rad. Bilder,
+film och ritningar i andra format hoppas över, och står med namn och skäl på annonsen (`unread_files`), på
+upphandlingssidan, i MCP-verktyget `hamta_upphandling` och i förteckningen modellen får. En fil hämtas igen när annonsen eller filen har
+ändrats efter att vi sparade den. Samma innehåll sparas inte två gånger. Har e-Avrop publicerat en ny version under
+samma namn blir den ett nytt dokument, och det gamla märks ersatt (`superseded_by`): bara aktuella dokument når
+motorerna, sökningen, MCP och dokumentlistan, men raden finns kvar så att äldre checklistors källänkar fungerar.
 
-**Huvuddokumentet** tolkas automatiskt till en checklista. Det väljs på filnamnet, i den här ordningen:
+**Huvuddokumentet** är det tolkningen startar från; tolkningen läser alla dokument
+([beslut 0020](decisions/0020-checklistan-lases-ur-alla-dokument.md)), så valet avgör bara ordningen. Det väljs på
+filnamnet, i den här ordningen:
 
 1. administrativa föreskrifter
 2. upphandlingsföreskrifter
@@ -90,9 +103,27 @@ En fil hämtas igen när annonsen eller filen har ändrats efter att vi sparade 
 8. krav på leverantör
 9. kravspecifikation
 
-En PDF går före en Word-fil med samma namn. Har annonsen bara en läsbar fil blir den huvuddokumentet. Annars tolkas
-inget automatiskt. De andra filerna sparas som bilagor: de går att söka i och läsa via MCP, och inköp kan be om en
-tolkning av dem under Inköp › Att granska.
+En PDF går före en Word-fil med samma namn. Matchar inget ord tas den första PDF:en, annars den första läsbara filen.
+De andra filerna följer med som bilagor i tolkningen, går att söka i och läsa via MCP, och inköp kan be om en tolkning
+med någon av dem som huvuddokument under Inköp › Att granska.
+
+## e-Avrops egna dokument
+
+Inköp skriver de flesta dokumenten inne i e-Avrop, som exporterar dem som PDF med en sidfot på varje sida: "Sundsvalls
+kommun / Upphandling / titel / Dokument / namn / Diarienummer / nummer / Datum / datum" och sidnumret. Kravdokumenten
+("Krav på Leverantör", "Kravspecifikation", "Pris och utvärdering", "Utvärderingsmodell") är dessutom elektroniska
+formulär: efter varje krav kommer fälten leverantören fyller i på webben, och raden före en numrerad punkt anger
+punktens typ i e-Avrop. Den 2026-10-13 var 25 av de 61 sparade dokumenten sådana exporter.
+
+| I exporten | Betyder | Så hanteras det (`backend/src/anbudsklar/documents/eavrop_export.py`) |
+|---|---|---|
+| Sidfoten | Samma uppgifter på varje sida | Tas bort ur den sparade texten. Dokumentet märks `layout = eavrop` |
+| `Kvalificeringskrav`, `Skakrav`, `Utvärderingskrav`, `Informationsfråga`, `Uteslutningsgrund` på egen rad | Typen på punkten som följer | Står kvar i texten. Modellen får en förklaring i förteckningen; den regelbaserade motorn hoppar över själva raden. En informationsfrågas text läses som annan text, eftersom det den ber om ska lämnas i anbudet |
+| `1.3.1.1 Leverantören bekräftar att ovanstående krav uppfylls.` följt av `Ja` | Svarsfältet för kravet ovanför | Står kvar i texten. Modellen uppmanas citera kravets egen text; den regelbaserade motorn hoppar över raderna |
+| `Ja`, `Nej`, `Svar`, `Kommentar`, `Ingen fil bifogad`, `Antal`, ett tal efter `Antal`, `Pris/…`, `SEK` | Fält leverantören fyller i | Som ovan |
+
+Formulärraderna står kvar i den sparade texten därför att ett citat måste gå att hitta på sidan som läsaren ser den.
+Sparade dokument får märkningen när jobbet `reextract_outdated` läser om dem.
 
 ## Frågor och svar
 
@@ -142,6 +173,7 @@ Antirio och inköp.
 | **En nyckel som bara läser publicerat** | Nyckeln läser sekretessbelagda uppgifter, och bara vår vitlista skyddar dem | En nyckel eller ett omfång som bara ger annonserade upphandlingar och annonsens dokument |
 | **Tillförlitlig sekretessmarkering** | `IsClassified` saknades på utvärderingsprotokoll och kreditupplysningar | Att markeringen sätts, eller att arbetsfiler hålls helt utanför API:t |
 | **Frågor och svar som fält** | Bara flaggan `IsQuestionsOnline`. Svaren läses ur en odokumenterad loggfil, se [Frågor och svar](#frågor-och-svar) | Publicerade frågor och svar per upphandling, med datum, som en del av API:t |
+| **Kravmodulen som data** | Kravdokumenten är redan strukturerade i e-Avrop, men API:t ger bara PDF-utskriften, som tjänsten tolkar tillbaka till krav, typ och svarsfält, se [e-Avrops egna dokument](#e-avrops-egna-dokument) | Punkterna i kravmodulen med nummer, text, typ och svarstyp, så att ingen tolkning av utskriften behövs |
 | **Vad som har ändrats** | Bara `UpdatedDate` på annonsen, och på enstaka filer. Rättelser syns inte som rättelser | En ändringslogg eller versioner av annonsen och dokumenten |
 | **Besked om ändringar** | Listan filtreras bara på när projektet skapades, så alla projekt listas varje gång | Filtrering på ändringsdatum, eller webhooks |
 | **Köpare per upphandling** | Alla e-Avrop-annonser får `ORGANIZATION_NAME`, även när kommunen köper åt ett bolag. Annonsens `Loggfil<datum>.txt` anger `Avtalstecknare`, men filen innehåller också handläggarens e-post och det interna värdet, så den läses inte | Köparens namn och organisationsnummer |

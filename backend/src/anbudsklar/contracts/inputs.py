@@ -7,6 +7,7 @@ numbers that our citation verification checks against.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Literal
 from zoneinfo import ZoneInfo
@@ -17,6 +18,24 @@ from anbudsklar.contracts.common import ContractModel
 
 PAGE_MARKER = "[SIDA {page}]"
 ANSWER_MARKER = "[SVAR {number}]"
+EMPTY_PAGE_TEXT = "(sidan saknar läsbar text, till exempel en bild eller en inskannad sida)"
+"""What a page without text says to the model, so it can tell a blank page from one it was not given."""
+
+EAVROP_LAYOUT = "eavrop"
+"""`PagedDocument.layout` of a document exported from e-Avrop (see `documents.eavrop_export`)."""
+LAYOUT_NOTES: dict[str, str] = {
+    EAVROP_LAYOUT: (
+        "Dokumentet är exporterat ur e-Avrop, där leverantören svarar i ett elektroniskt formulär. Raden "
+        "före en numrerad punkt anger punktens typ i e-Avrop: Kvalificeringskrav, Skakrav, Utvärderingskrav, "
+        "Informationsfråga eller Uteslutningsgrund. Kvalificeringskrav och Skakrav är obligatoriska krav; "
+        "välj kind efter vad kravet gäller. En Informationsfråga besvaras av leverantören i formuläret: det "
+        "den ber om ska lämnas i anbudet. Raderna Ja, Nej, Svar, Kommentar, Ingen fil bifogad, Antal och "
+        "Pris/… är fält som "
+        'leverantören fyller i, och punkten "Leverantören bekräftar att ovanstående krav uppfylls." är '
+        "svarsfältet för kravet ovanför: citera kravets egen text, aldrig fälten."
+    )
+}
+"""What a layout means for reading the document, told to the model with the outline."""
 _STOCKHOLM = ZoneInfo("Europe/Stockholm")
 
 # What a notice's deadline is the last day for: tenders, or requests to participate
@@ -52,6 +71,9 @@ class NoticeContext(ContractModel):
         default="tender",
         description="tender: sista anbudsdag. request: sista dag för anbudsansökan (selektivt förfarande).",
     )
+    question_deadline_at: datetime | None = Field(
+        default=None, description="The last day for questions to the buyer, as the source states it."
+    )
     url: str | None = None
 
 
@@ -61,12 +83,19 @@ class PagedDocument(ContractModel):
     document_id: str | None = None
     filename: str
     pages: list[str]
+    layout: str | None = Field(
+        default=None,
+        description="How the document was produced, when it matters for reading it (LAYOUT_NOTES).",
+    )
 
     def render(self) -> str:
-        """Render with explicit page markers that prompts tell the model to cite."""
+        """Render with explicit page markers that prompts tell the model to cite.
+
+        A page without text says so, so the model never takes a scanned page for a blank one.
+        """
 
         blocks = [
-            f"{PAGE_MARKER.format(page=index)}\n{text.strip()}"
+            f"{PAGE_MARKER.format(page=index)}\n{text.strip() or EMPTY_PAGE_TEXT}"
             for index, text in enumerate(self.pages, start=1)
         ]
         return f"DOKUMENT: {self.filename}\n\n" + "\n\n".join(blocks)
@@ -83,6 +112,7 @@ class DocumentOutline(ContractModel):
     filename: str
     page_count: int
     pages_included: int
+    layout: str | None = None
 
 
 class DocumentSet(ContractModel):
@@ -95,9 +125,13 @@ class DocumentSet(ContractModel):
 
     documents: list[PagedDocument]
     outline: list[DocumentOutline]
+    unread_files: list[str] = Field(
+        default_factory=list,
+        description="Files the source lists for the procurement that could not be read in, by name.",
+    )
 
     @classmethod
-    def of(cls, documents: list[PagedDocument]) -> DocumentSet:
+    def of(cls, documents: list[PagedDocument], unread_files: Sequence[str] = ()) -> DocumentSet:
         """A set with every page of every document, for engines and tests."""
 
         return cls(
@@ -108,9 +142,11 @@ class DocumentSet(ContractModel):
                     filename=document.filename,
                     page_count=document.page_count,
                     pages_included=document.page_count,
+                    layout=document.layout,
                 )
                 for document in documents
             ],
+            unread_files=list(unread_files),
         )
 
     @property
@@ -131,6 +167,15 @@ class DocumentSet(ContractModel):
         for index, item in enumerate(self.outline, start=1):
             included = "alla med" if item.pages_included == item.page_count else f"{item.pages_included} med"
             lines.append(f"{index}. {item.filename} – {item.page_count} sidor, {included}")
+        for layout in dict.fromkeys(item.layout for item in self.outline if item.layout in LAYOUT_NOTES):
+            named = [str(index) for index, item in enumerate(self.outline, start=1) if item.layout == layout]
+            lines.append(f"Dokument {', '.join(named)}: {LAYOUT_NOTES[layout]}")
+        if self.unread_files:
+            lines.append(
+                "Filer som hör till upphandlingen men inte kunde läsas in här, och därför inte är med: "
+                + ", ".join(self.unread_files)
+                + ". Säg att de finns hos köparen när frågan kan gälla dem."
+            )
         return "\n".join(lines) + "\n\n" + "\n\n".join(document.render() for document in self.documents)
 
 

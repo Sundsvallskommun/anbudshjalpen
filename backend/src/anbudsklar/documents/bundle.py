@@ -61,11 +61,16 @@ def build_document_set(
     *,
     hits: Iterable[PageRef] = (),
     budget_chars: int = BUNDLE_BUDGET_CHARS,
+    unread_files: Sequence[str] = (),
 ) -> DocumentSet:
-    """Choose what the engine reads. `documents[0]` is the main document."""
+    """Choose what the engine reads. `documents[0]` is the main document.
+
+    `unread_files` names the files of the procurement that were never read in (a format
+    the extraction does not read, a file too large), so the model can say that they exist.
+    """
 
     if not documents:
-        return DocumentSet(documents=[], outline=[])
+        return DocumentSet(documents=[], outline=[], unread_files=list(unread_files))
     hits = list(hits)
     total = sum(_page_size(page) for document in documents for page in document.pages)
     if total <= budget_chars:
@@ -80,9 +85,11 @@ def build_document_set(
                 filename=document.filename,
                 page_count=document.page_count,
                 pages_included=len(chosen[_key(document)]),
+                layout=document.layout,
             )
             for document in documents
         ],
+        unread_files=list(unread_files),
     )
 
 
@@ -142,4 +149,6 @@ def _cut(document: PagedDocument, included: set[int]) -> PagedDocument:
         text if page_no in included else OMITTED_PAGE_TEXT
         for page_no, text in enumerate(document.pages, start=1)
     ]
-    return PagedDocument(document_id=document.document_id, filename=document.filename, pages=pages)
+    return PagedDocument(
+        document_id=document.document_id, filename=document.filename, pages=pages, layout=document.layout
+    )

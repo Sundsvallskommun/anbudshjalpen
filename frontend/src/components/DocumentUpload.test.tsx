@@ -25,7 +25,7 @@ describe("DocumentUpload", () => {
       {
         method: "POST",
         path: uploadPath,
-        body: { id: DOCUMENT_ID, filename: "Förfrågningsunderlag.pdf", page_count: 12, is_fictitious: true },
+        body: { id: DOCUMENT_ID, filename: "Förfrågningsunderlag.pdf", page_count: 12, empty_pages: 0, is_fictitious: true },
       },
     ]);
     renderWithProviders(<DocumentUpload noticeId={NOTICE_ID} />);

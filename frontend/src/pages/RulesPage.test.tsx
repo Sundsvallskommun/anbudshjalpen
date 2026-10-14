@@ -17,12 +17,38 @@ const spärr: RuleSource = {
   excerpt:
     "Om underrättelsen om tilldelningsbeslut har skickats med ett elektroniskt medel får den upphandlande " +
     "myndigheten inte ingå avtal förrän 10 dagar har gått från det att underrättelsen skickades. …",
+  kind: "law",
+  note: null,
 };
 const förlängd: RuleSource = {
   title: "Förlängd avtalsspärr",
   reference: "LOU 20 kap. 8 §",
   url: "https://data.riksdagen.se/dokument/sfs-2016-1145.html#K20P8",
   excerpt: "Om en ansökan om överprövning har gjorts, fortsätter avtalsspärren att gälla under handläggningen.",
+  kind: "law",
+  note: null,
+};
+// A section of the municipality's procurement strategy (decision 0022): the backend labels it with a note.
+const konkurrens: RuleSource = {
+  title: "Konkurrensinriktade inköp",
+  reference: "Inköpsstrategin 5.3",
+  url: "https://sundsvall.se/download/strategi.pdf#page=9",
+  excerpt: "Sundsvalls kommuns inköp ska tillvarata och vårda konkurrensen på de olika marknaderna. …",
+  kind: "policy",
+  note: "Kommunens styrdokument, fastställt av kommunfullmäktige 2023-09-25.",
+};
+const STRATEGY_QUESTION = "Hur ser kommunen på småföretag?";
+const strategyAnswer: RulesView = {
+  answer: {
+    answer: [
+      "Paragrafer och avsnitt som kan handla om din fråga:",
+      `${konkurrens.reference} – ${konkurrens.title}: ${konkurrens.excerpt}`,
+      `${spärr.reference} – ${spärr.title}: ${spärr.excerpt}`,
+    ].join("\n\n"),
+    sources: [konkurrens, spärr],
+    session_id: null,
+  },
+  engine: "heuristic",
 };
 
 /** The rule-based engine's answer, worded as the backend writes it: an introduction, then each paragraph again. */
@@ -105,6 +131,29 @@ describe("RulesPage", () => {
     await screen.findByRole("heading", { level: 2, name: "Din fråga: Och vid direktupphandling?" });
     const asked = calls.filter((call) => call.path === "/api/rules/ask");
     expect(asked[1]?.body).toEqual({ question: "Och vid direktupphandling?", session_id: SESSION_ID });
+  });
+
+  it("shows a section of the municipality's strategy as a steering document, never as law", async () => {
+    mockApi([...baseRoutes(null), rulesRoute([strategyAnswer])]);
+    renderApp("/regelhjalpen");
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Regelhjälpen" })).toBeInTheDocument();
+    await userEvent.type(screen.getByRole("textbox", { name: "Din fråga" }), STRATEGY_QUESTION);
+    await userEvent.click(screen.getByRole("button", { name: "Fråga" }));
+
+    const answer = await screen.findByRole("article", { name: `Svar på: ${STRATEGY_QUESTION}`, busy: false });
+    const sources = within(answer).getByRole("list", { name: "Paragrafer och avsnitt som kan handla om din fråga" });
+    const items = within(sources).getAllByRole("listitem");
+    expect(items).toHaveLength(2);
+    const [strategy, law] = items as [HTMLElement, HTMLElement];
+    expect(within(strategy).getByRole("heading", { level: 4, name: "Inköpsstrategin 5.3 · Konkurrensinriktade inköp" })).toBeInTheDocument();
+    expect(within(strategy).getByText("Kommunens styrdokument, fastställt av kommunfullmäktige 2023-09-25.")).toBeInTheDocument();
+    expect(within(strategy).getByRole("link", { name: /^Läs hela avsnittet Inköpsstrategin 5\.3/ })).toHaveAttribute(
+      "href",
+      konkurrens.url,
+    );
+    expect(within(law).getByRole("link", { name: /^Läs hela paragrafen LOU 20 kap\. 1 §/ })).toBeInTheDocument();
+    expect(within(law).queryByText(/styrdokument/)).not.toBeInTheDocument();
   });
 
   it("explains in the provenance popover that the answer rests on the law, not on procurement documents", async () => {

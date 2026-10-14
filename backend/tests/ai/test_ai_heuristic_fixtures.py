@@ -16,6 +16,7 @@ from anbudsklar.ai.heuristic import HeuristicEngine
 from anbudsklar.contracts import (
     Checklist,
     CompanyProfile,
+    DocumentSet,
     MatchAssessment,
     MatchReason,
     NoticeContext,
@@ -36,7 +37,8 @@ async def _checklist(name: str) -> Checklist:
     path = DOCUMENTS[name]
     pages = extract_pages(path.read_bytes(), "application/pdf", path.name)
     checklist, _ = await HeuristicEngine().interpret_document(
-        NoticeContext(notice_id=name, title=name), PagedDocument(filename=path.name, pages=pages)
+        NoticeContext(notice_id=name, title=name),
+        DocumentSet.of([PagedDocument(filename=path.name, pages=pages)]),
     )
     return checklist
 

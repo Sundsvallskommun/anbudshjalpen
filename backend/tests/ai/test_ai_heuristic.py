@@ -52,6 +52,11 @@ PAGES = [
     "Avtalsvillkor\nVid försenad leverans har kommunen rätt till vite.\nMoms 25 % tillkommer.",
 ]
 DOCUMENT = PagedDocument(filename="underlag.pdf", pages=PAGES)
+DOCUMENTS = DocumentSet.of([DOCUMENT])
+
+
+def _set(pages: list[str], filename: str = "u.pdf") -> DocumentSet:
+    return DocumentSet.of([PagedDocument(filename=filename, pages=pages)])
 
 
 def test_split_sentences_keeps_abbreviations_and_headings_apart() -> None:
@@ -66,7 +71,7 @@ def test_split_sentences_keeps_abbreviations_and_headings_apart() -> None:
 
 
 async def test_interpret_document_quotes_verify_on_the_cited_page() -> None:
-    checklist, run = await HeuristicEngine().interpret_document(NOTICE, DOCUMENT)
+    checklist, run = await HeuristicEngine().interpret_document(NOTICE, DOCUMENTS)
     _, summary = verify_checklist(checklist, PAGES)
     assert summary.citations_total > 0
     assert summary.citations_verified == summary.citations_total
@@ -79,7 +84,7 @@ async def test_interpret_document_quotes_verify_on_the_cited_page() -> None:
 
 
 async def test_interpret_document_finds_requirements_and_kinds() -> None:
-    checklist, _ = await HeuristicEngine().interpret_document(NOTICE, DOCUMENT)
+    checklist, _ = await HeuristicEngine().interpret_document(NOTICE, DOCUMENTS)
     by_quote = {requirement.citation.quote: requirement for requirement in checklist.requirements}
     insurance = next(r for q, r in by_quote.items() if "ansvarsförsäkring" in q)
     assert insurance.kind == "kvalificeringskrav"
@@ -93,7 +98,7 @@ async def test_interpret_document_finds_requirements_and_kinds() -> None:
 
 
 async def test_interpret_document_dates_weights_terms_and_procedure() -> None:
-    checklist, _ = await HeuristicEngine().interpret_document(NOTICE, DOCUMENT)
+    checklist, _ = await HeuristicEngine().interpret_document(NOTICE, DOCUMENTS)
     dates = {(item.kind, item.date) for item in checklist.dates}
     assert ("fragestopp", dt.date(2026, 10, 20)) in dates
     assert ("sista_anbudsdag", dt.date(2026, 11, 2)) in dates
@@ -111,7 +116,7 @@ async def test_interpret_document_dates_weights_terms_and_procedure() -> None:
 
 async def test_interpret_document_reports_what_it_could_not_find() -> None:
     checklist, _ = await HeuristicEngine().interpret_document(
-        NOTICE, PagedDocument(filename="tom.txt", pages=["Ingen relevant text här."])
+        NOTICE, _set(["Ingen relevant text här."], "tom.txt")
     )
     assert checklist.requirements == []
     assert len(checklist.open_questions) == 3
@@ -272,6 +277,25 @@ async def test_answer_rules_summarises_context() -> None:
     assert_plain_text(empty.answer)
 
 
+async def test_answer_rules_says_sections_when_a_steering_document_is_among_the_hits() -> None:
+    """The lead says "paragrafer" only while every source is a section of the law (decision 0022)."""
+
+    context = [
+        RuleContext(
+            reference="Inköpsstrategin 5.3",
+            title="Konkurrensinriktade inköp",
+            text="Sundsvalls kommuns inköp ska tillvarata och vårda konkurrensen på de olika marknaderna.",
+            url="https://sundsvall.se/download/strategi.pdf#page=9",
+        ),
+        RuleContext(reference="LOU 4 kap. 1 §", title="Principer", text="Upphandlande myndigheter ska …"),
+    ]
+    answer, _ = await HeuristicEngine().answer_rules("Hur ser kommunen på småföretag?", None, context)
+    assert answer.answer.startswith("Paragrafer och avsnitt som kan handla om din fråga:")
+    assert [source.reference for source in answer.sources] == ["Inköpsstrategin 5.3", "LOU 4 kap. 1 §"]
+    assert answer.sources[0].excerpt == context[0].text
+    assert_plain_text(answer.answer)
+
+
 # --- Precision of tolka_underlag (sentences adapted from the fictitious fixtures) ---------
 
 HEADER = "Sundsvalls kommun – Ommålning av förskola (fiktiv) DEMO-0001"
@@ -307,9 +331,7 @@ PRECISION_PAGES = [
 
 
 async def _requirements(pages: list[str]) -> list[Requirement]:
-    checklist, _ = await HeuristicEngine().interpret_document(
-        NOTICE, PagedDocument(filename="u.pdf", pages=pages)
-    )
+    checklist, _ = await HeuristicEngine().interpret_document(NOTICE, _set(pages, "u.pdf"))
     verified, summary = verify_checklist(checklist, pages)
     assert summary.citations_verified == summary.citations_total  # folding keeps every quote verbatim
     return verified.requirements
@@ -374,9 +396,7 @@ DATE_PAGES = [
 
 
 async def test_dates_take_their_kind_from_their_own_label() -> None:
-    checklist, _ = await HeuristicEngine().interpret_document(
-        NOTICE, PagedDocument(filename="u.pdf", pages=DATE_PAGES)
-    )
+    checklist, _ = await HeuristicEngine().interpret_document(NOTICE, _set(DATE_PAGES, "u.pdf"))
     dates = [(item.kind, item.date) for item in checklist.dates]
     by_kind: dict[str, list[dt.date | None]] = {}
     for kind, date in dates:
@@ -395,17 +415,13 @@ async def test_dates_take_their_kind_from_their_own_label() -> None:
 
 async def test_a_label_after_the_date_counts_when_none_comes_before() -> None:
     pages = ["Den 30 oktober 2026 är sista dagen för frågor."]
-    checklist, _ = await HeuristicEngine().interpret_document(
-        NOTICE, PagedDocument(filename="u.pdf", pages=pages)
-    )
+    checklist, _ = await HeuristicEngine().interpret_document(NOTICE, _set(pages, "u.pdf"))
     assert [(item.kind, item.date) for item in checklist.dates] == [("fragestopp", dt.date(2026, 10, 30))]
 
 
 async def test_a_second_question_deadline_is_kept_as_another_date() -> None:
     pages = ["Frågor ska ställas senast 2026-10-20.\nDen 25 oktober 2026 är sista dagen för frågor."]
-    checklist, _ = await HeuristicEngine().interpret_document(
-        NOTICE, PagedDocument(filename="u.pdf", pages=pages)
-    )
+    checklist, _ = await HeuristicEngine().interpret_document(NOTICE, _set(pages, "u.pdf"))
     assert [(item.kind, item.date) for item in checklist.dates] == [
         ("fragestopp", dt.date(2026, 10, 20)),
         ("annat", dt.date(2026, 10, 25)),
@@ -418,9 +434,7 @@ async def test_the_last_day_for_anbudsansokan_is_not_sista_anbudsdag() -> None:
         "Ansökan om att få delta ska ha kommit in senast den 30 oktober 2026.\n"
         "Anbud ska ha kommit in senast 2026-12-01."
     ]
-    checklist, _ = await HeuristicEngine().interpret_document(
-        NOTICE, PagedDocument(filename="u.pdf", pages=pages)
-    )
+    checklist, _ = await HeuristicEngine().interpret_document(NOTICE, _set(pages, "u.pdf"))
     assert {(item.kind, item.date) for item in checklist.dates} == {
         ("annat", dt.date(2026, 10, 30)),
         ("sista_anbudsdag", dt.date(2026, 12, 1)),
@@ -432,9 +446,7 @@ async def test_current_procedure_names_win_over_the_repealed_ones() -> None:
         "Förfarandet motsvarar det som tidigare kallades förenklat förfarande.\n"
         "Upphandlingen är ett öppet förfarande."
     ]
-    checklist, _ = await HeuristicEngine().interpret_document(
-        NOTICE, PagedDocument(filename="u.pdf", pages=pages)
-    )
+    checklist, _ = await HeuristicEngine().interpret_document(NOTICE, _set(pages, "u.pdf"))
     assert checklist.procedure == "Öppet förfarande"
 
 
@@ -722,3 +734,57 @@ async def test_a_one_character_answer_is_quoted_by_its_question() -> None:
         NOTICE, DocumentSet.of([DOCUMENT]), "Hur många utbildningstillfällen planeras?", [], [short]
     )
     assert answer.answer_citations[0].quote == "Hur många utbildningstillfällen planeras totalt?"
+
+
+async def test_interpret_document_reads_every_document_and_names_the_attachment() -> None:
+    attachment = PagedDocument(
+        filename="6.6 Krav på entreprenör.pdf",
+        pages=["Krav på entreprenören\nEntreprenören ska vara certifierad enligt ISO 14001."],
+    )
+    documents = DocumentSet.of([DOCUMENT, attachment], unread_files=["Prisbilaga.zip"])
+
+    checklist, _ = await HeuristicEngine().interpret_document(NOTICE, documents)
+
+    iso = next(r for r in checklist.requirements if "ISO 14001" in r.citation.quote)
+    assert (iso.citation.document, iso.citation.page) == ("6.6 Krav på entreprenör.pdf", 1)
+    insurance = next(r for r in checklist.requirements if "ansvarsförsäkring" in r.citation.quote)
+    assert (insurance.citation.document, insurance.citation.page) == ("underlag.pdf", 2)
+    _, summary = verify_checklist(checklist, [DOCUMENT, attachment])
+    assert summary.citations_verified == summary.citations_total
+    assert checklist.summary.startswith(
+        "Underlaget har 2 dokument med 4 sidor sammanlagt. 1 fil kunde inte läsas in här och är inte med: "
+        "Prisbilaga.zip."
+    )
+
+
+EXPORT_PAGES = [
+    "1 Krav på Leverantör\n"
+    "1.1 Ekonomisk ställning\n"
+    "Leverantören ska ha en rating motsvarande lägst Grön huvudrating.\n"
+    "Kvalificeringskrav\n"
+    "1.1.1 Leverantören bekräftar att ovanstående krav uppfylls.\n"
+    "Ja\n"
+    "Informationsfråga\n"
+    "1.1.2 Leverantören ska ange vilka underleverantörer som anlitas.\n"
+    "Svar\n"
+    "1.2 Timpris\n"
+    "Antal\n"
+    "100\n"
+    "Pris/h\n"
+    "SEK",
+]
+
+
+async def test_an_eavrop_export_is_read_without_its_form_fields() -> None:
+    documents = DocumentSet.of([PagedDocument(filename="Krav.pdf", pages=EXPORT_PAGES, layout="eavrop")])
+    checklist, _ = await HeuristicEngine().interpret_document(NOTICE, documents)
+    quotes = [requirement.citation.quote for requirement in checklist.requirements]
+    # The requirement and the information question's demand; never a field or a confirmation.
+    assert quotes == [
+        "Leverantören ska ha en rating motsvarande lägst Grön huvudrating.",
+        "1.1.2 Leverantören ska ange vilka underleverantörer som anlitas.",
+    ]
+    _, summary = verify_checklist(checklist, [PagedDocument(filename="Krav.pdf", pages=EXPORT_PAGES)])
+    assert summary.citations_verified == summary.citations_total
+    answer, _ = await HeuristicEngine().answer_question(NOTICE, documents, "Vilket timpris gäller?", [])
+    assert not any(citation.quote in {"Ja", "Svar", "Antal", "100"} for citation in answer.citations)

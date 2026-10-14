@@ -158,15 +158,23 @@ export interface CpvSuggestions {
   suggestions: CpvSuggestion[];
 }
 
+/** A section of the law (LOU), or of one of the municipality's steering documents (decision 0022). */
+export type RuleSourceKind = "law" | "policy";
+
 export interface RuleSource {
   title: string;
+  /** "LOU 20 kap. 1 §" or "Inköpsstrategin 5.2". */
   reference: string | null;
   url: string | null;
   /**
-   * The start of the law text itself, cut after a whole sentence and ending with " …" when shortened. Set by the
-   * backend from its own copy of LOU (never by a model); null for sources that are not a LOU section it holds.
+   * The start of the source's own text, cut after a whole sentence and ending with " …" when shortened. Set by the
+   * backend from its own copy of LOU or the steering document (never by a model); null for sources it does not hold.
    */
   excerpt: string | null;
+  /** Set by the backend; null for guidance and web pages. */
+  kind: RuleSourceKind | null;
+  /** Set by the backend for a steering document: "Kommunens styrdokument, fastställt av kommunfullmäktige 2023-09-25." */
+  note: string | null;
 }
 
 export interface RulesAnswer {
@@ -281,8 +289,8 @@ export interface NoticeSummary {
   deadline_at: IsoDateTime | null;
   deadline_kind: NoticeDeadlineKind;
   /**
-   * Frågestopp from the published checklist, as the end of that day in Swedish time (like
-   * AnswerView.question_deadline): a date, so show it as one. Null without a published checklist that names it.
+   * Frågestopp as the end of that day in Swedish time (like AnswerView.question_deadline): the source's own date
+   * (e-Avrop) when it gives one, else the published checklist's. A date, so show it as one. Null when neither names it.
    */
   question_deadline: IsoDateTime | null;
   cpv_codes: string[];
@@ -330,7 +338,77 @@ export interface DocumentInfo {
   id: Uuid;
   filename: string;
   page_count: number;
+  /** Pages without readable text (scans, images): what the AI never saw, so the reader checks those in the file. */
+  empty_pages: number;
   is_fictitious: boolean;
+}
+
+/**
+ * A file the source lists for the procurement that Anbudshjälpen could not read in (decision 0020): the reader is
+ * told it exists and why it is missing here, so the documents shown are never taken for the whole set.
+ */
+export interface UnreadFile {
+  filename: string;
+  /** Swedish, as the ingestion wrote it: the format, the size or an unreadable file. */
+  reason: string;
+}
+
+/** How a stored file got here: fetched from e-Avrop, uploaded by inköp, unpacked from an archive, demo data, or by hand. */
+export type DocumentOrigin = "eavrop" | "upload" | "archive" | "fixture" | "manual";
+
+/**
+ * How one stored file was read in, for "Så lästes underlaget" (the demo's trace). Every value is something the app
+ * already keeps about the file; nothing is logged for the trace. Replaced versions are included.
+ */
+export interface DocumentReading {
+  id: Uuid;
+  filename: string;
+  origin: DocumentOrigin;
+  /** The archive the file was unpacked from, when origin is "archive". */
+  archive: string | null;
+  mimetype: string;
+  size_bytes: number;
+  /** When the file was fetched, uploaded or unpacked. */
+  stored_at: IsoDateTime;
+  page_count: number;
+  empty_pages: number;
+  /** The text of all pages: what the engines and the search read. */
+  characters: number;
+  /** "eavrop" for an export from e-Avrop's forms, whose footer was stripped (decision 0020); null otherwise. */
+  layout: string | null;
+  /** The text extraction that made the pages. */
+  extraction_version: number;
+  /** The document the worker interprets to a checklist on its own. */
+  is_main: boolean;
+  /** The newer file that took over, when the source replaced it. */
+  superseded_by: Uuid | null;
+  /** When that newer file was stored. */
+  superseded_at: IsoDateTime | null;
+}
+
+/** What happened to a notice's files, as the demo panel "Så lästes underlaget" shows it. */
+export interface ReadingReport {
+  notice_id: Uuid;
+  source: string;
+  /** When the notice was first stored. */
+  fetched_at: IsoDateTime;
+  /** When the source last changed it. */
+  updated_at: IsoDateTime;
+  /** Every stored file, oldest first, replaced ones included. */
+  documents: DocumentReading[];
+  unread_files: UnreadFile[];
+  /** What one interpretation or answer may be given at most (decision 0012). */
+  budget_chars: number;
+  /** The extraction the app runs now; an older document is read again. */
+  extraction_version: number;
+}
+
+/** What the engine was given (decision 0012), so the app can say so. */
+export interface ReadSummary {
+  documents_read: number;
+  documents_total: number;
+  pages_read: number;
+  pages_total: number;
 }
 
 export interface VerificationSummary {
@@ -338,6 +416,8 @@ export interface VerificationSummary {
   citations_verified: number;
   citations_moved: number;
   citations_unverified: number;
+  /** What the interpretation read (decision 0020); null on checklists made before it. */
+  read?: ReadSummary | null;
 }
 
 export interface ChecklistView {
@@ -405,11 +485,16 @@ export interface NoticeDetail extends NoticeSummary {
   procedure: string | null;
   url: string | null;
   documents_url: string | null;
+  /** TED's notice of a procurement from e-Avrop that also went to TED; e-Avrop's notice is the one shown. */
+  ted_url?: string | null;
   place: string | null;
   estimated_value_sek: number | null;
   /** CPV code -> Swedish label, for the codes in `cpv_codes` that are in the CPV list. */
   cpv_labels: Record<string, string>;
+  /** The current documents; a file the source replaced is left out. */
   documents: DocumentInfo[];
+  /** Files the source lists that were not read in, so the list above is never taken for all of them. */
+  unread_files: UnreadFile[];
   checklist: ChecklistView | null;
   /** Where a checklist on its way is; null when none is coming, so the page never promises one (decision 0019). */
   checklist_progress: ChecklistProgress | null;
@@ -437,14 +522,6 @@ export interface QuestionRequest {
   history: QuestionTurnIn[];
 }
 
-/** What the engine was given for an answer (decision 0012), so the card can say so. */
-export interface ReadSummary {
-  documents_read: number;
-  documents_total: number;
-  pages_read: number;
-  pages_total: number;
-}
-
 /**
  * What one answer cost: tokens as the model provider counted them, and money when a price is set. Null on a view
  * when the engine reported no counts (the rule-based engine has no model; Eneo's counts are not read yet).
@@ -464,7 +541,7 @@ export interface AnswerView {
   /** The main document; a citation's own document_id says where its quote is. */
   document_id: Uuid;
   read: ReadSummary;
-  /** Frågestopp from the checklist, as the end of that day in Stockholm: a date, so show it as one. */
+  /** Frågestopp as the end of that day in Stockholm: the source's date, else the published checklist's. A date. */
   question_deadline: IsoDateTime | null;
   /** Where to ask formally: the procurement in e-Avrop, else e-Avrop itself. */
   formal_question_url: string;
@@ -526,6 +603,15 @@ export interface CompanyView {
   insurance: string | null;
   public_references: string | null;
   is_fictitious: boolean;
+}
+
+/**
+ * GET /api/matches/status: true from a profile save with a language model until the re-assessment after the answer
+ * is done, so Start can say that the engine is working instead of "Inga nya träffar". The worker's scheduled run is
+ * not seen here.
+ */
+export interface MatchingStatus {
+  is_assessing: boolean;
 }
 
 /** PUT /api/profile: the saved profile, and how many open notices seem to fit it now. */
@@ -668,6 +754,46 @@ export interface InsightItem {
   visible: boolean;
 }
 
+/** A job inköp is considering (decision 0023), described as a notice would be: words and CPV codes. */
+export interface SupplierSearch {
+  title: string;
+  description: string;
+  cpv_codes: string[];
+}
+
+/**
+ * How close the company's nearest CPV code is to the job's: the same code, a code in the same category (five
+ * significant digits) or one in the same group (three), the level matching starts at.
+ */
+export type SupplierCpvKind = "same_code" | "same_category" | "same_group";
+
+export interface SupplierCpvMatch {
+  company_code: string;
+  /** The company code's Swedish label, when the code is in the CPV list. */
+  label: string | null;
+  kind: SupplierCpvKind;
+}
+
+/**
+ * A company that seems able to answer the job. Only what the matching itself reads: never the description, the
+ * turnover, the insurance or the references.
+ */
+export interface SupplierMatch {
+  company_id: Uuid;
+  name: string;
+  is_fictitious: boolean;
+  /** A workshop participant's own company (decision 0010). */
+  is_lab: boolean;
+  municipalities: string[];
+  employees: number | null;
+  cpv_codes: string[];
+  cpv_labels: Record<string, string>;
+  /** Null when the company got in on its words alone. */
+  cpv_match: SupplierCpvMatch | null;
+  /** Words of the company's own description that the job's text also has, in the company's order. */
+  shared_words: string[];
+}
+
 export interface JobRunView {
   id: Uuid;
   job: string;
@@ -740,6 +866,7 @@ export type JobName =
   | "ingest_lou"
   | "close_expired"
   | "interpret_pending"
+  | "reextract_outdated"
   | "match_all"
   | "send_reminders"
   | "notify_matches"

@@ -104,8 +104,8 @@ export const CHECK_STATUS: Record<CheckStatus, string> = {
 
 /** The review's groups, by what the reader does first (direction.md, section 2). */
 export const CHECK_GROUP: Record<CheckStatus, string> = {
-  saknas: "Måste åtgärdas",
-  obevisat: "Måste åtgärdas",
+  saknas: "Bör åtgärdas",
+  obevisat: "Bör åtgärdas",
   oklart: "Kontrollera själv",
   uppfyllt: "Ser bra ut",
 };
@@ -292,11 +292,13 @@ export function verificationText(summary: VerificationSummary): string | null {
   return parts.join(" · ");
 }
 
-/** The four steps of a notice page, in order, with the values `?flik=` has always used. */
+/**
+ * The two steps of a notice page, in order, with the values `?flik=` has always used. Granska is the last step
+ * (decision 0024): the old step "Lämna in" (`inlamning`) is gone, and its address opens Granska.
+ */
 export const STEPS = [
   { value: "checklista", label: "Krav", number: 1 },
   { value: "granska", label: "Granska", number: 2 },
-  { value: "inlamning", label: "Lämna in", number: 3 },
 ] as const;
 
 export type StepValue = (typeof STEPS)[number]["value"];

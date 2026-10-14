@@ -45,6 +45,7 @@ from anbudsklar.contracts import (
 )
 from anbudsklar.contracts.tasks import CheckStatus, DateKind, Fit, RequirementKind
 from anbudsklar.cpv import MIN_GROUP_DIGITS, closest_cpv_pair, significant_digits
+from anbudsklar.documents.eavrop_export import prepare_for_rules
 from anbudsklar.lou_refs import lou_excerpt
 
 _QUOTE_LIMIT = 300
@@ -82,6 +83,8 @@ class Sentence:
     text: str
     segment: int = 0
     section: int = 0
+    # The document's name when the material has several; a citation then names it.
+    document: str | None = None
 
 
 def _collapse(text: str) -> str:
@@ -230,24 +233,60 @@ def _is_heading_segment(segment: str) -> bool:
     )
 
 
-def document_sentences(pages: Sequence[str]) -> list[Sentence]:
+def document_sentences(
+    pages: Sequence[str], *, document: str | None = None, start_segment: int = 0, start_section: int = 0
+) -> list[Sentence]:
+    """The sentences of one document's pages, numbered on from `start_segment` and `start_section`.
+
+    The numbering continues across the documents of a set, so a sentence that opens an
+    attachment is never read as an elaboration of the last sentence of the main document.
+    """
+
     skip = running_lines(pages)
     sentences: list[Sentence] = []
-    segment_number = section_number = 0
+    segment_number, section_number = start_segment, start_section
     for page_number, page in enumerate(pages, start=1):
         for segment in _segments(page, skip):
             segment_number += 1
             if _is_heading_segment(segment):
                 section_number += 1
             sentences.extend(
-                Sentence(page=page_number, text=text, segment=segment_number, section=section_number)
+                Sentence(
+                    page=page_number,
+                    text=text,
+                    segment=segment_number,
+                    section=section_number,
+                    document=document,
+                )
                 for text in _segment_sentences(segment)
             )
     return sentences
 
 
+def set_sentences(documents: DocumentSet) -> list[Sentence]:
+    """Every sentence of a document set, the main document first, named when there are several.
+
+    An e-Avrop export is read without its form fields (`prepare_for_rules`), so that "Ja" and
+    an information question never become requirements.
+    """
+
+    sentences: list[Sentence] = []
+    several = len(documents.documents) > 1
+    for document in documents.documents:
+        last = sentences[-1] if sentences else None
+        sentences.extend(
+            document_sentences(
+                prepare_for_rules(document.pages, document.layout),
+                document=document.filename if several else None,
+                start_segment=last.segment + 1 if last else 0,
+                start_section=last.section + 1 if last else 0,
+            )
+        )
+    return sentences
+
+
 def _citation(sentence: Sentence) -> Citation:
-    return Citation(page=sentence.page, quote=_excerpt(sentence.text))
+    return Citation(page=sentence.page, quote=_excerpt(sentence.text), document=sentence.document)
 
 
 def _best_matches(query: set[str], sentences: Iterable[Sentence]) -> list[tuple[float, Sentence]]:
@@ -1106,6 +1145,16 @@ def _answer_from_published(
 
 
 RULES_LEAD = "Paragrafer som kan handla om din fråga:"
+# When a section of one of the municipality's steering documents is among the hits (decision 0022).
+RULES_LEAD_MIXED = "Paragrafer och avsnitt som kan handla om din fråga:"
+
+
+def rules_lead(sources: Sequence[RuleSource]) -> str:
+    """The line over the sources: paragraphs only while every source is a section of the law."""
+
+    if all((source.reference or "").startswith("LOU") for source in sources):
+        return RULES_LEAD
+    return RULES_LEAD_MIXED
 
 
 class HeuristicEngine:
@@ -1119,18 +1168,30 @@ class HeuristicEngine:
     async def interpret_document(
         self,
         notice: NoticeContext,
-        document: PagedDocument,
+        documents: DocumentSet,
         answers: Sequence[PublishedAnswerInput] = (),
     ) -> tuple[Checklist, EngineRun]:
         # Without a model the rules cannot tell which requirement an answer changes, so the
         # published answers are left to the page's own list of them (decision 0018).
-        sentences = document_sentences(document.pages)
+        sentences = set_sentences(documents)
         requirements = _requirements(sentences)
         attachments = _attachments(sentences)
         evaluation = _evaluation(sentences)
         dates = _dates(sentences)
+        pages = sum(document.page_count for document in documents.documents)
+        count = len(documents.documents)
+        extent = (
+            f"Underlaget har {_counted(pages, 'sida', 'sidor')}."
+            if count == 1
+            else f"Underlaget har {count} dokument med {_counted(pages, 'sida', 'sidor')} sammanlagt."
+        )
+        if documents.unread_files:
+            extent += (
+                f" {_counted(len(documents.unread_files), 'fil', 'filer')} kunde inte läsas in här och är "
+                f"inte med: {_listing(documents.unread_files)}."
+            )
         summary = (
-            f"Underlaget har {_counted(document.page_count, 'sida', 'sidor')}. Listan har "
+            f"{extent} Listan har "
             f"{len(requirements)} krav, {_counted(len(attachments), 'bilaga', 'bilagor')}, "
             f"{_counted(len(evaluation), 'utvärderingskriterium', 'utvärderingskriterier')} och "
             f"{len(dates)} datum, alla som utdrag ur texten. "
@@ -1209,7 +1270,10 @@ class HeuristicEngine:
         answers: Sequence[PublishedAnswerInput] = (),
     ) -> tuple[Answer, EngineRun]:
         published = _published_answer_for(question, answers)
-        by_document = [(document, document_sentences(document.pages)) for document in documents.documents]
+        by_document = [
+            (document, document_sentences(prepare_for_rules(document.pages, document.layout)))
+            for document in documents.documents
+        ]
         # Question words the documents never use ("hur stor", "krävs") cannot match anything,
         # so only the words the documents share count towards the score.
         vocabulary: set[str] = set()
@@ -1296,7 +1360,7 @@ class HeuristicEngine:
             for item in context[:3]
         ]
         excerpts = "\n\n".join(f"{source.reference} – {source.title}: {source.excerpt}" for source in sources)
-        return RulesAnswer(answer=f"{RULES_LEAD}\n\n{excerpts}", sources=sources), self._run()
+        return RulesAnswer(answer=f"{rules_lead(sources)}\n\n{excerpts}", sources=sources), self._run()
 
     async def aclose(self) -> None:
         return None

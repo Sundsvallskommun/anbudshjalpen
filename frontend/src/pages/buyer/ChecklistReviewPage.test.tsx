@@ -83,7 +83,10 @@ describe("ChecklistReviewPage: header", () => {
     mockApi(routes(draftChecklistView));
     open();
 
-    expect(await screen.findByRole("heading", { level: 1, name: noticeDetail.title })).toBeInTheDocument();
+    // The file's first render loads the page cold, which took 3.5 s on CI's runner (2026-10-13).
+    expect(
+      await screen.findByRole("heading", { level: 1, name: noticeDetail.title }, { timeout: 6000 }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Granska checklista")).toBeInTheDocument();
     const steps = screen.getByRole("list", { name: "Checklistans status" });
     expect(within(steps).getByText("Utkast").closest('[aria-current="step"]')).not.toBeNull();

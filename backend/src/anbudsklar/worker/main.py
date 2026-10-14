@@ -43,6 +43,7 @@ def schedule() -> list[tuple[str, BaseTrigger]]:
         ("ingest_lou", CronTrigger(day_of_week="mon", hour=5, minute=0, timezone=STOCKHOLM)),
         ("close_expired", IntervalTrigger(minutes=15, timezone=STOCKHOLM)),
         (INTERPRET_JOB, IntervalTrigger(seconds=int(INTERPRET_INTERVAL.total_seconds()), timezone=STOCKHOLM)),
+        ("reextract_outdated", IntervalTrigger(minutes=10, timezone=STOCKHOLM)),
         ("match_all", IntervalTrigger(minutes=30, timezone=STOCKHOLM)),
         ("send_reminders", IntervalTrigger(minutes=1, timezone=STOCKHOLM)),
         ("notify_matches", IntervalTrigger(minutes=10, timezone=STOCKHOLM)),
@@ -65,7 +66,12 @@ async def run_scheduled(session_factory: SessionFactory, context: JobContext, jo
 
 
 async def ensure_reference_data(session_factory: SessionFactory, context: JobContext) -> None:
-    """Load the CPV list and LOU on first start, so search and rule help work from day one."""
+    """Load the CPV list and LOU when their tables are empty, and the steering documents every start.
+
+    The steering documents come from the image's own data/ folder, so loading them on
+    every start is what makes a revised document reach the database with the deploy that
+    carries it (decision 0022). It is a handful of rows.
+    """
 
     async with session_factory() as session:
         cpv_missing = await session.scalar(select(CpvCode.code).limit(1)) is None
@@ -74,6 +80,7 @@ async def ensure_reference_data(session_factory: SessionFactory, context: JobCon
         await run_scheduled(session_factory, context, "load_cpv")
     if lou_missing:
         await run_scheduled(session_factory, context, "ingest_lou")
+    await run_scheduled(session_factory, context, "load_policies")
 
 
 async def run_worker(settings: Settings) -> None:

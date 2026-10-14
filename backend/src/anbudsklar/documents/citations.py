@@ -39,7 +39,7 @@ import bisect
 import re
 import unicodedata
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from functools import cache
 
@@ -100,7 +100,7 @@ _GUARD = re.compile(
 )
 _LEADING_ZEROS = re.compile(r"^0+(?=\d)")
 _NEGATION_BEFORE = re.compile(rf"(?<!\w)(?:{_NEGATIONS})\s*$", re.IGNORECASE)
-_NEGATION_AFTER = re.compile(rf"\s*(?:{_NEGATIONS})\b", re.IGNORECASE)
+_NEGATION_AFTER = re.compile(rf"(?P<gap>\s*)(?P<word>{_NEGATIONS})\b", re.IGNORECASE)
 _NEGATION_REACH = 16
 """Characters around a passage searched for a negation (the longest word plus spaces)."""
 _CLAUSE_END = frozenset(".,;:!?)")
@@ -327,7 +327,14 @@ def _negated_outside(text: str, start: int, end: int) -> bool:
     if _NEGATION_BEFORE.search(text, max(0, start - _NEGATION_REACH), start):
         return True
     ends_clause = end > 0 and text[end - 1] in _CLAUSE_END
-    return not ends_clause and _NEGATION_AFTER.match(text, end, end + _NEGATION_REACH) is not None
+    if ends_clause:
+        return False
+    after = _NEGATION_AFTER.match(text, end, end + _NEGATION_REACH)
+    if after is None:
+        return False
+    # A capitalised negation on the next line starts a new sentence ("Ingen fil bifogad" under
+    # a requirement in e-Avrop's forms); a wrapped "inte" continues the passage.
+    return not ("\n" in after["gap"] and after["word"][:1].isupper())
 
 
 def _passage_holds(index: PageIndex, page_no: int, part: _Part, start: int, end: int) -> bool:
@@ -499,22 +506,27 @@ def _verify(citation: Citation, index: PageIndex) -> Citation:
 
 
 def _unverified(citation: Citation) -> Citation:
+    """Unverified, but still pointing at the document where the quote was looked for."""
+
     return citation.model_copy(update={"check": "unverified", "found_page": None})
 
 
-def _verify_criterion(item: EvaluationCriterion, index: PageIndex) -> EvaluationCriterion:
+Verify = Callable[[Citation], Citation]
+
+
+def _verify_criterion(item: EvaluationCriterion, verify: Verify) -> EvaluationCriterion:
     """The weight shown next to the criterion must be written in its quote."""
 
-    citation = _verify(item.citation, index)
+    citation = verify(item.citation)
     if item.weight_percent is not None and not states_percentage(citation.quote, item.weight_percent):
         citation = _unverified(citation)
     return item.model_copy(update={"citation": citation})
 
 
-def _verify_date(item: KeyDate, index: PageIndex) -> KeyDate:
+def _verify_date(item: KeyDate, verify: Verify) -> KeyDate:
     """The date that drives deadlines and reminders must be written in its quote."""
 
-    citation = _verify(item.citation, index)
+    citation = verify(item.citation)
     if item.date is not None and not states_date(citation.quote, item.date):
         citation = _unverified(citation)
     return item.model_copy(update={"citation": citation})
@@ -554,22 +566,41 @@ def verify_citation(citation: Citation, pages: Sequence[str]) -> Citation:
     return _verify(citation, PageIndex(pages))
 
 
-def verify_checklist(
-    checklist: Checklist, pages: Sequence[str], answers: Sequence[PublishedAnswerInput] = ()
-) -> tuple[Checklist, VerificationSummary]:
-    """Verify every citation in a checklist against the document it was made from.
+Material = Sequence[PagedDocument] | Sequence[str]
+"""What a checklist is verified against: the documents it was made from, or one document's pages."""
 
-    A date or weight that its quote does not state makes that citation unverified, so it
-    is counted in the summary and the buyer is asked to check it before publishing. A
-    requirement's quote from a published answer is checked against the answers (decision
-    0018); the summary counts the document's citations, which the provenance line names.
+
+def _as_documents(material: Material) -> list[PagedDocument]:
+    """One nameless document for a list of pages; the documents themselves otherwise."""
+
+    documents = list(material)
+    if documents and isinstance(documents[0], str):
+        pages = [page for page in documents if isinstance(page, str)]
+        return [PagedDocument(filename="", pages=pages)]
+    return [document for document in documents if isinstance(document, PagedDocument)]
+
+
+def verify_checklist(
+    checklist: Checklist, material: Material, answers: Sequence[PublishedAnswerInput] = ()
+) -> tuple[Checklist, VerificationSummary]:
+    """Verify every citation in a checklist against the documents it was made from.
+
+    A citation names its document (decision 0020); the quote is looked for there first,
+    then in the others, the main document before the rest, as for an answer. A date or
+    weight that its quote does not state makes that citation unverified, so it is counted
+    in the summary and the buyer is asked to check it before publishing. A requirement's
+    quote from a published answer is checked against the answers (decision 0018); the
+    summary counts the documents' citations, which the provenance line names.
     """
 
-    index = PageIndex(pages)
+    indexes = [(document, PageIndex(document.pages)) for document in _as_documents(material)]
     answer_index = AnswerIndex(answers)
 
+    def verify(citation: Citation) -> Citation:
+        return _verify_in_documents(citation, indexes)
+
     def cited[T: (Requirement, RequiredAttachment)](items: Sequence[T]) -> list[T]:
-        return [item.model_copy(update={"citation": _verify(item.citation, index)}) for item in items]
+        return [item.model_copy(update={"citation": verify(item.citation)}) for item in items]
 
     requirements = [
         item.model_copy(update={"answer_citation": answer_index.verify(item.answer_citation)})
@@ -581,10 +612,10 @@ def verify_checklist(
         update={
             "requirements": requirements,
             "attachments": cited(checklist.attachments),
-            "evaluation": [_verify_criterion(item, index) for item in checklist.evaluation],
-            "dates": [_verify_date(item, index) for item in checklist.dates],
+            "evaluation": [_verify_criterion(item, verify) for item in checklist.evaluation],
+            "dates": [_verify_date(item, verify) for item in checklist.dates],
             "terms": [
-                term.model_copy(update={"citation": _verify_optional(term.citation, index)})
+                term.model_copy(update={"citation": verify(term.citation) if term.citation else None})
                 for term in checklist.terms
             ],
         }
@@ -704,12 +735,17 @@ def _located(citation: Citation, document: PagedDocument, check: CitationCheck, 
     )
 
 
-def verify_match(assessment: MatchAssessment, pages: Sequence[str]) -> MatchAssessment:
-    """Verify the citations behind a fit assessment against the notice's document."""
+def verify_match(assessment: MatchAssessment, material: Material) -> MatchAssessment:
+    """Verify the citations behind a fit assessment against the notice's documents.
 
-    index = PageIndex(pages)
+    The reasons copy the checklist's citations, which may point into an attachment.
+    """
+
+    indexes = [(document, PageIndex(document.pages)) for document in _as_documents(material)]
     reasons = [
-        reason.model_copy(update={"citation": _verify_optional(reason.citation, index)})
+        reason.model_copy(
+            update={"citation": _verify_in_documents(reason.citation, indexes) if reason.citation else None}
+        )
         for reason in assessment.reasons
     ]
     return assessment.model_copy(update={"reasons": reasons})

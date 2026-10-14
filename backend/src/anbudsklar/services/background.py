@@ -60,8 +60,24 @@ class MatchRefresher:
     def __init__(self) -> None:
         self._running: set[uuid.UUID] = set()
         self._again: set[uuid.UUID] = set()
+        self._pending: set[uuid.UUID] = set()
+
+    def expect(self, company_id: uuid.UUID) -> None:
+        """Count the company as being assessed from now, before `run` starts after the response.
+
+        A page that asks right after the save would otherwise see a moment with nothing going on
+        and show "Inga nya träffar" for a profile the engine has not looked at yet.
+        """
+
+        self._pending.add(company_id)
+
+    def is_assessing(self, company_id: uuid.UUID) -> bool:
+        """True while a run of the company's re-assessment is expected or going (this process only)."""
+
+        return company_id in self._pending or company_id in self._running
 
     async def run(self, session_factory: SessionFactory, engine: AiEngine, company_id: uuid.UUID) -> None:
+        self._pending.discard(company_id)
         if company_id in self._running:
             self._again.add(company_id)
             return

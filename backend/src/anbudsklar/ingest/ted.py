@@ -9,6 +9,10 @@ reuse of notices.
 
 eForms change notices get a new publication number but keep their `notice-identifier`,
 so a change replaces the stored row (and its external id) instead of adding a duplicate.
+
+A procurement that e-Avrop sent to TED is stored as e-Avrop's notice, which has the documents,
+the question deadline and the answers (decision 0021). TED's notice of it only adds what e-Avrop's
+API lacks to that notice: the buyer, the estimated value and the place, with TED's link.
 """
 
 from __future__ import annotations
@@ -27,7 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.config import Settings
 from anbudsklar.contracts import DeadlineKind
-from anbudsklar.ingest.common import IngestError, IngestStats
+from anbudsklar.ingest.common import IngestError, IngestStats, Outcome, assign_changed
 from anbudsklar.ingest.http import ensure_ok, send
 from anbudsklar.ingest.notices import (
     STOCKHOLM,
@@ -386,7 +390,17 @@ def _title(notice: Mapping[str, Any]) -> str | None:
 
 
 def _description(notice: Mapping[str, Any]) -> str | None:
-    return _text(notice.get("description-proc")) or _text(notice.get("description-lot"))
+    """The procedure's description, else every lot's: a notice with several lots describes each.
+
+    Only the first lot's text would lose the others from the search, the matching and the
+    notice block the engines read. Identical lot descriptions are kept once.
+    """
+
+    procedure = _text(notice.get("description-proc"))
+    if procedure:
+        return procedure
+    lots = _texts(notice.get("description-lot"))
+    return "\n\n".join(lots) or None
 
 
 def reference_number(notice: Mapping[str, Any]) -> str | None:
@@ -454,16 +468,55 @@ def _version(notice: Mapping[str, Any]) -> int:
 # --- Storage ---------------------------------------------------------------------------
 
 
+def ted_facts(notice: Notice | NoticeValues) -> dict[str, Any]:
+    """What TED's notice adds to e-Avrop's notice of the same procurement, kept as `raw["ted"]`.
+
+    e-Avrop's API names no buyer (the client also buys for the municipal companies), no
+    published value and no place; TED's notice does.
+    """
+
+    return {
+        "external_id": notice.external_id,
+        "url": notice.url,
+        "version": _version(notice.raw),
+        "buyer": notice.buyer,
+        "estimated_value_sek": notice.estimated_value_sek,
+        "place": notice.place,
+    }
+
+
+def add_ted_facts(notice: Notice, values: NoticeValues) -> Outcome:
+    """Put TED's facts on e-Avrop's notice of the procurement, unless it holds a newer version's."""
+
+    known = notice.raw.get("ted")
+    if isinstance(known, Mapping) and int(known.get("version") or 1) > _version(values.raw):
+        return "unchanged"
+    facts = ted_facts(values)
+    columns = {
+        "buyer": facts["buyer"] or notice.buyer,
+        "estimated_value_sek": facts["estimated_value_sek"],
+        "place": facts["place"],
+        "raw": notice.raw | {"ted": facts},
+    }
+    return "updated" if assign_changed(notice, columns) else "unchanged"
+
+
 async def upsert_ted_notices(session: AsyncSession, records: Sequence[TedRecord]) -> IngestStats:
     stats = IngestStats(fetched=len(records))
     by_external_id, by_identifier = await _existing(session, records)
-    from_eavrop = await _eavrop_procurement_ids(session)
+    from_eavrop = await _eavrop_notices(session)
     for record in records:
         existing = by_external_id.get(record.values.external_id)
         if existing is None and record.notice_identifier:
             existing = by_identifier.get(record.notice_identifier)
-        if existing is None and eavrop_procurement_id(record.values.documents_url) in from_eavrop:
-            stats.skipped += 1  # the same procurement is already stored from e-Avrop (decision 0009)
+        eavrop = from_eavrop.get(eavrop_procurement_id(record.values.documents_url) or "")
+        if existing is None and eavrop is not None:
+            # The same procurement is already stored from e-Avrop (decision 0021). A prior
+            # information notice adds nothing to it.
+            if record.values.notice_type == "contract":
+                stats.record(add_ted_facts(eavrop, record.values))
+            else:
+                stats.skipped += 1
             continue
         if existing is not None and _version(existing.raw) > record.version:
             stats.record("unchanged")  # we already hold a newer version of this notice
@@ -473,8 +526,9 @@ async def upsert_ted_notices(session: AsyncSession, records: Sequence[TedRecord]
     return stats
 
 
-async def _eavrop_procurement_ids(session: AsyncSession) -> set[str]:
-    return set(await session.scalars(select(Notice.external_id).where(Notice.source == "eavrop")))
+async def _eavrop_notices(session: AsyncSession) -> dict[str, Notice]:
+    rows = await session.scalars(select(Notice).where(Notice.source == "eavrop"))
+    return {notice.external_id: notice for notice in rows}
 
 
 async def _existing(

@@ -71,9 +71,9 @@ describe("reviewGroups", () => {
 describe("reviewVerdict", () => {
   it("leads with what must be fixed, then with what to check, else says it looks good", () => {
     const verdict = reviewVerdict(reviewGroups(view([check("K2", "saknas"), check("K3", "obevisat"), check("K1", "uppfyllt")]), checklist));
-    expect(verdict).toEqual({ title: "2 saker behöver åtgärdas innan du lämnar anbudet", mustFix: 2, good: 1, essential: 3, others: 0 });
+    expect(verdict).toEqual({ title: "2 saker bör åtgärdas innan du lämnar anbudet", mustFix: 2, good: 1, essential: 3, others: 0 });
     expect(reviewVerdict(reviewGroups(view([check("K4", "oklart")]), checklist)).title).toBe(
-      "Inget måste åtgärdas, men 1 krav behöver du kontrollera själv",
+      "Inget verkar behöva åtgärdas, men 1 krav bör du kontrollera själv",
     );
     expect(reviewVerdict(reviewGroups(view([check("K1", "uppfyllt")]), checklist)).title).toBe(
       "Skall- och kvalificeringskraven ser bra ut",

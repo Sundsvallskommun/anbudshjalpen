@@ -56,10 +56,12 @@ def derived_due_at(deadline: date, now: datetime) -> datetime:
 def reminder_deadline(notice: Notice, kind: str, checklist: Checklist | None) -> datetime | None:
     """The deadline a reminder of this kind follows, as a moment; None for "egen" and unknown ones.
 
-    The published checklist's date comes first, because inköp has reviewed it; the
-    notice's own deadline backs up sista anbudsdag, and gives it its time of day when it
-    falls on the same day. A date without a time of day lasts until that day ends in
-    Stockholm, since it names the last day on which something may be done.
+    A date the source itself states comes first: the notice's deadline for sista anbudsdag,
+    and e-Avrop's last day for questions for frågestopp. Then the published checklist's
+    date, because inköp has reviewed it; the notice's own deadline backs up sista
+    anbudsdag, and gives it its time of day when it falls on the same day. A date without a
+    time of day lasts until that day ends in Stockholm, since it names the last day on which
+    something may be done.
 
     When the notice's deadline is the last day for anbudsansökan, only an "anbudsansokan"
     reminder follows it, and sista anbudsdag is known from the checklist alone.
@@ -71,6 +73,8 @@ def reminder_deadline(notice: Notice, kind: str, checklist: Checklist | None) ->
     own = notice.deadline_at if kind == own_kind else None
     if kind == "anbudsansokan":
         return own  # no checklist names it
+    if kind == "fragestopp" and notice.question_deadline_at is not None:
+        return notice.question_deadline_at  # the source's own date, as the end of that day
     day = key_date(checklist, kind) if checklist else None
     if day is None:
         return own

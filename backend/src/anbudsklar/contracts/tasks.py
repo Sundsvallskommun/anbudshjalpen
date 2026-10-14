@@ -180,14 +180,29 @@ class CpvSuggestions(ContractModel):
 # --- regelhjalpen -------------------------------------------------------------------
 
 
+RuleSourceKind = Literal["law", "policy"]
+
+
 class RuleSource(ContractModel):
     title: str
-    reference: str | None = Field(default=None, description="E.g. 'LOU 20 kap. 1 §'.")
+    reference: str | None = Field(
+        default=None, description="E.g. 'LOU 20 kap. 1 §' or 'Inköpsstrategin 5.2'."
+    )
     url: str | None = None
     excerpt: str | None = Field(
         default=None,
-        description="Set by our code from its own copy of the law: the start of the section's text, "
-        "cut after a whole sentence.",
+        description="Set by our code from its own copy of the law or the steering document: the start of "
+        "the section's text, cut after a whole sentence.",
+    )
+    kind: RuleSourceKind | None = Field(
+        default=None,
+        description="Set by our code: 'law' for a section of LOU, 'policy' for a section of one of the "
+        "municipality's steering documents (decision 0022), None for guidance and web pages.",
+    )
+    note: str | None = Field(
+        default=None,
+        description="Set by our code for a steering document, e.g. 'Kommunens styrdokument, fastställt av "
+        "kommunfullmäktige 2023-09-25.' The page shows it under the source's title.",
     )
 
 

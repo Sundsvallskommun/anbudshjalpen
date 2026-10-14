@@ -26,7 +26,8 @@ loggar man in som Anna Berg på firman ([beslut 0007](decisions/0007-poc-login-p
    med Påminn mig, och under träffarna kommande upphandlingar utifrån avtalskatalogen. Gamla adressen /bevakning leder
    hit.
 3. **Träff:** ett mejl som visas i Mailpit, med länk till upphandlingen och till Start.
-4. **Krav:** upphandlingens sida har tre steg, 1 Krav, 2 Granska och 3 Lämna in. Steg 1 visar skallkrav,
+4. **Krav:** upphandlingens sida har två steg, 1 Krav och 2 Granska
+   ([beslut 0024](decisions/0024-granska-ar-sista-steget.md)). Steg 1 visar skallkrav,
    kvalificeringskrav, bilagor, utvärdering och datum, där varje punkt länkar till sidan i underlaget ("s. 5") och
    termerna förklaras vid klick. "Påminn mig" finns vid sista anbudsdag och sista dag för frågor i sidhuvudet, och på
    checklistans första daterade rad för frågestopp och för sista anbudsdag, alltså de datum som påminnelsen gäller.
@@ -39,18 +40,26 @@ loggar man in som Anna Berg på firman ([beslut 0007](decisions/0007-poc-login-p
    e-Avrop före frågestoppet och skapar en påminnelse, när den publicerade checklistan anger ett frågestopp som inte
    har passerat. Samtalet följer med mellan sidorna och går att spara som PDF. I steg 1 står de svar inköp redan har
    publicerat i e-Avrop på andra leverantörers frågor, samma för alla ([beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md)).
-6. **Granska:** firman laddar upp ett utkast och får först ett besked, till exempel hur många saker som behöver
-   åtgärdas, och sedan kraven grupperade som Måste åtgärdas, Kontrollera själv och Ser bra ut. Inget sparas.
-7. **Lämna in:** sker i e-Avrop. Steg 4 är en sista kontroll att bocka av, där det som granskningen bedömde som "Ser
-   bra ut" redan är förbockat, och en länk till e-Avrop.
+6. **Granska:** firman laddar upp ett utkast och får först ett besked, till exempel hur många saker som bör
+   åtgärdas, och sedan kraven grupperade som Bör åtgärdas, Kontrollera själv och Ser bra ut. Inget sparas.
+7. **Lämna in:** sker i e-Avrop. Granska slutar med kortet "Lämna anbudet", med sista anbudsdag och länken till
+   e-Avrop. Något eget steg för inlämningen finns inte längre.
 8. **Tilldelning:** Anbudshjälpen förklarar beslutet och vad avtalsspärren innebär.
 
-Regelhjälpen svarar på allmänna frågor om upphandling med hänvisning till LOU och vägledningar. Varje paragraf som
-svaret bygger på visas med lagens egna ord.
+Regelhjälpen svarar på allmänna frågor om upphandling med hänvisning till LOU, kommunens inköpsstrategi och
+vägledningar. Varje paragraf eller avsnitt som svaret bygger på visas med källans egna ord, och ett avsnitt ur
+strategin är märkt som kommunens styrdokument, inte lag
+([beslut 0022](decisions/0022-kommunens-styrdokument-som-kalla.md)).
 
-Inköparens vy (demopersonen Lars Holm) har två flikar: Att granska, där inköparen granskar, rättar, godkänner och
-publicerar checklistan innan företagen ser den, och Företagens frågor med de sammanställda frågorna. Jobben finns på
-sidan Drift i kontomenyn.
+För den som visar demon finns växeln "Visa hur underlaget lästes" under "Om demon och AI". Upphandlingens sida får då
+knappen "Så lästes underlaget", som visar vad som hände med varje fil från hämtningen till checklistan, se
+[Design](design.md#upphandlingens-sida). Valet sparas i webbläsaren och ändrar inget för andra.
+
+Inköparens vy (demopersonen Lars Holm) har tre flikar: Att granska, där inköparen granskar, rättar, godkänner och
+publicerar checklistan innan företagen ser den, Företagens frågor med de sammanställda frågorna, och Möjliga
+anbudsgivare, där inköparen beskriver ett tänkt uppdrag eller utgår från ett avtal som snart ska upphandlas igen och
+ser vilka företag som verkar kunna svara ([beslut 0023](decisions/0023-mojliga-anbudsgivare-for-inkop.md)). Jobben
+finns på sidan Drift i kontomenyn.
 
 ## Plan
 
@@ -82,6 +91,7 @@ AI-motorn är en Eneo-testinstans som nås via API. Utan Eneo används motorn `o
 | Annonser | Riktiga från TED, och från e-Avrops API när kommunens nyckel är inlagd, se [Datakällor](data-sources.md) |
 | Underlag | Tre påhittade underlag med facit, tills inköp kan lämna 3–5 avslutade upphandlingar |
 | LOU | Riktig, från Riksdagens öppna data |
+| Kommunens inköpsstrategi | Riktig, kommunfullmäktiges beslut 2023-09-25 återgivet i repot |
 | Vägledningar och sundsvall.se | Riktiga, som kunskap i Eneo för Regelhjälpen |
 | CPV-koder | Riktiga: EU:s officiella lista med svenska benämningar |
 | Avtalskatalog | Påhittad och märkt, tills inköp kan lämna ett utdrag |

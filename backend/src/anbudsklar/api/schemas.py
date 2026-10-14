@@ -12,7 +12,7 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from anbudsklar.contracts import (
     Answer,
@@ -133,8 +133,9 @@ class NoticeSummary(ApiModel):
     # What `deadline_at` is the last day for: "tender" (sista anbudsdag) or "request" (sista
     # dag för anbudsansökan, all a restricted procedure's notice in TED gives).
     deadline_kind: DeadlineKind = "tender"
-    # Frågestopp from the published checklist, as the end of that day in Stockholm (like
-    # AnswerView.question_deadline): the last day for questions, so show it as a date.
+    # Frågestopp as the end of that day in Stockholm (like AnswerView.question_deadline): the
+    # source's own date (e-Avrop) when it gives one, else the published checklist's. The
+    # last day for questions, so show it as a date.
     question_deadline: datetime | None = None
     cpv_codes: list[str]
     cpv_label: str | None = None  # Swedish label of the main (first) CPV code, when the code is known
@@ -181,7 +182,79 @@ class DocumentInfo(ApiModel):
     id: uuid.UUID
     filename: str
     page_count: int
+    # Pages without readable text (scans, images): what the AI never saw, so the reader can
+    # check those pages in the file itself.
+    empty_pages: int = 0
     is_fictitious: bool
+
+
+class UnreadFile(ApiModel):
+    """A file the source lists for the procurement that Anbudshjälpen could not read in.
+
+    The reader is told it exists and why it is missing here, so that the documents shown
+    are never taken for the whole set.
+    """
+
+    filename: str
+    reason: str  # Swedish, as the ingestion wrote it: the format, the size or an unreadable file
+
+
+DocumentOrigin = Literal["eavrop", "upload", "archive", "fixture", "manual"]
+"""How a stored file got here: fetched from e-Avrop, uploaded by inköp, unpacked from an
+archive among the notice's files, loaded as demo data, or added by hand."""
+
+
+class DocumentReading(ApiModel):
+    """How one stored file was read in, for "Så lästes underlaget" (the demo's trace).
+
+    Every value is something the app already keeps about the file; nothing is logged for
+    the trace. Replaced versions are included, so the reader sees that a newer file took
+    over, and the page count and the characters say what the engines could read.
+    """
+
+    id: uuid.UUID
+    filename: str
+    origin: DocumentOrigin
+    archive: str | None = None  # the archive the file was unpacked from, when origin is "archive"
+    mimetype: str
+    size_bytes: int
+    stored_at: datetime  # when the file was fetched, uploaded or unpacked
+    page_count: int
+    empty_pages: int
+    characters: int  # the text of all pages, what the engines and the search read
+    # "eavrop" when the file is an export from e-Avrop's forms, whose footer was stripped and
+    # whose fields the engines are told about (decision 0020); None otherwise.
+    layout: str | None
+    extraction_version: int  # the text extraction that made the pages
+    is_main: bool  # the document the worker interprets to a checklist on its own
+    superseded_by: uuid.UUID | None  # the newer file that took over, when the source replaced it
+    superseded_at: datetime | None  # when that newer file was stored
+
+
+class ReadingReport(ApiModel):
+    """What happened to a notice's files, as the demo panel "Så lästes underlaget" shows it.
+
+    The checklist's own events (interpreted, approved, published) and the published answers
+    are already on the notice detail; this adds the files, replaced versions included.
+    """
+
+    notice_id: uuid.UUID
+    source: str
+    fetched_at: datetime  # when the notice was first stored
+    updated_at: datetime  # when the source last changed it
+    documents: list[DocumentReading]  # every stored file, oldest first, replaced ones included
+    unread_files: list[UnreadFile] = Field(default_factory=list)
+    budget_chars: int  # what one interpretation or answer may be given at most (decision 0012)
+    extraction_version: int  # the extraction the app runs now; an older document is read again
+
+
+class ReadSummary(ApiModel):
+    """What the engine was given (decision 0012), so the app can say so."""
+
+    documents_read: int
+    documents_total: int
+    pages_read: int
+    pages_total: int
 
 
 class VerificationSummary(ApiModel):
@@ -189,6 +262,8 @@ class VerificationSummary(ApiModel):
     citations_verified: int = 0
     citations_moved: int = 0
     citations_unverified: int = 0
+    # What the interpretation read (decision 0020); None on checklists made before it.
+    read: ReadSummary | None = None
 
 
 class ChecklistView(ApiModel):
@@ -252,10 +327,14 @@ class NoticeDetail(NoticeSummary):
     procedure: str | None
     url: str | None
     documents_url: str | None
+    # TED's notice of a procurement stored from e-Avrop, which also went to TED (decision 0021).
+    ted_url: str | None = None
     place: str | None
     estimated_value_sek: int | None
     cpv_labels: dict[str, str] = Field(default_factory=dict)  # code -> Swedish label, for known codes
-    documents: list[DocumentInfo]
+    documents: list[DocumentInfo]  # the current documents; a file the source replaced is left out
+    # Files the source lists that were not read in, so the list above is never taken for all of them.
+    unread_files: list[UnreadFile] = Field(default_factory=list)
     checklist: ChecklistView | None  # companies only see published checklists
     # Where a checklist on its way is; None when none is coming, so a page never promises a
     # checklist that the worker will not make (decision 0019).
@@ -285,15 +364,6 @@ class QuestionRequest(ApiModel):
     history: list[QuestionTurnIn] = Field(default_factory=list, max_length=10)
 
 
-class ReadSummary(ApiModel):
-    """What the engine was given for an answer (decision 0012), so the app can say so."""
-
-    documents_read: int
-    documents_total: int
-    pages_read: int
-    pages_total: int
-
-
 class TokenUsageView(ApiModel):
     """What one answer cost: tokens as the model provider counted them, and money when a price is set.
 
@@ -312,8 +382,8 @@ class AnswerView(ApiModel):
     usage: TokenUsageView | None = None
     document_id: uuid.UUID  # the main document; a citation's own document_id says where its quote is
     read: ReadSummary
-    # Frågestopp from the checklist, as the end of that day in Stockholm: the date is the
-    # last day for questions, so show it as a date.
+    # Frågestopp as the end of that day in Stockholm: the source's date, else the published
+    # checklist's. The date is the last day for questions, so show it as a date.
     question_deadline: datetime | None
     formal_question_url: str  # where to ask formally: the procurement in e-Avrop, else e-Avrop itself
 
@@ -372,6 +442,17 @@ class CompanyView(ApiModel):
     insurance: str | None
     public_references: str | None
     is_fictitious: bool
+
+
+class MatchingStatus(ApiModel):
+    """Whether the signed-in company's matches are being re-assessed right now.
+
+    True from a profile save with a language model until the run after the response is
+    done, so Start can say so instead of "Inga nya träffar". The scheduled `match_all` in
+    the worker is not seen here.
+    """
+
+    is_assessing: bool
 
 
 class ProfileSaved(CompanyView):
@@ -518,6 +599,51 @@ class InsightItem(ApiModel):
     visible: bool  # False while the tender period is running
 
 
+class SupplierSearch(ApiModel):
+    """A job inköp is considering (decision 0023), described as a notice would be: words and CPV codes."""
+
+    title: str = Field(default="", max_length=500)
+    description: str = Field(default="", max_length=8000)
+    cpv_codes: list[CpvCodeIn] = Field(default_factory=list, max_length=30)
+
+    @model_validator(mode="after")
+    def _something_to_match_on(self) -> SupplierSearch:
+        if not self.cpv_codes and len(f"{self.title} {self.description}".strip()) < 3:
+            raise ValueError("Beskriv uppdraget eller ange minst en CPV-kod.")
+        return self
+
+
+# How close the company's nearest CPV code is to the job's: the same code, a code in the same
+# category (five significant digits) or one in the same group (three), the level matching starts at.
+SupplierCpvKind = Literal["same_code", "same_category", "same_group"]
+
+
+class SupplierCpvMatch(ApiModel):
+    company_code: str
+    label: str | None  # the company code's Swedish label, when the code is in the CPV list
+    kind: SupplierCpvKind
+
+
+class SupplierMatch(ApiModel):
+    """A company that seems able to answer the job (`services.suppliers`).
+
+    Only what the matching itself reads is shown: never the description, the turnover, the
+    insurance or the references.
+    """
+
+    company_id: uuid.UUID
+    name: str
+    is_fictitious: bool
+    is_lab: bool  # a workshop participant's own company (decision 0010)
+    municipalities: list[str]
+    employees: int | None
+    cpv_codes: list[str]
+    cpv_labels: dict[str, str] = Field(default_factory=dict)
+    cpv_match: SupplierCpvMatch | None  # None when the company got in on its words alone
+    # Words of the company's own description that the job's text also has, in the company's order.
+    shared_words: list[str]
+
+
 class JobRunView(ApiModel):
     id: uuid.UUID
     job: str
@@ -592,6 +718,7 @@ JobName = Literal[
     "ingest_lou",
     "close_expired",
     "interpret_pending",
+    "reextract_outdated",
     "match_all",
     "send_reminders",
     "notify_matches",

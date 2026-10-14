@@ -15,11 +15,12 @@ Anbudshjälpen (det här repot, en image)
 │  ├─ /        webbappen: Vite, React och Astryx som statiska filer
 │  ├─ /api     REST-API för webbappen, med inloggning via demoperson
 │  └─ /mcp     MCP-server som bara läser, för Eneos assistenter
-├─ worker      schemalagda jobb: hämta annonser och LOU, stänga passerade
-│              annonser, tolka underlag, matcha företag, skicka påminnelser
-│              och träffar
-├─ Postgres    upphandlingar, underlag per sida, checklistor, LOU, CPV-koder,
-│              avtal, demoföretag och deras data; sökning med fulltext och trigram
+├─ worker      schemalagda jobb: hämta annonser och LOU, läsa in kommunens
+│              styrdokument, stänga passerade annonser, tolka underlag, matcha
+│              företag, skicka påminnelser och träffar
+├─ Postgres    upphandlingar, underlag per sida, checklistor, LOU, kommunens
+│              styrdokument, CPV-koder, avtal, demoföretag och deras data;
+│              sökning med fulltext och trigram
 └─ Mailpit     mejlkorg som fångar alla utskick
 
 Eneo-testinstans (2.2, egen Compose i Dokploy)
@@ -34,14 +35,18 @@ Beslut: [0004](decisions/0004-eneo-api-and-own-mcp-server.md) (Eneo och MCP),
 
 ### Så blir ett underlag en checklista
 
-1. Inköparen laddar upp ett underlag till en annons. Appen tar ut texten sida för sida, gissar vilket avsnitt varje
-   sida hör till och sparar sidorna i Postgres.
-2. Appen skickar underlaget till uppgiften "tolka underlag" direkt efter uppladdningen, och jobbet
+1. Inköparen laddar upp ett underlag till en annons, eller insamlaren hämtar upphandlingens filer från e-Avrop. Appen
+   tar ut texten sida för sida (PDF, Word, Excel och text), räknar sidor utan läsbar text, gissar vilket avsnitt varje
+   sida hör till och sparar sidorna i Postgres. Originalfilen sparas också, så att ett bättre textuttag kan läsa om den
+   (jobbet `reextract_outdated`). Filer som inte kan läsas in står med namn och skäl på annonsen.
+2. Appen skickar upphandlingens alla aktuella dokument till uppgiften "tolka underlag" direkt efter uppladdningen,
+   huvuddokumentet först ([beslut 0020](decisions/0020-checklistan-lases-ur-alla-dokument.md)), och jobbet
    `interpret_pending` tar det som inte blivit klart. Med Eneo som motor går texten med sidmarkeringen `[SIDA n]` i en
    fråga till assistenten för uppgiften, och sessionen raderas efteråt. Ett misslyckat försök görs om med allt längre
    paus, och efter fem försök ger jobbet upp. Det ger upp direkt när samma underlag inte kan lyckas, till exempel när
    det är för stort för modellen. Inköparen ser underlagen som saknar checklista under Inköp › Att granska och kan
-   tolka dem igen ([Drift](operations.md#schemalagda-jobb)).
+   tolka dem igen ([Drift](operations.md#schemalagda-jobb)). Ändras underlaget eller inköps publicerade svar tolkas
+   upphandlingen om.
 3. Svaret valideras mot uppgiftens JSON-kontrakt. Är det fel ber motorn modellen rätta det.
 4. Appen kontrollerar varje citat mot sidtexten: verifierat, på annan sida eller kunde inte kontrolleras. Ett datum
    eller en vikt i checklistan måste dessutom stå i sitt citat.
@@ -126,7 +131,7 @@ De egna delarna finns för det som Eneo saknar eller inte ska äga.
 | Granska utkast | Utkastet och checklistan | Krav för krav: uppfyllt, obevisat, saknas eller oklart. Webbappen säger Ser bra ut, Bevis saknas, Hittades inte och Kontrollera själv |
 | Besvara fråga | Underlaget, frågan och tidigare frågor | Svar med citat, eller att det inte står i underlaget och bör frågas formellt |
 | Föreslå CPV | Företagets beskrivning och kandidater ur CPV-listan | Högst åtta koder med motivering |
-| Regelhjälpen | En allmän fråga om upphandlingsregler | Svar med källor: LOU-paragrafer och vägledningar |
+| Regelhjälpen | En allmän fråga om upphandlingsregler | Svar med källor: LOU-paragrafer, avsnitt i kommunens styrdokument och vägledningar. Ett styrdokument märks som kommunens, aldrig som lag |
 
 Indata, kontrakt och kontroller för varje uppgift står i [AI-uppgifterna](ai-tasks.md).
 
@@ -134,11 +139,12 @@ Indata, kontrakt och kontroller för varje uppgift står i [AI-uppgifterna](ai-t
 
 | Funktion | Teknik | Varför |
 |---|---|---|
-| Checklista och frågor | Hela underlaget i ett anrop, utan RAG | RAG hämtar bara de mest relevanta styckena och tappar krav när frågan är "lista alla skallkrav". 40–60 sidor får plats i kontexten |
+| Checklista och frågor | Alla dokument i upphandlingen i ett anrop, utan RAG | RAG hämtar bara de mest relevanta styckena och tappar krav när frågan är "lista alla skallkrav". 40–60 sidor får plats i kontexten; över budgeten väljs sidor med hänvisningar och sökning |
 | Citat | Vår egen kontroll mot sidtexten | Modellen kan inte själv markera ett citat som kontrollerat |
 | Matchning (företagarens Start) | Först fasta regler (CPV-prefix och nyckelord), sedan bedömer modellen mot kraven som plockats ut | Går att förklara och testa |
 | Prediktion | Datumräkning på avtalskatalogen. Modellen sammanfattar bara förra gångens krav | Mest unikt värde, minst AI |
-| Regelfrågor | En assistent i Eneo. Vägledningar ligger som kunskap, och LOU hämtas paragraf för paragraf via MCP | Hänvisningen blir kapitel och paragraf, inte ett helt dokument |
+| Möjliga anbudsgivare (inköps vy) | Matchningens fasta regler lästa åt andra hållet: CPV-grupp eller ord ur företagets beskrivning, utan modell ([beslut 0023](decisions/0023-mojliga-anbudsgivare-for-inkop.md)) | Svarar på "finns det företag som kan svara" utan ett anrop per företag, och går att förklara |
+| Regelfrågor | En assistent i Eneo. Vägledningar ligger som kunskap, och LOU och kommunens styrdokument hämtas paragraf för paragraf respektive avsnitt för avsnitt via egna MCP-verktyg, så att modellen väljer källa efter frågan ([beslut 0022](decisions/0022-kommunens-styrdokument-som-kalla.md)) | Hänvisningen blir kapitel och paragraf, eller dokument och avsnitt, inte ett helt dokument |
 | Sökning | Fulltext på svenska och trigram i Postgres | Filter, exakta termer och sidträffar utan en extra tjänst |
 
 MCP-servern ger Eneos assistenter läsåtkomst till offentliga upphandlingsdata. Kärnuppgifterna får hela underlaget i
@@ -148,6 +154,10 @@ publicerade.
 ## Dataskydd i designen
 
 - Ett företag kommer bara åt sina egna profiler, träffar, påminnelser och svar.
+- Inköp ser av företagens profiler bara det matchningen läser, och bara som svar på ett tänkt uppdrag under Möjliga
+  anbudsgivare: namn, CPV-koder, kommuner, antal anställda och de ord i beskrivningen som uppdraget delar. Aldrig
+  beskrivningen i sin helhet, omsättningen, försäkringen eller referenserna, och aldrig företagens träffar, frågor eller
+  avfärdanden ([beslut 0023](decisions/0023-mojliga-anbudsgivare-for-inkop.md)).
 - Anbudsutkast sparas inte. Utkastet hanteras i minnet, skickas till motorn och slängs efter granskningen.
 - Frågor om ett underlag sparas för inköparens sammanställning, som aldrig visar vilket företag som frågade. Exempel på
   frågor visas först efter sista anbudsdag. Frågor som ställs efter sista anbudsdag sparas inte, och inte heller

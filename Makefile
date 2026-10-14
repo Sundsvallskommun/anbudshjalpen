@@ -1,5 +1,5 @@
 # Common tasks. Run `make help` for a list.
-.PHONY: help setup services dev-api dev-web up down migrate seed ingest-lou ingest-ted check check-backend check-frontend test gate image eval
+.PHONY: help setup services dev-api dev-web up down migrate seed ingest-lou ingest-styrdokument ingest-ted check check-backend check-frontend test gate image eval
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-16s %s\n", $$1, $$2}'
@@ -26,11 +26,14 @@ down: ## Stop the stack
 migrate: ## Apply database migrations
 	cd backend && uv run alembic upgrade head
 
-seed: ## Load fictitious demo data and CPV codes (LOU: make ingest-lou)
+seed: ## Load fictitious demo data, CPV codes and the municipality's steering documents (LOU: make ingest-lou)
 	cd backend && uv run anbudsklar seed
 
 ingest-lou: ## Fetch LOU from Riksdagen's open data (needs internet)
 	cd backend && uv run anbudsklar ingest lou
+
+ingest-styrdokument: ## Load the municipality's steering documents from data/styrdokument
+	cd backend && uv run anbudsklar ingest styrdokument
 
 ingest-ted: ## Fetch Sundsvall notices from TED (needs internet)
 	cd backend && uv run anbudsklar ingest ted

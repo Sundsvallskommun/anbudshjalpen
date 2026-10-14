@@ -30,7 +30,7 @@ async def test_accepts_bearer_and_api_key_header(headers: dict[str, str]) -> Non
     response = await post_tools_list(make_app(make_settings()), headers)
 
     assert response.status_code == 200
-    assert len(response.json()["result"]["tools"]) == 11
+    assert len(response.json()["result"]["tools"]) == 13
 
 
 @pytest.mark.parametrize(

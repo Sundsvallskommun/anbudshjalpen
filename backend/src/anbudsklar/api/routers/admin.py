@@ -1,4 +1,4 @@
-"""The buyer's (inköpare) tools: checklist review, notices, documents, insights and jobs.
+"""The buyer's (inköpare) tools: checklist review, notices, documents, insights, possible bidders and jobs.
 
 Every route needs the buyer persona, which a deployment can turn off (DEMO_BUYER_ENABLED).
 """
@@ -37,9 +37,11 @@ from anbudsklar.api.schemas import (
     NoticeCreate,
     NoticeDetail,
     RejectRequest,
+    SupplierMatch,
+    SupplierSearch,
 )
 from anbudsklar.api.uploads import UPLOAD_OPENAPI, read_upload
-from anbudsklar.services import checklists, insights, jobs, notices, reminders
+from anbudsklar.services import checklists, insights, jobs, notices, reminders, suppliers
 from anbudsklar.services.access import Viewer
 from anbudsklar.services.ai_usage import DEFAULT_DAYS, MAX_DAYS, token_prices, usage_summary
 from anbudsklar.services.app_settings import get_app_settings, save_app_settings
@@ -144,7 +146,11 @@ async def upload_document(
     session_factory: SessionFactoryDep,
     user: BuyerDep,
 ) -> DocumentInfo:
-    """Store the document and interpret it right after the response has been sent."""
+    """Store the document and, when it is the notice's main document, interpret it right after the response.
+
+    An attachment waits for the worker, which interprets the notice again with every document
+    (decision 0020).
+    """
 
     upload = await read_upload(
         request,
@@ -154,7 +160,7 @@ async def upload_document(
     document = await notices.attach_document(
         session, notice_id, filename=upload.filename, data=upload.data, uploaded_by=user.id
     )
-    needs_checklist = not await checklists.has_checklist(session, document.id)
+    needs_checklist = document.auto_interpret and not await checklists.has_checklist(session, document.id)
     await session.commit()
     if needs_checklist:
         background.add_task(interpret_in_background, session_factory, engine, document.id)
@@ -196,6 +202,13 @@ async def interpret_document(
 @router.get("/insights")
 async def list_insights(session: SessionDep) -> list[InsightItem]:
     return await insights.list_insights(session, utcnow())
+
+
+@router.post("/suppliers/search")
+async def search_suppliers(body: SupplierSearch, session: SessionDep) -> list[SupplierMatch]:
+    """The companies that could answer a job inköp is considering (decision 0023). Nothing is stored."""
+
+    return await suppliers.find_suppliers(session, body, utcnow())
 
 
 @router.get("/settings")

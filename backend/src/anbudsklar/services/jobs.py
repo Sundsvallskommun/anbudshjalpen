@@ -23,13 +23,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from anbudsklar.ai.engine import AiEngine, EngineError, build_engine
 from anbudsklar.api.schemas import JobRunView
 from anbudsklar.config import Settings
-from anbudsklar.ingest import ingest_eavrop, ingest_lou, ingest_ted, load_cpv
+from anbudsklar.ingest import POLICY_DIR, ingest_eavrop, ingest_lou, ingest_ted, load_cpv, load_policies
 from anbudsklar.ingest.common import IngestError
 from anbudsklar.ingest.http import user_agent
 from anbudsklar.models import JobRun
 from anbudsklar.services.background import SessionFactory
-from anbudsklar.services.checklists import interpret_answered, interpret_pending
+from anbudsklar.services.checklists import interpret_changed, interpret_pending
 from anbudsklar.services.dates import utcnow
+from anbudsklar.services.documents import reextract_outdated
 from anbudsklar.services.errors import ConflictError, ServiceError
 from anbudsklar.services.lab import purge_expired
 from anbudsklar.services.matching import match_all, notify_matches
@@ -86,6 +87,10 @@ def agreements_csv_path(settings: Settings) -> Path:
     return settings.data_dir / "fixtures" / "agreements.csv"
 
 
+def policies_dir(settings: Settings) -> Path:
+    return settings.data_dir / POLICY_DIR
+
+
 async def _ingest_ted(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:
     return await ingest_ted(session, ctx.http, ctx.settings)
 
@@ -109,14 +114,22 @@ async def _load_cpv(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]
     return {"loaded": await load_cpv(session, cpv_csv_path(ctx.settings))}
 
 
+async def _load_policies(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:
+    return await load_policies(session, policies_dir(ctx.settings))
+
+
 async def _close_expired(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:
     return await close_expired_notices(session, utcnow())
 
 
 async def _interpret_pending(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:
-    """New documents first, then checklists whose published answers changed (decision 0018)."""
+    """New documents first, then checklists whose documents or published answers changed (0018, 0020)."""
 
-    return {**await interpret_pending(session, ctx.engine), **await interpret_answered(session, ctx.engine)}
+    return {**await interpret_pending(session, ctx.engine), **await interpret_changed(session, ctx.engine)}
+
+
+async def _reextract_outdated(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:
+    return await reextract_outdated(session)
 
 
 async def _match_all(session: AsyncSession, ctx: JobContext) -> Mapping[str, int]:
@@ -140,8 +153,10 @@ JOBS: dict[str, JobFunction] = {
     "ingest_eavrop": _ingest_eavrop,
     "ingest_lou": _ingest_lou,
     "load_cpv": _load_cpv,
+    "load_policies": _load_policies,
     "close_expired": _close_expired,
     "interpret_pending": _interpret_pending,
+    "reextract_outdated": _reextract_outdated,
     "match_all": _match_all,
     "send_reminders": _send_reminders,
     "notify_matches": _notify_matches,

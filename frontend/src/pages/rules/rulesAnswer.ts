@@ -3,7 +3,7 @@
  * when the engine wrote one, the explanation, and one card per paragraph the answer rests on. Pure functions, so the
  * reading of the engines' texts is tested without rendering.
  */
-import type { RuleSource, RulesAnswer, RulesView } from "../../api/types";
+import type { RuleSource, RuleSourceKind, RulesAnswer, RulesView } from "../../api/types";
 import { formatNumber } from "../../lib/format";
 
 export interface RulesAnswerParts {
@@ -85,9 +85,29 @@ export function sourceTitle(source: Pick<RuleSource, "reference" | "title">): st
   return `${reference} · ${title}`;
 }
 
-/** A paragraph of the law (LOU), as opposed to guidance or a web page. */
-export function isLawSource(source: Pick<RuleSource, "reference">): boolean {
-  return Boolean(source.reference?.startsWith("LOU"));
+export type SourceKind = RuleSourceKind | "other";
+
+/**
+ * What a source is: a paragraph of the law, a section of one of the municipality's steering documents (decision
+ * 0022), or something else (guidance, a web page). The backend says which; an older answer without `kind` is read
+ * from its reference.
+ */
+export function sourceKind(source: Pick<RuleSource, "reference" | "kind">): SourceKind {
+  if (source.kind) return source.kind;
+  return source.reference?.startsWith("LOU") ? "law" : "other";
+}
+
+/** A paragraph of the law (LOU), as opposed to a steering document, guidance or a web page. */
+export function isLawSource(source: Pick<RuleSource, "reference" | "kind">): boolean {
+  return sourceKind(source) === "law";
+}
+
+/** "Läs hela paragrafen" for the law, "Läs hela avsnittet" for a steering document, else "Läs källan". */
+export function sourceLinkLabel(source: Pick<RuleSource, "reference" | "kind">): string {
+  const kind = sourceKind(source);
+  if (kind === "law") return "Läs hela paragrafen";
+  if (kind === "policy") return "Läs hela avsnittet";
+  return "Läs källan";
 }
 
 /** The heading over the cards: the engine's own introduction, else a plain one; a heading, so without its colon. */

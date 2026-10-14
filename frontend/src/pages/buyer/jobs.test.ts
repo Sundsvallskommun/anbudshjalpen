@@ -13,7 +13,7 @@ describe("JOB_GROUPS", () => {
   it("groups every job once as Hämta, Bearbeta and Skicka", () => {
     expect(JOB_GROUPS.map((group) => group.title)).toEqual(["Hämta", "Bearbeta", "Skicka"]);
     const jobs = JOB_GROUPS.flatMap((group) => group.jobs);
-    expect(new Set(jobs).size).toBe(9);
+    expect(new Set(jobs).size).toBe(10);
   });
 });
 

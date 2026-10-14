@@ -66,7 +66,7 @@ _CLOSING: dict[Task, str] = {
 
 # Inputs per task, in the order they are rendered. All of them must be passed.
 TASK_INPUTS: dict[Task, tuple[str, ...]] = {
-    Task.INTERPRET_DOCUMENT: ("notice", "document", "answers"),
+    Task.INTERPRET_DOCUMENT: ("notice", "documents", "answers"),
     Task.ASSESS_MATCH: ("profile", "notice", "checklist"),
     Task.REVIEW_DRAFT: ("checklist", "draft"),
     Task.ANSWER_QUESTION: ("notice", "documents", "answers", "history", "question"),
@@ -118,6 +118,11 @@ def _local_time(value: datetime) -> str:
     return local.strftime("%Y-%m-%d kl. %H:%M")
 
 
+def _local_date(value: datetime) -> str:
+    local = value.astimezone(STOCKHOLM) if value.tzinfo else value
+    return local.strftime("%Y-%m-%d")
+
+
 def _line(label: str, value: object | None) -> str:
     if value is None or value == "" or value == []:
         return f"{label}: uppgift saknas"
@@ -146,11 +151,11 @@ def _render_notice(notice: NoticeContext) -> str:
         _line("Länk till annonsen", notice.url),
         _line("Beskrivning", notice.description),
     ]
+    if notice.question_deadline_at is not None:
+        # The source's own date, so the model can check what the document says against it.
+        questions = _line("Sista dag för frågor enligt annonsen", _local_date(notice.question_deadline_at))
+        lines.insert(6, questions)
     return _block("annons", "\n".join(lines))
-
-
-def _render_document(document: PagedDocument) -> str:
-    return _block("underlag", document.render())
 
 
 def _render_documents(documents: DocumentSet) -> str:
@@ -239,7 +244,6 @@ def _render_context(context: Sequence[RuleContext]) -> str:
 
 _RENDERERS: dict[str, Callable[[Any], str]] = {
     "notice": _render_notice,
-    "document": _render_document,
     "documents": _render_documents,
     "answers": _render_answers,
     "draft": _render_draft,

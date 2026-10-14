@@ -1,5 +1,7 @@
 """e-Avrop's Projekt API: the allowlist, the public request, documents and the TED twin.
 
+A procurement in both TED and e-Avrop is e-Avrop's notice, with what only TED gives (decision 0021).
+
 All responses here are synthetic and fictitious. Real responses cannot be recorded: the API is
 the municipality's own and a project's response holds tenderers, prices and staff. The
 synthetic project below carries such parts on purpose, so the tests can show they never leave
@@ -8,13 +10,15 @@ the response.
 
 from __future__ import annotations
 
+import io
 import json
 import re
 from copy import deepcopy
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
+import openpyxl
 import pytest
 import respx
 from pydantic import SecretStr
@@ -34,7 +38,7 @@ from anbudsklar.ingest.eavrop import (
 )
 from anbudsklar.ingest.notices import STOCKHOLM, NoticeValues, eavrop_procurement_id, notices_by_external_id
 from anbudsklar.ingest.ted import TedRecord, upsert_ted_notices
-from anbudsklar.models import Document, Notice, PublishedAnswer
+from anbudsklar.models import Document, DocumentPage, Notice, PublishedAnswer
 
 API = "https://www.e-avrop.com/api"
 CLIENT_ID = 4242
@@ -150,6 +154,7 @@ def _project(**changes: Any) -> dict[str, Any]:
                 _document(11, "Bilaga 1 Prisbilaga.xlsx"),
                 _document(12, "Kravspecifikation fiktiv.txt"),
                 _document(13, "Administrativa föreskrifter fiktiv.txt"),
+                _document(14, "Foto entré.jpg"),
             ],
         },
         "RequestForApplications": {},
@@ -185,15 +190,31 @@ def api_settings(settings: Settings) -> Settings:
     )
 
 
+def _workbook(rows: list[list[object]]) -> bytes:
+    """A small fictitious price list, as a buyer attaches it."""
+
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    assert sheet is not None
+    sheet.title = "Priser"
+    for row in rows:
+        sheet.append(row)
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+
 def _mock_documents(respx_mock: respx.MockRouter, *, question_log: bool = True) -> dict[int, respx.Route]:
     routes = {}
-    for doc_id, text in (
-        (12, "Kravspecifikation. Leverantören ska måla fasaden."),
-        (13, "Anbud ska lämnas på svenska."),
-    ):
+    files: tuple[tuple[int, bytes], ...] = (
+        (11, _workbook([["Post", "Pris per timme"], ["Målning", 450]])),
+        (12, "Kravspecifikation. Leverantören ska måla fasaden.".encode()),
+        (13, "Anbud ska lämnas på svenska.".encode()),
+    )
+    for doc_id, content in files:
         routes[doc_id] = respx_mock.get(f"{API}/v1/announcement-documents/{doc_id}").mock(
             return_value=httpx.Response(
-                200, content=text.encode(), headers={"Content-Type": "application/octet-stream"}
+                200, content=content, headers={"Content-Type": "application/octet-stream"}
             )
         )
     if question_log:
@@ -248,6 +269,7 @@ def test_public_procurement_reads_only_the_allowlist() -> None:
         "Bilaga 1 Prisbilaga.xlsx",
         "Kravspecifikation fiktiv.txt",
         "Administrativa föreskrifter fiktiv.txt",
+        "Foto entré.jpg",
     ]
     stored = json.dumps(map_procurement(procurement, Settings(), now=NOW).columns(), default=str)
     for word in SECRET_WORDS:
@@ -315,8 +337,9 @@ def test_a_document_outside_the_announcement_address_is_skipped() -> None:
         (["Kravspecifikation.pdf", "Upphandlinsförfrågan 2026.docx"], "Upphandlinsförfrågan 2026.docx"),
         (["Avtalsvillkor.pdf", "Krav på Leverantör.pdf", "Kravspecifikation.pdf"], "Krav på Leverantör.pdf"),
         (["Prisbilaga.xlsx", "Inbjudan till utbildning.pdf"], "Inbjudan till utbildning.pdf"),
-        (["Prisbilaga.xlsx", "Uppdraget.pdf"], "Uppdraget.pdf"),  # the only readable file
-        (["Avtalsvillkor.pdf", "Utvärderingsmodell.pdf"], None),
+        (["Ritningar.zip", "Uppdraget.pdf"], "Uppdraget.pdf"),  # the only readable file
+        (["Avtalsvillkor.docx", "Utvärderingsmodell.pdf"], "Utvärderingsmodell.pdf"),  # no word: first PDF
+        (["Ritningar.zip", "Film.mp4"], None),
     ],
 )
 def test_main_document(filenames: list[str], expected: str | None) -> None:
@@ -362,8 +385,8 @@ async def test_ingest_stores_the_notice_and_only_the_public_documents(
         "inserted": 1,
         "updated": 0,
         "not_public": 1,
-        "documents_stored": 2,
-        "documents_skipped": 1,
+        "documents_stored": 3,
+        "documents_skipped": 1,  # the photo
         "answers_inserted": 1,
     }
     assert listing.calls.last.request.headers["Authorization"] == "Bearer test-token"
@@ -382,13 +405,21 @@ async def test_ingest_stores_the_notice_and_only_the_public_documents(
         assert word not in stored_text
     stored = list(
         await db_session.scalars(
-            select(Document).where(Document.notice_id == notice.id).order_by(Document.created_at)
+            select(Document)
+            .where(Document.notice_id == notice.id)
+            .order_by(Document.created_at, Document.filename)
         )
     )
     assert [(document.filename, document.auto_interpret) for document in stored] == [
         ("Administrativa föreskrifter fiktiv.txt", True),
+        ("Bilaga 1 Prisbilaga.xlsx", False),
         ("Kravspecifikation fiktiv.txt", False),
     ]
+    workbook = next(document for document in stored if document.filename.endswith(".xlsx"))
+    pages = await db_session.scalars(select(DocumentPage.text).where(DocumentPage.document_id == workbook.id))
+    assert list(pages) == ["Blad: Priser\nPost | Pris per timme\nMålning | 450"]
+    # The reader is told what is in e-Avrop but not here, and why.
+    assert notice.unread_files == [{"filename": "Foto entré.jpg", "reason": "Filformatet .jpg stöds inte"}]
     # Only the answered question is public; the unanswered one is not stored.
     [answer] = (await db_session.scalars(select(PublishedAnswer))).all()
     assert (answer.notice_id, answer.question, answer.answer) == (
@@ -432,7 +463,7 @@ async def test_a_refetch_reads_stored_projects_again(
 
     second = await ingest_eavrop(db_session, client, api_settings, now=NOW, refetch=True, request_interval=0)
 
-    assert second == {"fetched": 1, "inserted": 0, "updated": 1, "documents_skipped": 1}  # the xlsx
+    assert second == {"fetched": 1, "inserted": 0, "updated": 1, "documents_skipped": 1}  # the photo
     assert notice.deadline_at == datetime(2026, 10, 28, 23, 59, 59, tzinfo=STOCKHOLM)
     assert detail.call_count == 2  # read once for the project and its question log together
     assert all(route.call_count == 1 for route in documents.values())  # unchanged files are not fetched again
@@ -454,17 +485,31 @@ async def test_projects_unchanged_since_the_last_run_are_not_fetched(
     assert not detail.called
 
 
-async def test_documents_go_to_the_ted_notice_of_the_same_procurement(
+TED_LINK = "https://www.e-avrop.com/sundsvall/e-Upphandling/NoticeLink.aspx?id=900001"
+TED_PAGE = "https://ted.europa.eu/sv/notice/-/detail/900001-2026"
+
+
+def _ted_notice(**changes: Any) -> Notice:
+    values: dict[str, Any] = {
+        "source": "ted",
+        "external_id": "900001-2026",
+        "title": "Fiktiv ommålning (TED)",
+        "notice_type": "contract",
+        "status": "open",
+        "buyer": "Fiktiva Bostäder AB",
+        "estimated_value_sek": 2_000_000,
+        "place": "Västernorrlands län",
+        "url": TED_PAGE,
+        "documents_url": TED_LINK,
+        "raw": {"notice-version": "1"},
+    }
+    return Notice(**(values | changes))
+
+
+async def test_a_ted_notice_of_the_same_procurement_becomes_the_eavrop_notice(
     respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
 ) -> None:
-    twin = Notice(
-        source="ted",
-        external_id="900001-2026",
-        title="Fiktiv ommålning (TED)",
-        status="open",
-        documents_url="https://www.e-avrop.com/sundsvall/e-Upphandling/NoticeLink.aspx?id=900001",
-        raw={},
-    )
+    twin = _ted_notice()
     db_session.add(twin)
     await db_session.flush()
     respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[_list_item(900100)]))
@@ -474,42 +519,121 @@ async def test_documents_go_to_the_ted_notice_of_the_same_procurement(
     stats = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
 
     assert stats["linked"] == 1 and stats["answers_inserted"] == 1
-    assert (
-        await db_session.scalar(select(func.count()).select_from(Notice).where(Notice.source == "eavrop"))
-        == 0
+    assert (await db_session.scalar(select(func.count()).select_from(Notice))) == 1
+    # The same row, so what hangs on it stays; e-Avrop's facts, with what only TED gives.
+    assert (twin.source, twin.external_id, twin.title) == ("eavrop", "900001", "Fiktiv ommålning av förskola")
+    assert twin.url == twin.documents_url == TED_LINK
+    assert (twin.buyer, twin.estimated_value_sek, twin.place) == (
+        "Fiktiva Bostäder AB",
+        2_000_000,
+        "Västernorrlands län",
     )
+    assert twin.raw["ted"]["url"] == TED_PAGE
     assert (
         await db_session.scalar(
             select(func.count()).select_from(Document).where(Document.notice_id == twin.id)
         )
-        == 2
+        == 3
     )
+    assert twin.unread_files == [{"filename": "Foto entré.jpg", "reason": "Filformatet .jpg stöds inte"}]
     assert (await db_session.scalar(select(PublishedAnswer.notice_id))) == twin.id
 
 
-async def test_ted_does_not_add_a_procurement_already_stored_from_eavrop(db_session: AsyncSession) -> None:
-    db_session.add(
-        Notice(source="eavrop", external_id="900001", title="Fiktiv ommålning", status="open", raw={})
-    )
+async def test_an_update_from_eavrop_keeps_what_ted_added(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    db_session.add(_ted_notice())
     await db_session.flush()
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[_list_item(900100)]))
+    respx_mock.get(f"{API}/v1/procurements/900100").mock(return_value=httpx.Response(200, json=_project()))
+    _mock_documents(respx_mock)
+    await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+    await ingest_eavrop(db_session, client, api_settings, now=NOW, refetch=True, request_interval=0)
+
+    [notice] = await db_session.scalars(select(Notice))
+    assert notice.buyer == "Fiktiva Bostäder AB" and notice.raw["ted"]["url"] == TED_PAGE
+
+
+async def test_a_prior_information_notice_stays_teds_own(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    planned = _ted_notice(notice_type="planned", status="planned")
+    db_session.add(planned)
+    await db_session.flush()
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[_list_item(900100)]))
+    respx_mock.get(f"{API}/v1/procurements/900100").mock(return_value=httpx.Response(200, json=_project()))
+    _mock_documents(respx_mock)
+
+    stats = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+    assert stats["inserted"] == 1 and "linked" not in stats
+    assert planned.source == "ted"
+
+
+def _ted_record(version: int = 1, **changes: Any) -> TedRecord:
     values = NoticeValues(
-        source="ted",
-        external_id="900001-2026",
-        title="Fiktiv ommålning (TED)",
-        notice_type="contract",
+        **{
+            "source": "ted",
+            "external_id": "900001-2026",
+            "title": "Fiktiv ommålning (TED)",
+            "notice_type": "contract",
+            "status": "open",
+            "raw": {"notice-version": str(version)},
+            "buyer": "Fiktiva Bostäder AB",
+            "estimated_value_sek": 2_000_000,
+            "place": "Västernorrlands län",
+            "url": TED_PAGE,
+            "documents_url": TED_LINK,
+        }
+        | changes
+    )
+    return TedRecord(values=values, notice_identifier=None, version=version)
+
+
+async def test_ted_adds_its_facts_to_a_procurement_already_stored_from_eavrop(
+    db_session: AsyncSession,
+) -> None:
+    eavrop = Notice(
+        source="eavrop",
+        external_id="900001",
+        title="Fiktiv ommålning",
         status="open",
-        raw={},
-        documents_url="https://www.e-avrop.com/sundsvall/e-Upphandling/NoticeLink.aspx?id=900001",
+        buyer="Sundsvalls kommun",
+        raw={"procurement_id": "900001"},
     )
+    db_session.add(eavrop)
+    await db_session.flush()
 
-    stats = await upsert_ted_notices(
-        db_session, [TedRecord(values=values, notice_identifier=None, version=1)]
-    )
+    stats = await upsert_ted_notices(db_session, [_ted_record()])
 
-    assert stats.skipped == 1
-    assert (
-        await db_session.scalar(select(func.count()).select_from(Notice).where(Notice.source == "ted")) == 0
+    assert stats.updated == 1
+    assert (await db_session.scalar(select(func.count()).select_from(Notice))) == 1
+    assert (eavrop.title, eavrop.buyer, eavrop.estimated_value_sek) == (
+        "Fiktiv ommålning",
+        "Fiktiva Bostäder AB",
+        2_000_000,
     )
+    assert eavrop.raw["procurement_id"] == "900001" and eavrop.raw["ted"]["url"] == TED_PAGE
+
+    # An older version of TED's notice does not undo a newer one's facts.
+    await upsert_ted_notices(db_session, [_ted_record(version=2, buyer="Fiktiva Fastigheter AB")])
+    stats = await upsert_ted_notices(db_session, [_ted_record(version=1)])
+
+    assert stats.unchanged == 1 and eavrop.buyer == "Fiktiva Fastigheter AB"
+
+
+async def test_ted_adds_no_prior_information_notice_of_a_procurement_from_eavrop(
+    db_session: AsyncSession,
+) -> None:
+    eavrop = Notice(source="eavrop", external_id="900001", title="Fiktiv ommålning", status="open", raw={})
+    db_session.add(eavrop)
+    await db_session.flush()
+
+    stats = await upsert_ted_notices(db_session, [_ted_record(notice_type="planned", status="planned")])
+
+    assert stats.skipped == 1 and "ted" not in eavrop.raw
+    assert (await db_session.scalar(select(func.count()).select_from(Notice))) == 1
 
 
 async def test_without_token_the_job_does_nothing(
@@ -714,3 +838,123 @@ async def test_a_refused_project_in_the_answers_pass_does_not_fail_the_run(
     stats = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
 
     assert stats["answers_failed"] == 1
+
+
+async def test_the_sources_question_deadline_is_stored_as_the_end_of_that_day(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[_list_item(900100)]))
+    respx_mock.get(f"{API}/v1/procurements/900100").mock(return_value=httpx.Response(200, json=_project()))
+    _mock_documents(respx_mock)
+
+    await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+    notice = (await notices_by_external_id(db_session, "eavrop", ["900001"]))["900001"]
+    assert notice.question_deadline_at == datetime(2026, 10, 20, 23, 59, 59, tzinfo=STOCKHOLM)
+
+
+async def test_a_republished_file_supersedes_the_stored_one(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    """Only the current version reaches the engines; the old row stays for older checklists' sources."""
+
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[_list_item(900100)]))
+    detail = respx_mock.get(f"{API}/v1/procurements/900100").mock(
+        return_value=httpx.Response(200, json=_project())
+    )
+    routes = _mock_documents(respx_mock)
+    await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+    # The buyer corrects the main document; the request's update time moves past our copy
+    # (which the database stamped with the real clock).
+    later = _project()
+    later["RequestForTender"]["UpdatedDate"] = (datetime.now(UTC) + timedelta(hours=1)).isoformat()
+    detail.mock(return_value=httpx.Response(200, json=later))
+    routes[13].mock(
+        return_value=httpx.Response(
+            200,
+            content="Anbud ska lämnas på svenska eller engelska.".encode(),
+            headers={"Content-Type": "text/plain"},
+        )
+    )
+    second = await ingest_eavrop(db_session, client, api_settings, now=NOW, refetch=True, request_interval=0)
+
+    assert second["documents_stored"] == 3  # every file is fetched again; two are unchanged content
+    notice = (await notices_by_external_id(db_session, "eavrop", ["900001"]))["900001"]
+    versions = list(
+        await db_session.scalars(
+            select(Document)
+            .where(
+                Document.notice_id == notice.id, Document.filename == "Administrativa föreskrifter fiktiv.txt"
+            )
+            .order_by(Document.created_at)
+        )
+    )
+    assert len(versions) == 2
+    # Both rows were stamped in this test's transaction, so the chain, not the order, tells them apart.
+    new = next(version for version in versions if version.superseded_by is None)
+    old = next(version for version in versions if version is not new)
+    assert old.superseded_by == new.id
+    assert new.auto_interpret  # the corrected main document gets a new checklist
+    assert (
+        await db_session.scalar(
+            select(func.count()).select_from(Document).where(Document.notice_id == notice.id)
+        )
+        == 4
+    )
+
+
+def _archive(members: dict[str, bytes]) -> bytes:
+    import zipfile
+
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, content in members.items():
+            archive.writestr(name, content)
+    return buffer.getvalue()
+
+
+async def test_an_archives_readable_files_become_documents_and_the_rest_is_said(
+    respx_mock: respx.MockRouter, client: httpx.AsyncClient, api_settings: Settings, db_session: AsyncSession
+) -> None:
+    project = _project()
+    project["RequestForTender"]["Documents"] = [
+        _document(13, "Administrativa föreskrifter fiktiv.txt"),
+        _document(21, "11.4 Ritningar.zip"),
+        _document(22, "Trasigt.zip"),
+    ]
+    respx_mock.get(LIST_URL).mock(return_value=httpx.Response(200, json=[_list_item(900100)]))
+    respx_mock.get(f"{API}/v1/procurements/900100").mock(return_value=httpx.Response(200, json=project))
+    _mock_documents(respx_mock)
+    archive = _archive(
+        {
+            "ritningar/A-40-1-001.dwg": b"not readable",
+            "ritningar/A-40-1-001.pdf": b"",  # an empty PDF cannot be read: counted, not stored
+            "ritningar/Ritningsförteckning.txt": "Förteckning över ritningar.".encode(),
+            "__MACOSX/._Ritningsförteckning.txt": b"junk",
+        }
+    )
+    respx_mock.get(f"{API}/v1/announcement-documents/21").mock(
+        return_value=httpx.Response(200, content=archive, headers={"Content-Type": "application/zip"})
+    )
+    respx_mock.get(f"{API}/v1/announcement-documents/22").mock(
+        return_value=httpx.Response(200, content=b"PK\x03\x04 not a zip")
+    )
+
+    stats = await ingest_eavrop(db_session, client, api_settings, now=NOW, request_interval=0)
+
+    notice = (await notices_by_external_id(db_session, "eavrop", ["900001"]))["900001"]
+    stored = {
+        document.filename: document
+        for document in await db_session.scalars(select(Document).where(Document.notice_id == notice.id))
+    }
+    member = stored["11.4 Ritningar.zip › ritningar › Ritningsförteckning.txt"]
+    assert member.auto_interpret is False and member.page_count == 1
+    assert stats["documents_stored"] == 2 and stats["documents_skipped"] == 3
+    assert notice.unread_files == [
+        {
+            "filename": "11.4 Ritningar.zip",
+            "reason": "1 filer i arkivet kunde inte läsas (.dwg); 1 filer i arkivet gick inte att läsa",
+        },
+        {"filename": "Trasigt.zip", "reason": "Arkivet kunde inte packas upp. Det kan vara skadat"},
+    ]

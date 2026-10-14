@@ -8,8 +8,8 @@ import type { CheckStatus } from "../../../../api/types";
 import { StatusToken } from "../../../../components/tokens";
 
 const LEGEND: { status: CheckStatus; meaning: string }[] = [
-  { status: "saknas", meaning: "Inget i utkastet svarar mot kravet." },
-  { status: "obevisat", meaning: "Utkastet nämner kravet, men beviset är inte bifogat." },
+  { status: "saknas", meaning: "Granskningen hittade inget i utkastet som svarar mot kravet." },
+  { status: "obevisat", meaning: "Utkastet nämner kravet, men granskningen hittade inte beviset." },
   { status: "oklart", meaning: "Utkastet nämner delvis samma sak." },
   { status: "uppfyllt", meaning: "Utkastet svarar mot kravet." },
 ];
@@ -52,14 +52,14 @@ function Legend() {
             </VStack>
           ))}
         </VStack>
-        <Text type="supporting">Granskningen är ett stöd och ersätter inte din egen läsning. Det är underlaget som gäller.</Text>
+        <Text type="supporting">Granskningen görs av AI och kan ha fel. Den är ett stöd och ersätter inte din egen läsning. Det är underlaget som gäller.</Text>
       </VStack>
     </Card>
   );
 }
 
 /**
- * Step 3's rail (direction.md, section 2 "Högerspalten"): integrity and the legend. While the upload form is open it
+ * Step 2's rail (direction.md, section 2 "Högerspalten"): integrity and the legend. While the upload form is open it
  * says at the field that the draft is not kept, so the rail does not say it again (`showsNotKept` false).
  */
 export function ReviewRail({ showsNotKept = true }: { showsNotKept?: boolean }) {

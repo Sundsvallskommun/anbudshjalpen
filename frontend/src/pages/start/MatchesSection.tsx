@@ -12,7 +12,7 @@ import type { Ref } from "react";
 import type { MatchView } from "../../api/types";
 import { NoticeRow } from "../../components/NoticeRow";
 import { RowList } from "../../components/RowList";
-import { ErrorNotice, Loading } from "../../components/states";
+import { ErrorNotice, Loading, Working } from "../../components/states";
 import { relativeDays } from "../../lib/format";
 import { noticeDeadlineReminder, REMINDER_SUBJECT } from "../../lib/labels";
 import { useIsPhone } from "../../lib/usePhone";
@@ -22,6 +22,11 @@ import { MatchCard } from "./MatchCard";
 import type { MatchDismissal } from "./useMatchDismissal";
 
 const HEADING_ID = "nya-traffar";
+export const ASSESSING_TITLE = "Anbudshjälpen bedömer upphandlingarna mot er profil …";
+const ASSESSING_NOTE =
+  "Det tar ungefär en halv minut per upphandling. Träffarna visas här så snart bedömningen är klar.";
+/** Over the cards when they are being assessed anew: the ones shown are from the profile before the save. */
+export const REASSESSING = "Profilen är ändrad. Träffarna bedöms på nytt och kan ändras om en stund.";
 
 /** "Bedömda mot er profil. Närmaste sista anbudsdag är om 25 dagar." (or sista dag för anbudsansökan, if that is nearer) */
 function lead(fitting: readonly MatchView[]): string {
@@ -43,6 +48,20 @@ function NoMatches() {
         description="Du får ett mejl när en ny upphandling verkar passa er. Träffarna bygger på er företagsprofil."
         actions={<Button label="Ändra profil" href="/profil" size="sm" />}
       />
+    </Card>
+  );
+}
+
+/** The profile was just saved and a language model is at work: not "Inga nya träffar", which would read as a bug. */
+function Assessing() {
+  return (
+    <Card>
+      <VStack gap={2} hAlign="center" padding={6}>
+        <Loading label={ASSESSING_TITLE} />
+        <Text type="supporting" justify="center">
+          {ASSESSING_NOTE}
+        </Text>
+      </VStack>
     </Card>
   );
 }
@@ -71,6 +90,8 @@ export interface MatchesSectionProps {
   fitting: readonly MatchView[];
   notFitting: readonly MatchView[];
   dismissal: MatchDismissal;
+  /** The engine is re-assessing the matches after a profile save (`useMatchingStatus`). */
+  isAssessing: boolean;
   /** The heading takes the focus when a card leaves, so keyboard users keep their place in the section. */
   headingRef: Ref<HTMLHeadingElement>;
   /** The match whose card takes the focus when it is shown (back after "Ångra"). */
@@ -88,6 +109,7 @@ export function MatchesSection({
   fitting,
   notFitting,
   dismissal,
+  isAssessing,
   headingRef,
   focusId,
   onFocused,
@@ -122,7 +144,8 @@ export function MatchesSection({
       {query.isError && (
         <ErrorNotice title="Träffarna kunde inte hämtas" error={query.error} onRetry={() => query.refetch()} />
       )}
-      {query.isSuccess && fitting.length === 0 && <NoMatches />}
+      {query.isSuccess && fitting.length === 0 && (isAssessing ? <Assessing /> : <NoMatches />)}
+      {fitting.length > 0 && isAssessing && <Working>{REASSESSING}</Working>}
       {fitting.length > 0 && (
         <VStack as="ul" role="list" gap={4}>
           {fitting.map((match) => (

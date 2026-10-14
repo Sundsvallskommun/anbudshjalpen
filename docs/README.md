@@ -29,8 +29,8 @@ Status: **Aktuell** stämmer med det vi vet nu. **Under arbete** beskriver någo
 | [Design](design.md) | Gränssnittets designsystem: principer, navigering, sidorna, delade komponenter, regler för text, tillgänglighet och mått | Under arbete |
 | [Målbild för gränssnittet](direction.md) | Riktningen som omgörningen av gränssnittet byggdes efter, med besluten, skälen och utgångsläget. Skrivs inte om | Daterad 2026-10-05 |
 | [Eneo-integration](eneo-integration.md) | Testinstansen, uppsättningen i Eneo, nycklar, MCP och vad verksamheten kan ändra | Daterad 2026-10-05 |
-| [Datakällor](data-sources.md) | TED, e-Avrop, Riksdagen, CPV, avtalskatalogen och villkoren för dem | Daterad 2026-10-08 |
-| [e-Avrops API](eavrop.md) | Hur e-Avrop läses, reglerna som skyddar sekretessen, frågeloggen och det API:t saknar | Daterad 2026-10-12 |
+| [Datakällor](data-sources.md) | TED, e-Avrop, Riksdagen, kommunens styrdokument, CPV, avtalskatalogen och villkoren för dem | Daterad 2026-10-14 |
+| [e-Avrops API](eavrop.md) | Hur e-Avrop läses, reglerna som skyddar sekretessen, frågeloggen och det API:t saknar | Daterad 2026-10-13 |
 | [Kvalitetstest](quality-test.md) | Hur tolkningen mäts mot facit, och facitformatet | Under arbete |
 | [Utveckling](development.md) | Köra lokalt, kommandon, portar och tester | Under arbete |
 | [Drift](operations.md) | Imagen, miljövariabler, gränser, jobb, säkerhetskopiering, uppdatering och felsökning | Under arbete |

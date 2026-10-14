@@ -49,11 +49,16 @@ from anbudsklar.contracts import (
     Task,
     model_output_schema,
 )
+from anbudsklar.policy_refs import parse_policy_reference
 
 logger = logging.getLogger(__name__)
 
 FormatMode = Literal["json_schema", "json_object", "plain"]
 _MODES: tuple[FormatMode, ...] = ("json_schema", "json_object", "plain")
+_CUT_OFF_MESSAGE = (
+    "Språkmodellens svar blev för långt och höggs av innan det var klart. Dela upp underlaget, eller välj "
+    "en modell som kan skriva längre svar."
+)
 _LAW_REFERENCE = re.compile(r"(\d+)\s*kap\.\s*(\d+\s*[a-z]?)\s*§", re.IGNORECASE)
 
 
@@ -61,14 +66,33 @@ def _law_keys(text: str) -> set[tuple[str, str]]:
     return {(chapter, section.replace(" ", "").lower()) for chapter, section in _LAW_REFERENCE.findall(text)}
 
 
+def _cites_policy(answer: str, reference: str) -> bool:
+    """True when the answer names a steering-document section in any of the usual forms.
+
+    "Inköpsstrategin 5.2", "inköpsstrategin, avsnitt 5.2" and "inköpsstrategins avsnitt 5.2"
+    all count; "5.21" does not count for 5.2.
+    """
+
+    parsed = parse_policy_reference(reference)
+    if parsed is None:
+        return False
+    name, number = parsed
+    if name is None:
+        return False
+    pattern = rf"{re.escape(name)}s?\W{{0,20}}?(?:avsnitt\s*)?{re.escape(number)}(?!\.?\d)"
+    return re.search(pattern, answer, re.IGNORECASE) is not None
+
+
 def cited_sources(answer: str, context: list[RuleContext]) -> list[RuleSource]:
-    """The rule texts an answer refers to, matched on "N kap. M §" or the literal reference."""
+    """The rule texts an answer refers to: "N kap. M §" for the law, the document's name and
+    section number for a steering document, or the literal reference."""
 
     cited_keys = _law_keys(answer)
     sources: list[RuleSource] = []
     for item in context:
         keys = _law_keys(item.reference)
-        if (keys and keys <= cited_keys) or item.reference in answer:
+        cited = (keys and keys <= cited_keys) or item.reference in answer
+        if cited or _cites_policy(answer, item.reference):
             sources.append(RuleSource(title=item.title, reference=item.reference, url=item.url))
     return sources
 
@@ -173,7 +197,12 @@ class OpenAICompatEngine:
                 raise _engine_error(error) from error
             if task not in TEXT_TASKS:
                 self._mode = mode
-            text = completion.choices[0].message.content or "" if completion.choices else ""
+            choice = completion.choices[0] if completion.choices else None
+            if choice is not None and choice.finish_reason == "length":
+                # The JSON is cut off. Asking for a corrected answer would be cut off again, so
+                # the caller is told at once instead of after the retries.
+                raise EngineError(_CUT_OFF_MESSAGE, retryable=False)
+            text = (choice.message.content or "") if choice is not None else ""
             return text, _usage(completion)
         raise EngineError("Anropet till språkmodellen misslyckades.")
 
@@ -212,11 +241,11 @@ class OpenAICompatEngine:
     async def interpret_document(
         self,
         notice: NoticeContext,
-        document: PagedDocument,
+        documents: DocumentSet,
         answers: Sequence[PublishedAnswerInput] = (),
     ) -> tuple[Checklist, EngineRun]:
         return await self._run_task(
-            Task.INTERPRET_DOCUMENT, Checklist, notice=notice, document=document, answers=list(answers)
+            Task.INTERPRET_DOCUMENT, Checklist, notice=notice, documents=documents, answers=list(answers)
         )
 
     async def assess_match(

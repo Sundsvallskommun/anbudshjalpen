@@ -1,7 +1,7 @@
 import { Text } from "@astryxdesign/core/Text";
 import { VStack } from "@astryxdesign/core/VStack";
 import { useRef, useState } from "react";
-import { useMatches } from "../api/queries";
+import { useMatches, useMatchingStatus } from "../api/queries";
 import type { UserView } from "../api/types";
 import { plural, relativeDays } from "../lib/format";
 import { useIsPhone } from "../lib/usePhone";
@@ -16,14 +16,24 @@ import { firstName, isFitting, nextDeadlines, sortMatches } from "./start/start"
 import { UpcomingSection } from "./start/UpcomingSection";
 import { useMatchDismissal } from "./start/useMatchDismissal";
 
-/** "Målerifirman i Matfors AB · 2 nya träffar · nästa frist om 25 dagar"; a phone leaves out the company. */
-function summaryLine(parts: { company: string | null; matchCount: number | null; nextAt: string | null }): string {
+/**
+ * "Målerifirman i Matfors AB · 2 nya träffar · nästa frist om 25 dagar"; a phone leaves out the company. While the
+ * engine is still assessing a just-saved profile, no count is final: "träffarna bedöms" instead of "inga nya träffar".
+ */
+function summaryLine(parts: {
+  company: string | null;
+  matchCount: number | null;
+  isAssessing: boolean;
+  nextAt: string | null;
+}): string {
   return [
     parts.company,
     parts.matchCount === null
       ? null
       : parts.matchCount === 0
-        ? "inga nya träffar"
+        ? parts.isAssessing
+          ? "träffarna bedöms"
+          : "inga nya träffar"
         : plural(parts.matchCount, "ny träff", "nya träffar"),
     parts.nextAt ? `nästa frist ${relativeDays(parts.nextAt)}` : null,
   ]
@@ -34,6 +44,7 @@ function summaryLine(parts: { company: string | null; matchCount: number | null;
 function StartContent({ user }: { user: UserView }) {
   const isPhone = useIsPhone();
   const matches = useMatches();
+  const isAssessing = useMatchingStatus();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
   const dismissal = useMatchDismissal({
@@ -53,6 +64,7 @@ function StartContent({ user }: { user: UserView }) {
       fitting={fitting}
       notFitting={notFitting}
       dismissal={dismissal}
+      isAssessing={isAssessing}
       headingRef={headingRef}
       focusId={focusId}
       onFocused={() => setFocusId(null)}
@@ -69,6 +81,7 @@ function StartContent({ user }: { user: UserView }) {
           {summaryLine({
             company: isPhone ? null : (user.company?.name ?? null),
             matchCount: matches.isSuccess ? fitting.length : null,
+            isAssessing,
             nextAt: deadlines?.next.at ?? null,
           })}
         </Text>

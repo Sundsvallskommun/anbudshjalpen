@@ -89,7 +89,7 @@ export function ReviewResult({
   const [open, setOpen] = useState<string[]>(() => groups.filter((group) => group.defaultOpen).map((group) => group.id));
   const count = (id: ReviewGroupId) => groups.find((group) => group.id === id)?.items.length ?? 0;
   const filters = [
-    { value: "atgarda", label: "Måste åtgärdas", count: count("atgarda") },
+    { value: "atgarda", label: "Bör åtgärdas", count: count("atgarda") },
     { value: "kontrollera", label: "Kontrollera själv", count: count("kontrollera") },
     { value: "bra", label: "Ser bra ut", count: count("bra") },
     { value: "ovriga", label: "Övriga krav", count: verdict.others },
