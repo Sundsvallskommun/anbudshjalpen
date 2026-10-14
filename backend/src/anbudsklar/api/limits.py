@@ -47,10 +47,12 @@ DEFAULT_LIMITS: Mapping[str, Limit] = {
     "login": Limit(300, TEN_MINUTES),
     "gate": Limit(20, TEN_MINUTES),  # guesses at the access code, per address
     "lab": Limit(20, TEN_MINUTES),  # lab companies created, per address
+    "ask": Limit(60, TEN_MINUTES),  # Fråga AI, whichever subject answers (decision 0026)
     "questions": Limit(60, TEN_MINUTES),
     "rules": Limit(60, TEN_MINUTES),
     "review": Limit(20, TEN_MINUTES),
     "cpv_suggestions": Limit(30, TEN_MINUTES),
+    "profile_chat": Limit(30, TEN_MINUTES),  # messages to the profile in Fråga AI
     "interpret": Limit(30, TEN_MINUTES),  # buyer uploads and new interpretations
 }
 MAX_TRACKED_CLIENTS = 20_000

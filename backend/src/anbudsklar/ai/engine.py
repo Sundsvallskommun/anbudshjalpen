@@ -34,9 +34,12 @@ from anbudsklar.contracts import (
     MatchAssessment,
     NoticeContext,
     PagedDocument,
+    ProfileChange,
     PublishedAnswerInput,
     ReviewResult,
     RulesAnswer,
+    SubjectChoice,
+    SubjectOption,
 )
 
 
@@ -69,10 +72,15 @@ class EngineOutputError(EngineError):
 
 @dataclass(frozen=True)
 class QuestionTurn:
-    """An earlier question and answer in the same conversation about a document."""
+    """An earlier question and its answer in the same conversation.
+
+    `subject` says which of Fråga AI's subjects answered it (decision 0026); only the
+    subject choice reads it, and the other tasks get turns about their own subject.
+    """
 
     question: str
     answer: str
+    subject: str | None = None
 
 
 @dataclass(frozen=True)
@@ -106,6 +114,10 @@ class EngineRun:
     # None when the engine reported no counts: the heuristic engine has no model, and the
     # Eneo adapter does not read Eneo's counts yet (see `anbudsklar.ai.eneo`).
     usage: TokenUsage | None = None
+    # The MCP tools the engine's assistant called, by our server's names ("sok_lou"), in the
+    # order they were first used. The views show them so the reader sees what was looked up.
+    # Only Eneo has tools; the other engines leave the list empty.
+    tools: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -177,6 +189,32 @@ class AiEngine(Protocol):
 
         `context` holds LOU sections found by our own search. The Eneo engine ignores it,
         because its assistant has knowledge sources and our MCP tools of its own.
+        """
+        ...
+
+    async def update_profile(
+        self,
+        profile: CompanyProfile,
+        candidates: list[CpvCandidate],
+        history: list[QuestionTurn],
+        message: str,
+    ) -> tuple[ProfileChange, EngineRun]:
+        """uppdatera_profil: read what a message in Fråga AI changes in the company's profile.
+
+        `candidates` are CPV codes our search found for the message's words, the only
+        codes the change may add. The engine reads the wish; `services.profiles` applies
+        it through the same validation as the profile form, so nothing is saved here.
+        """
+        ...
+
+    async def choose_subject(
+        self, question: str, subjects: list[SubjectOption], history: list[QuestionTurn]
+    ) -> tuple[SubjectChoice, EngineRun]:
+        """valj_amne: which of Fråga AI's subjects a message is for (decision 0026).
+
+        Called only when `anbudsklar.ai.subject_rules` cannot tell from the words alone.
+        `subjects` are the subjects at hand on the page; `history` carries each earlier
+        turn's subject, so a short follow-up stays with the subject it continues.
         """
         ...
 

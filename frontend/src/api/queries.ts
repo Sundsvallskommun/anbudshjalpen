@@ -8,6 +8,8 @@ import { api, withQuery } from "./client";
 import type {
   AnswerView,
   AppConfig,
+  AskRequest,
+  AskView,
   AiUsageView,
   AppSettingsSaved,
   AppSettingsUpdate,
@@ -39,6 +41,8 @@ import type {
   NoticeSort,
   NoticeStatus,
   PageView,
+  ProfileChatRequest,
+  ProfileChatView,
   ProfileSaved,
   ReadingReport,
   QuestionRequest,
@@ -301,13 +305,29 @@ export function useUpdateProfile() {
     mutationFn: (update: CompanyUpdate) => api.put<ProfileSaved>("/api/profile", update),
     onSuccess: async (saved) => {
       const { fitting_notices: _count, ...profile } = saved;
-      client.setQueryData<CompanyView>(keys.profile, profile);
-      await Promise.all([
-        client.invalidateQueries({ queryKey: keys.matches, exact: true }),
-        client.invalidateQueries({ queryKey: keys.matchingStatus }),
-        client.invalidateQueries({ queryKey: ["notices"] }),
-        client.invalidateQueries({ queryKey: ["notice"] }),
-      ]);
+      await afterProfileSaved(client, profile);
+    },
+  });
+}
+
+/** After the profile was saved, from the form or from Fråga AI: show it, and refetch what its fit decides. */
+async function afterProfileSaved(client: QueryClient, profile: CompanyView) {
+  client.setQueryData<CompanyView>(keys.profile, profile);
+  await Promise.all([
+    client.invalidateQueries({ queryKey: keys.matches, exact: true }),
+    client.invalidateQueries({ queryKey: keys.matchingStatus }),
+    client.invalidateQueries({ queryKey: ["notices"] }),
+    client.invalidateQueries({ queryKey: ["notice"] }),
+  ]);
+}
+
+/** A message to the profile in Fråga AI. When it changed the profile, the app follows up as after a save. */
+export function useProfileChat() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (request: ProfileChatRequest) => api.post<ProfileChatView>("/api/profile/chat", request),
+    onSuccess: async (view) => {
+      if (view.profile) await afterProfileSaved(client, view.profile);
     },
   });
 }
@@ -383,6 +403,20 @@ export function useUpcoming(months: number) {
 
 export function useAskRules() {
   return useMutation({ mutationFn: (request: RulesRequest) => api.post<RulesView>("/api/rules/ask", request) });
+}
+
+/**
+ * A message to Fråga AI, whichever subject answers it (decision 0026). When it changed the profile, the app follows
+ * up as after a save from the form.
+ */
+export function useAsk() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (request: AskRequest) => api.post<AskView>("/api/ask", request),
+    onSuccess: async (view) => {
+      if (view.profile?.profile) await afterProfileSaved(client, view.profile.profile);
+    },
+  });
 }
 
 // --- Buyer (inköpare) --------------------------------------------------------------------------

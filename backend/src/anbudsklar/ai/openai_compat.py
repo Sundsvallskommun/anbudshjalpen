@@ -42,10 +42,13 @@ from anbudsklar.contracts import (
     MatchAssessment,
     NoticeContext,
     PagedDocument,
+    ProfileChange,
     PublishedAnswerInput,
     ReviewResult,
     RulesAnswer,
     RuleSource,
+    SubjectChoice,
+    SubjectOption,
     Task,
     model_output_schema,
 )
@@ -303,6 +306,29 @@ class OpenAICompatEngine:
             raise EngineError("Språkmodellen gav ett tomt svar.")
         answer = RulesAnswer(answer=text, sources=cited_sources(text, context))
         return answer, EngineRun(engine=self.name, model=self._model, usage=usage)
+
+    async def update_profile(
+        self,
+        profile: CompanyProfile,
+        candidates: list[CpvCandidate],
+        history: list[QuestionTurn],
+        message: str,
+    ) -> tuple[ProfileChange, EngineRun]:
+        return await self._run_task(
+            Task.UPDATE_PROFILE,
+            ProfileChange,
+            profile=profile,
+            candidates=candidates,
+            history=history,
+            message=message,
+        )
+
+    async def choose_subject(
+        self, question: str, subjects: list[SubjectOption], history: list[QuestionTurn]
+    ) -> tuple[SubjectChoice, EngineRun]:
+        return await self._run_task(
+            Task.CHOOSE_SUBJECT, SubjectChoice, subjects=subjects, history=history, question=question
+        )
 
     async def aclose(self) -> None:
         await self._client.close()

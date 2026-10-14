@@ -18,7 +18,18 @@ from anbudsklar import __version__
 from anbudsklar.ai.engine import AiEngine, EngineConfigError, EngineError, EngineOutputError
 from anbudsklar.api.gate import require_gate
 from anbudsklar.api.limits import AiSlots, BodyLimitMiddleware, RateLimiter
-from anbudsklar.api.routers import admin, health, lab, matches, notices, profile, reminders, rules, session
+from anbudsklar.api.routers import (
+    admin,
+    ask,
+    health,
+    lab,
+    matches,
+    notices,
+    profile,
+    reminders,
+    rules,
+    session,
+)
 from anbudsklar.api.security import ConversationStore, SessionStore, origin_of, require_same_origin
 from anbudsklar.api.web import SecurityHeadersMiddleware, serve_web
 from anbudsklar.config import Settings, get_settings
@@ -128,7 +139,7 @@ def _api_router() -> APIRouter:
     """Every /api route gets the same-origin check; it only acts on writes."""
 
     router = APIRouter(prefix="/api", dependencies=[Depends(require_same_origin), Depends(require_gate)])
-    for module in (session, lab, notices, reminders, profile, matches, rules, admin):
+    for module in (session, lab, notices, reminders, profile, matches, rules, ask, admin):
         router.include_router(module.router)
     return router
 

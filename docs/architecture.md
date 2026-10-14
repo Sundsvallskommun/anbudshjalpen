@@ -182,7 +182,7 @@ publicerade.
 - Anrop som kostar AI har gränser per IP-adress, och högst fyra AI-anrop från webbappen körs samtidigt. Gränserna står
   i [Drift](operations.md#gränser).
 - Ett samtal i Regelhjälpen fortsätter bara i webbläsaren som startade det. Appen minns vilket samtal den gav vilken
-  webbläsare, med en egen `HttpOnly`-cookie som bara skickas till `/api/rules`, så ett samtals-id från någon annan
+  webbläsare, med en egen `HttpOnly`-cookie som bara skickas till `/api`, så ett samtals-id från någon annan
   startar ett nytt samtal ([Eneo-integration](eneo-integration.md#så-anropar-appen-en-assistent)).
 - Fel från AI-motorn visas med motorns egen text på svenska, som aldrig innehåller adresser eller nycklar. Ett
   inställningsfel visas för besökare som ett allmänt fel, och detaljerna skrivs i serverns logg.

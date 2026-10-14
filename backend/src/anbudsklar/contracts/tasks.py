@@ -13,6 +13,7 @@ from typing import Literal
 from pydantic import Field
 
 from anbudsklar.contracts.common import AnswerCitation, Citation, CitationCheck, ContractModel
+from anbudsklar.contracts.inputs import Subject
 
 CONTRACT_VERSION = "2026-10-13"
 
@@ -26,6 +27,8 @@ class Task(StrEnum):
     ANSWER_QUESTION = "besvara_fraga"
     SUGGEST_CPV = "foresla_cpv"
     ANSWER_RULES = "regelhjalpen"
+    UPDATE_PROFILE = "uppdatera_profil"
+    CHOOSE_SUBJECT = "valj_amne"
 
 
 # --- tolka_underlag -----------------------------------------------------------------
@@ -214,6 +217,62 @@ class RulesAnswer(ContractModel):
     session_id: str | None = None
 
 
+# --- uppdatera_profil ---------------------------------------------------------------
+
+
+class ProfileChange(ContractModel):
+    """Output of uppdatera_profil: what a message in Fråga AI changes in the company's profile.
+
+    A field left null (or an empty list of codes) leaves that part of the profile as it is.
+    Our code applies the change through the same validation as the profile form, so a
+    CPV code must come from the candidates the task was given and never from the model.
+    """
+
+    reply: str = Field(
+        description="One or two sentences to the company in plain Swedish: what is changed, or the "
+        "question to ask when the message cannot be applied as it is."
+    )
+    needs_clarification: bool = Field(
+        default=False,
+        description="True when the message is unclear or asks for something the profile cannot hold. "
+        "Nothing is changed then, and reply asks the question.",
+    )
+    description: str | None = Field(
+        default=None, description="The whole new description of the company, when the message changes it."
+    )
+    cpv_add: list[str] = Field(
+        default_factory=list,
+        description="Codes from <cpv_kandidater> to add to the profile, eight digits each.",
+    )
+    cpv_remove: list[str] = Field(
+        default_factory=list, description="Codes already in the profile to remove, eight digits each."
+    )
+    municipalities: list[str] | None = Field(
+        default=None, description="The whole new list of municipalities the company works in."
+    )
+    employees: int | None = Field(default=None, ge=0)
+    annual_turnover_sek: int | None = Field(default=None, ge=0, description="Whole kronor per year.")
+    certifications: list[str] | None = Field(default=None, description="The whole new list.")
+    insurance: str | None = Field(default=None, description="An empty string removes the entry.")
+    public_references: str | None = Field(default=None, description="An empty string removes the entry.")
+
+
+# --- valj_amne ----------------------------------------------------------------------
+
+
+class SubjectChoice(ContractModel):
+    """Output of valj_amne: which of Fråga AI's subjects a message is for (decision 0026).
+
+    Asked only when our own rules cannot tell. The subject must be one the task was
+    given; our code falls back to the page's own subject otherwise.
+    """
+
+    subject: Subject = Field(description="One of the subjects listed in <amnen>.")
+    reason: str = Field(
+        max_length=300, description="One short sentence in Swedish on what settled the choice."
+    )
+
+
 TASK_OUTPUTS: dict[Task, type[ContractModel]] = {
     Task.INTERPRET_DOCUMENT: Checklist,
     Task.ASSESS_MATCH: MatchAssessment,
@@ -221,4 +280,6 @@ TASK_OUTPUTS: dict[Task, type[ContractModel]] = {
     Task.ANSWER_QUESTION: Answer,
     Task.SUGGEST_CPV: CpvSuggestions,
     Task.ANSWER_RULES: RulesAnswer,
+    Task.UPDATE_PROFILE: ProfileChange,
+    Task.CHOOSE_SUBJECT: SubjectChoice,
 }

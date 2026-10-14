@@ -533,7 +533,7 @@ describe("NoticePage without a checklist", () => {
     // "Fråga underlaget" opens the "Fråga AI" panel about this notice (decision 0014).
     await userEvent.click(screen.getByRole("button", { name: "Fråga underlaget" }));
     const panel = await screen.findByRole("dialog", { name: "Fråga AI" });
-    expect(await within(panel).findByRole("radio", { name: "Underlaget" })).toBeChecked();
+    expect(within(panel).getByText(noticeDetail.title)).toBeInTheDocument();
     expect(within(panel).getByRole("textbox")).toBeInTheDocument();
   });
 

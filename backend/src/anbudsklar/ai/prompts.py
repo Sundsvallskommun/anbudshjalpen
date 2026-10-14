@@ -33,6 +33,7 @@ from anbudsklar.contracts import (
     NoticeContext,
     PagedDocument,
     PublishedAnswerInput,
+    SubjectOption,
     Task,
     model_output_schema,
     render_published_answers,
@@ -62,6 +63,8 @@ _CLOSING: dict[Task, str] = {
     Task.ANSWER_QUESTION: "Besvara frågan i <fraga> utifrån underlaget. Svara med JSON-objektet.",
     Task.SUGGEST_CPV: "Föreslå CPV-koder ur kandidatlistan för företaget. Svara med JSON-objektet.",
     Task.ANSWER_RULES: "Besvara frågan i <fraga>.",
+    Task.UPDATE_PROFILE: "Tolka meddelandet i <meddelande> och svara med ändringarna i profilen.",
+    Task.CHOOSE_SUBJECT: "Välj det ämne i <amnen> som meddelandet i <fraga> gäller. Svara med JSON-objektet.",
 }
 
 # Inputs per task, in the order they are rendered. All of them must be passed.
@@ -72,6 +75,8 @@ TASK_INPUTS: dict[Task, tuple[str, ...]] = {
     Task.ANSWER_QUESTION: ("notice", "documents", "answers", "history", "question"),
     Task.SUGGEST_CPV: ("description", "candidates"),
     Task.ANSWER_RULES: ("context", "question"),
+    Task.UPDATE_PROFILE: ("profile", "candidates", "history", "message"),
+    Task.CHOOSE_SUBJECT: ("subjects", "history", "question"),
 }
 
 
@@ -212,14 +217,30 @@ def _render_checklist(checklist: Checklist | None) -> str:
 
 
 def _render_history(history: Sequence[QuestionTurn]) -> str:
+    """Earlier turns; the subject that answered each is named only where the task reads it."""
+
     if not history:
         return ""
-    turns = [f"Fråga: {turn.question}\nSvar: {turn.answer}" for turn in history]
+    turns = [
+        f"Fråga: {turn.question}\nSvar: {turn.answer}" + (f"\nÄmne: {turn.subject}" if turn.subject else "")
+        for turn in history
+    ]
     return _block("tidigare_fragor", "\n\n".join(turns))
+
+
+def _render_subjects(subjects: Sequence[SubjectOption]) -> str:
+    lines = [f"{option.subject}: {option.description}" for option in subjects]
+    return _block("amnen", "\n".join(lines))
 
 
 def _render_question(question: str) -> str:
     return _block("fraga", question)
+
+
+def _render_message(message: str) -> str:
+    """A message to the profile assistant: a wish, not a question, so its own tag."""
+
+    return _block("meddelande", message)
 
 
 def _render_description(description: str) -> str:
@@ -251,9 +272,11 @@ _RENDERERS: dict[str, Callable[[Any], str]] = {
     "checklist": _render_checklist,
     "history": _render_history,
     "question": _render_question,
+    "message": _render_message,
     "description": _render_description,
     "candidates": _render_candidates,
     "context": _render_context,
+    "subjects": _render_subjects,
 }
 
 

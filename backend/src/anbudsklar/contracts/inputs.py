@@ -236,3 +236,20 @@ class CpvCandidate(ContractModel):
 
     code: str
     label: str
+
+
+# What a message in Fråga AI can be about (decision 0026): a procurement's documents, the
+# rules of procurement, or the signed-in company's own profile.
+Subject = Literal["underlag", "regler", "profil"]
+
+
+class SubjectOption(ContractModel):
+    """One subject the panel can route a message to, as the model is told about it.
+
+    Only the subjects at hand are listed: the documents only on a notice page, the
+    profile only for a signed-in company. `description` says what the subject covers,
+    with the notice's title for the documents.
+    """
+
+    subject: Subject
+    description: str

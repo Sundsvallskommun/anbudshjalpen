@@ -17,6 +17,8 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 
 from anbudsklar.ai.engine import EngineRun, QuestionTurn, RuleContext
+from anbudsklar.ai.profile_rules import read_profile_change
+from anbudsklar.ai.subject_rules import choose_subject_by_rules, default_subject
 from anbudsklar.contracts import (
     Answer,
     AnswerCitation,
@@ -34,6 +36,7 @@ from anbudsklar.contracts import (
     MatchReason,
     NoticeContext,
     PagedDocument,
+    ProfileChange,
     PublishedAnswerInput,
     RequiredAttachment,
     Requirement,
@@ -41,6 +44,8 @@ from anbudsklar.contracts import (
     ReviewResult,
     RulesAnswer,
     RuleSource,
+    SubjectChoice,
+    SubjectOption,
     TermExplanation,
 )
 from anbudsklar.contracts.tasks import CheckStatus, DateKind, Fit, RequirementKind
@@ -1361,6 +1366,27 @@ class HeuristicEngine:
         ]
         excerpts = "\n\n".join(f"{source.reference} – {source.title}: {source.excerpt}" for source in sources)
         return RulesAnswer(answer=f"{rules_lead(sources)}\n\n{excerpts}", sources=sources), self._run()
+
+    async def update_profile(
+        self,
+        profile: CompanyProfile,
+        candidates: list[CpvCandidate],
+        history: list[QuestionTurn],
+        message: str,
+    ) -> tuple[ProfileChange, EngineRun]:
+        """Plain patterns in the message (`anbudsklar.ai.profile_rules`); the history is not needed."""
+
+        return read_profile_change(profile, candidates, message), self._run()
+
+    async def choose_subject(
+        self, question: str, subjects: list[SubjectOption], history: list[QuestionTurn]
+    ) -> tuple[SubjectChoice, EngineRun]:
+        """The same words as the service tried first; what they leave open goes to the page's subject."""
+
+        choice = choose_subject_by_rules(question, subjects, history)
+        if choice is None:
+            choice = SubjectChoice(subject=default_subject(subjects), reason="Sidans eget ämne.")
+        return choice, self._run()
 
     async def aclose(self) -> None:
         return None

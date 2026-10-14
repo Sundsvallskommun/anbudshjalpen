@@ -1,20 +1,33 @@
-"""The company profile and CPV help (foresla_cpv)."""
+"""The company profile, CPV help (foresla_cpv) and changes to the profile from Fråga AI (uppdatera_profil)."""
 
 from __future__ import annotations
+
+from collections.abc import Mapping
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from anbudsklar.ai.engine import AiEngine, EngineRun
-from anbudsklar.api.schemas import CompanyUpdate, CompanyView, CpvHit, CpvSuggestionView
-from anbudsklar.contracts import CpvCandidate, CpvSuggestion, CpvSuggestions, Task
+from anbudsklar.api.schemas import (
+    CompanyUpdate,
+    CompanyView,
+    CpvHit,
+    CpvSuggestionView,
+    ProfileChangeItem,
+    ProfileChatRequest,
+    ProfileChatView,
+)
+from anbudsklar.contracts import CpvCandidate, CpvSuggestion, CpvSuggestions, ProfileChange, Task
 from anbudsklar.cpv import cpv_prefix
 from anbudsklar.models import Company
 from anbudsklar.search.queries import cpv_areas, cpv_descendants, cpv_labels, search_cpv
 from anbudsklar.services.access import Viewer
 from anbudsklar.services.ai_usage import TokenPrices, combined_usage, record_call, usage_view
+from anbudsklar.services.contexts import company_profile
 from anbudsklar.services.cpv import normalize_cpv_codes
 from anbudsklar.services.errors import InvalidInputError, NotFoundError
+from anbudsklar.services.questions import bounded_history
 from anbudsklar.services.text import keywords
+from anbudsklar.services.tools import engine_tools, tool_use
 
 # The areas (CPV divisions and groups) the engine picks first, and how many exact codes
 # under them it then sees. 400 lines is a few thousand tokens; the largest group alone has
@@ -156,6 +169,155 @@ async def _candidates(session: AsyncSession, description: str) -> list[CpvCandid
         if len(found) >= MAX_CANDIDATES:
             break
     return [CpvCandidate(code=code, label=label) for code, label in list(found.items())[:MAX_CANDIDATES]]
+
+
+# --- Changes from Fråga AI (uppdatera_profil) ---------------------------------------
+
+CHANGE_LABELS: dict[str, str] = {
+    "description": "Beskrivning",
+    "cpv_codes": "CPV-koder",
+    "municipalities": "Verksamhetsorter",
+    "employees": "Antal anställda",
+    "annual_turnover_sek": "Årsomsättning",
+    "certifications": "Certifieringar",
+    "insurance": "Försäkring",
+    "public_references": "Uppdrag för offentliga köpare",
+}
+NOTHING_TO_CHANGE = (
+    "Jag hittade inget i meddelandet som ändrar profilen. Skriv vad som ska ändras, så gör jag det."
+)
+
+
+async def chat_update(
+    session: AsyncSession,
+    engine: AiEngine,
+    viewer: Viewer,
+    request: ProfileChatRequest,
+    *,
+    prices: TokenPrices | None = None,
+) -> ProfileChatView:
+    """Change the profile as a message in Fråga AI asks, through the profile's own validation.
+
+    The engine only reads the wish (`ProfileChange`); this code applies it with
+    `update_profile`, so a CPV code must come from our search's candidates and the
+    message can never reach the database as anything but a profile field. A question
+    back, or a message that changes nothing, saves nothing. The caller commits and
+    re-assesses the matches as after a save from the form.
+    """
+
+    company = await get_company(session, viewer)
+    labels = await cpv_labels(session, company.cpv_codes or [])
+    profile = company_profile(company, labels)
+    candidates = await _candidates(session, request.message)
+    found = _counted(len(candidates), "kandidat", "kandidater")
+    tools = [tool_use("hamta_profil"), tool_use("sok_cpv", found)]
+    change, run = await engine.update_profile(
+        profile, candidates, bounded_history(request.history), request.message
+    )
+    await record_call(session, Task.UPDATE_PROFILE, run)
+    tools += [tool_use("tolka_meddelande"), *engine_tools(run)]
+
+    def view(
+        applied: bool, reply: str, changes: list[ProfileChangeItem], saved: CompanyView | None
+    ) -> ProfileChatView:
+        return ProfileChatView(
+            reply=reply,
+            applied=applied,
+            changes=changes,
+            profile=saved,
+            engine=run.engine,
+            usage=usage_view(run, prices),
+            tools=tools,
+        )
+
+    if change.needs_clarification:
+        return view(False, change.reply, [], None)
+    all_labels = {**labels, **{candidate.code: candidate.label for candidate in candidates}}
+    update, changes = apply_change(company, change, candidates, all_labels)
+    if not changes:
+        return view(False, change.reply or NOTHING_TO_CHANGE, [], None)
+    saved = await update_profile(session, viewer, update)
+    tools.append(tool_use("spara_profil"))
+    return view(True, change.reply, changes, saved)
+
+
+def apply_change(
+    company: Company, change: ProfileChange, candidates: list[CpvCandidate], labels: Mapping[str, str]
+) -> tuple[CompanyUpdate, list[ProfileChangeItem]]:
+    """The profile with the change applied, and what differs, for the panel to show.
+
+    A field the change leaves as None keeps its value; an empty string clears a text.
+    Codes to add must be candidates and codes to remove must be in the profile; the rest
+    are dropped rather than refused, because the model already told the company what it
+    does in `reply`, and what was saved is shown next to it.
+    """
+
+    allowed = {candidate.code for candidate in candidates}
+    codes = list(company.cpv_codes or [])
+    for code in change.cpv_remove:
+        if code in codes:
+            codes.remove(code)
+    codes += [code for code in change.cpv_add if code in allowed and code not in codes]
+
+    def keep[T](current: T, wanted: T | None) -> T:
+        return current if wanted is None else wanted
+
+    update = CompanyUpdate(
+        description=keep(company.description, change.description),
+        cpv_codes=codes,
+        municipalities=keep(list(company.municipalities or []), change.municipalities),
+        employees=keep(company.employees, change.employees),
+        annual_turnover_sek=keep(company.annual_turnover_sek, change.annual_turnover_sek),
+        certifications=keep(list(company.certifications or []), change.certifications),
+        insurance=keep(company.insurance, change.insurance),
+        public_references=keep(company.public_references, change.public_references),
+    )
+    before = {
+        "description": company.description,
+        "cpv_codes": _cpv_text(company.cpv_codes or [], labels),
+        "municipalities": _list_text(company.municipalities or []),
+        "employees": _number_text(company.employees),
+        "annual_turnover_sek": _money_text(company.annual_turnover_sek),
+        "certifications": _list_text(company.certifications or []),
+        "insurance": _clean_text(company.insurance),
+        "public_references": _clean_text(company.public_references),
+    }
+    after = {
+        "description": update.description.strip(),
+        "cpv_codes": _cpv_text(codes, labels),
+        "municipalities": _list_text(_clean_list(update.municipalities)),
+        "employees": _number_text(update.employees),
+        "annual_turnover_sek": _money_text(update.annual_turnover_sek),
+        "certifications": _list_text(_clean_list(update.certifications)),
+        "insurance": _clean_text(update.insurance),
+        "public_references": _clean_text(update.public_references),
+    }
+    changes = [
+        ProfileChangeItem(field=name, label=CHANGE_LABELS[name], before=before[name], after=after[name])
+        for name in CHANGE_LABELS
+        if before[name] != after[name]
+    ]
+    return update, changes
+
+
+def _cpv_text(codes: list[str], labels: Mapping[str, str]) -> str | None:
+    return ", ".join(f"{code} {labels[code]}" if code in labels else code for code in codes) or None
+
+
+def _list_text(values: list[str]) -> str | None:
+    return ", ".join(values) or None
+
+
+def _number_text(value: int | None) -> str | None:
+    return None if value is None else f"{value:,}".replace(",", " ")
+
+
+def _money_text(value: int | None) -> str | None:
+    return None if value is None else f"{_number_text(value)} kr"
+
+
+def _counted(count: int, one: str, many: str) -> str:
+    return f"{count} {one if count == 1 else many}"
 
 
 def _clean_list(values: list[str]) -> list[str]:

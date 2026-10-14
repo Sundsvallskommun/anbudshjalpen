@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AnswerView } from "../api/types";
 import { STORAGE_KEY, type Turn } from "../components/ask/askAiState";
-import { answerNotInDocument, companyUser, NOTICE_ID, noticeDetail, publishedAnswer } from "../test/fixtures";
+import { answerNotInDocument, companyUser, NOTICE_ID, noticeDetail, profileChatView, publishedAnswer } from "../test/fixtures";
 import { baseRoutes, mockApi, renderApp } from "../test/render";
 import { answerCitationLine, citationLine } from "./AskAiExportPage";
 
@@ -35,8 +35,8 @@ afterEach(() => {
 describe("The conversation as a document (decision 0014)", () => {
   it("prints the questions and answers about a notice, with the quotes and their pages", async () => {
     storeConversation(`notice:${NOTICE_ID}`, [
-      { id: 1, question: "Vilka försäkringar måste vi ha?", answer: answerInDocument, rules: null, error: null },
-      { id: 2, question: "Får vi arbeta på helger?", answer: answerNotInDocument, rules: null, error: null },
+      { id: 1, question: "Vilka försäkringar måste vi ha?", answer: answerInDocument, rules: null, profile: null, error: null },
+      { id: 2, question: "Får vi arbeta på helger?", answer: answerNotInDocument, rules: null, profile: null, error: null },
     ]);
     mockApi([...baseRoutes(companyUser), { method: "GET", path: `/api/notices/${NOTICE_ID}`, body: noticeDetail }]);
     const print = vi.spyOn(window, "print").mockImplementation(() => undefined);
@@ -63,7 +63,7 @@ describe("The conversation as a document (decision 0014)", () => {
 
   it("says when there is nothing to print", async () => {
     mockApi([...baseRoutes(companyUser)]);
-    renderApp("/fraga-ai/utskrift?amne=rules");
+    renderApp("/fraga-ai/utskrift?amne=general");
 
     expect(await screen.findByText("Det finns inga frågor och svar att skriva ut. Ställ en fråga i Fråga AI först.")).toBeInTheDocument();
     expect(screen.getByText("Reglerna för offentlig upphandling")).toBeInTheDocument();
@@ -88,5 +88,20 @@ describe("The conversation as a document (decision 0014)", () => {
     );
     expect(answerCitationLine({ ...quote, check: "unverified" }, [publishedAnswer])).toBe("hittades inte bland inköps svar");
     expect(answerCitationLine({ ...quote, check: "verified" }, [])).toBe("hittades inte bland inköps svar");
+  });
+  it("prints a conversation with the profile: the message, the reply, what changed and the tools (decision 0025)", async () => {
+    storeConversation("general", [
+      { id: 1, question: "Vi har numera tolv anställda", answer: null, rules: null, profile: profileChatView, error: null },
+    ]);
+    mockApi(baseRoutes(companyUser));
+    renderApp("/fraga-ai/utskrift?amne=general");
+
+    expect(await screen.findByText("Reglerna för offentlig upphandling")).toBeInTheDocument();
+    expect(screen.getByText(/^Från Anbudshjälpen/u)).toHaveTextContent("Ändringarna är sparade i profilen");
+    const turn = screen.getByRole("heading", { level: 2, name: "Meddelande 1" }).closest("li");
+    if (!turn) throw new Error("expected the message");
+    expect(turn).toHaveTextContent("Jag uppdaterar antal anställda i er profil.");
+    expect(turn).toHaveTextContent("Antal anställda12Förut: 5");
+    expect(turn).toHaveTextContent("Verktyg: Hämta profilen · Sök CPV-koder · 0 kandidater · Tolka meddelandet · Spara profilen");
   });
 });

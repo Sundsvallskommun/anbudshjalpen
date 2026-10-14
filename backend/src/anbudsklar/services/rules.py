@@ -24,6 +24,7 @@ from anbudsklar.search.queries import (
     search_rule_texts,
 )
 from anbudsklar.services.ai_usage import TokenPrices, record_call, usage_view
+from anbudsklar.services.tools import ToolUse, engine_tools, tool_use
 
 CONTEXT_SECTIONS = 5
 # Engines with their own knowledge and our MCP tools do not need our search results.
@@ -71,9 +72,12 @@ async def ask_rules(
     """
 
     context: list[RuleContext] = []
+    tools: list[ToolUse] = []
     if engine.name not in ENGINES_WITH_OWN_KNOWLEDGE:
         sections = await search_rule_texts(session, question, limit=CONTEXT_SECTIONS)
         context = [rule_context(section) for section in sections]
+        found = len(context)
+        tools.append(tool_use("sok_regeltexter", f"{found} {'träff' if found == 1 else 'träffar'}"))
     answer, run = await engine.answer_rules(question, session_id, context)
     await record_call(session, Task.ANSWER_RULES, run)
     sources = [await complete_source(session, source) for source in answer.sources]
@@ -81,6 +85,7 @@ async def ask_rules(
         answer=answer.model_copy(update={"sources": sources}),
         engine=run.engine,
         usage=usage_view(run, prices),
+        tools=tools + engine_tools(run),
     )
 
 

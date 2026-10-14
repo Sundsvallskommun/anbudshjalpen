@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
@@ -23,11 +24,15 @@ from anbudsklar.api.schemas import (
     CpvHit,
     CpvSuggestionRequest,
     CpvSuggestionView,
+    ProfileChatRequest,
+    ProfileChatView,
     ProfileSaved,
 )
 from anbudsklar.services import matching, profiles
 from anbudsklar.services.access import Viewer
 from anbudsklar.services.ai_usage import token_prices
+from anbudsklar.services.background import MatchRefresher, SessionFactory
+from anbudsklar.services.tools import tool_use
 
 router = APIRouter(tags=["profile"])
 
@@ -57,11 +62,70 @@ async def update_profile(
 
     view = await profiles.update_profile(session, Viewer.for_user(user), body)
     await session.commit()
-    fitting = await matching.rematch_quickly(session, engine, view.id)
-    if fitting is None:
-        refresher.expect(view.id)
-        background.add_task(refresher.run, session_factory, engine, view.id)
+    fitting = await _rematch(session, engine, view.id, background, session_factory, refresher)
     return ProfileSaved(**view.model_dump(), fitting_notices=fitting)
+
+
+@router.post("/profile/chat", dependencies=[Depends(rate_limited("profile_chat"))])
+async def chat_profile(
+    body: ProfileChatRequest,
+    session: SessionDep,
+    user: CompanyUserDep,
+    engine: EngineDep,
+    slots: AiSlotsDep,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    session_factory: SessionFactoryDep,
+    refresher: MatchRefresherDep,
+) -> ProfileChatView:
+    """Change the profile as a message in Fråga AI asks; a saved change re-assesses the matches."""
+
+    async with slots.hold():
+        view = await profiles.chat_update(
+            session, engine, Viewer.for_user(user), body, prices=token_prices(settings)
+        )
+    await session.commit()
+    return await after_profile_chat(view, session, engine, background, session_factory, refresher)
+
+
+async def after_profile_chat(
+    view: ProfileChatView,
+    session: SessionDep,
+    engine: EngineDep,
+    background: BackgroundTasks,
+    session_factory: SessionFactory,
+    refresher: MatchRefresher,
+) -> ProfileChatView:
+    """After a message changed the profile: re-assess the matches and say so among the tools.
+
+    Shared with Fråga AI's own endpoint (`routers.ask`), which routes a message to the
+    profile the same way (decision 0026). Runs after the commit, as the form's save does.
+    """
+
+    if view.profile is None:
+        return view
+    fitting = await _rematch(session, engine, view.profile.id, background, session_factory, refresher)
+    detail = None if fitting is None else f"{fitting} verkar passa"
+    return view.model_copy(
+        update={"fitting_notices": fitting, "tools": [*view.tools, tool_use("bedom_matchning", detail)]}
+    )
+
+
+async def _rematch(
+    session: SessionDep,
+    engine: EngineDep,
+    company_id: uuid.UUID,
+    background: BackgroundTasks,
+    session_factory: SessionFactory,
+    refresher: MatchRefresher,
+) -> int | None:
+    """Re-assess the matches now, or after the answer when the engine is slow (`rematch_quickly`)."""
+
+    fitting = await matching.rematch_quickly(session, engine, company_id)
+    if fitting is None:
+        refresher.expect(company_id)
+        background.add_task(refresher.run, session_factory, engine, company_id)
+    return fitting
 
 
 @router.post(
