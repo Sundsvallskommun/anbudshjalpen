@@ -26,7 +26,8 @@ loggar man in som Anna Berg på firman ([beslut 0007](decisions/0007-poc-login-p
    med Påminn mig, och under träffarna kommande upphandlingar utifrån avtalskatalogen. Gamla adressen /bevakning leder
    hit.
 3. **Träff:** ett mejl som visas i Mailpit, med länk till upphandlingen och till Start.
-4. **Krav:** upphandlingens sida har tre steg, 1 Krav, 2 Granska och 3 Lämna in. Steg 1 visar skallkrav,
+4. **Krav:** upphandlingens sida har två steg, 1 Krav och 2 Granska
+   ([beslut 0024](decisions/0024-granska-ar-sista-steget.md)). Steg 1 visar skallkrav,
    kvalificeringskrav, bilagor, utvärdering och datum, där varje punkt länkar till sidan i underlaget ("s. 5") och
    termerna förklaras vid klick. "Påminn mig" finns vid sista anbudsdag och sista dag för frågor i sidhuvudet, och på
    checklistans första daterade rad för frågestopp och för sista anbudsdag, alltså de datum som påminnelsen gäller.
@@ -41,8 +42,8 @@ loggar man in som Anna Berg på firman ([beslut 0007](decisions/0007-poc-login-p
    publicerat i e-Avrop på andra leverantörers frågor, samma för alla ([beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md)).
 6. **Granska:** firman laddar upp ett utkast och får först ett besked, till exempel hur många saker som bör
    åtgärdas, och sedan kraven grupperade som Bör åtgärdas, Kontrollera själv och Ser bra ut. Inget sparas.
-7. **Lämna in:** sker i e-Avrop. Steg 4 är en sista kontroll att bocka av, där det som granskningen bedömde som "Ser
-   bra ut" redan är förbockat, och en länk till e-Avrop.
+7. **Lämna in:** sker i e-Avrop. Granska slutar med kortet "Lämna anbudet", med sista anbudsdag och länken till
+   e-Avrop. Något eget steg för inlämningen finns inte längre.
 8. **Tilldelning:** Anbudshjälpen förklarar beslutet och vad avtalsspärren innebär.
 
 Regelhjälpen svarar på allmänna frågor om upphandling med hänvisning till LOU, kommunens inköpsstrategi och

@@ -173,7 +173,7 @@ När frågan bör ställas formellt visar webbappen:
 
 Svarar underlaget på frågan står bara en kort rad om att fråga i e-Avrop före frågestoppet om något är oklart.
 
-Steg 4 "Lämna in" följer samma regel för var anbudet lämnas: upphandlingen i e-Avrop när annonsen länkar dit,
+Kortet "Lämna anbudet" sist i steg 2 Granska följer samma regel för var anbudet lämnas: upphandlingen i e-Avrop när annonsen länkar dit,
 annonsens egen sida när den inte är TED:s, och annars "Gå till e-Avrop" med adressen från `GET /api/config`
 (`eavrop_url`, samma som `EAVROP_BASE_URL`). En påhittad annons utan egen sida säger även där att den inte finns i
 e-Avrop.

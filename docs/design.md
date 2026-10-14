@@ -31,8 +31,9 @@ Hur koden skrivs, till exempel Astryx-komponenter i stället för egen layout oc
 
 1. **Svaret först, detaljerna sedan.** Varje vy börjar med ett besked: en siffra, en status och nästa steg. Detaljerna
    ligger i hopfällbara grupper med antalet i rubriken.
-2. **En väg, inte en verktygslåda.** Upphandlingens sida har fyra numrerade steg: 1 Krav, 2 Fråga, 3 Granska och
-   4 Lämna in. Varje steg slutar med kortet "Nästa steg".
+2. **En väg, inte en verktygslåda.** Upphandlingens sida har två numrerade steg: 1 Krav och 2 Granska. Frågor ställs
+   i panelen Fråga AI, och anbudet lämnas i e-Avrop från kortet sist i Granska
+   ([beslut 0024](decisions/0024-granska-ar-sista-steget.md)). Varje steg slutar med ett kort som leder vidare.
 3. **Fristen är ankaret.** Samma fristblock används i listan, i korten, i sidhuvudet, bland påminnelserna och i
    inköparens kö: datumet stort, klockslaget och "om N dagar", med varningsfärg vid 7 dagar eller färre.
 4. **Förtroende genom undantag.** Ursprungsraden säger en gång per vy vem som tog fram innehållet och hur källorna höll.
@@ -65,7 +66,7 @@ sidhuvudet rullar bort med sidan.
 |---|---|
 | `/start` | Start. Den gamla adressen `/bevakning` leder hit, med sina parametrar kvar |
 | `/upphandlingar` | Listan över upphandlingar. Sökningen och filtren står i adressen, så att en sökning går att dela: `?q=`, `?status=planned\|alla` (utan värde visas Öppna), `?kalla=`, `?kopare=`, `?passar=1`, `?sortera=frist\|publicerad\|relevans` och `?sida=` |
-| `/upphandlingar/:id?flik=checklista\|granska\|inlamning` | Upphandlingens sida och dess steg. Värdena är kvar från före omgörningen, så `checklista` är steget Krav. `?flik=fraga` och `?fraga=…` öppnar Fråga AI, det senare med frågan ifylld |
+| `/upphandlingar/:id?flik=checklista\|granska` | Upphandlingens sida och dess steg. Värdena är kvar från före omgörningen, så `checklista` är steget Krav. `?flik=fraga` och `?fraga=…` öppnar Fråga AI, det senare med frågan ifylld, och `?flik=inlamning`, det borttagna steget Lämna in, öppnar Granska |
 | `/fraga-ai/utskrift?amne=notice:<id>\|rules` | Ett samtal i Fråga AI som utskriftsvy, utanför ramen ([beslut 0014](decisions/0014-fraga-ai-panel.md)) |
 | `/upphandlingar/:id?citat=…&sida=…&pastaende=…` | Öppnar källdialogen på upphandlingens sida. `?flik=underlag` öppnar underlaget på sida 1 |
 | `/regelhjalpen?fraga=…` | Regelhjälpen, som ställer frågan direkt och sedan tar bort den ur adressen |
@@ -189,17 +190,17 @@ kontroller som gick bra en bock. Allt kommer från det som redan sparas (`GET /a
 upphandlingen själv), inget loggas för panelen; koden ligger i `frontend/src/pages/notice/reading/`. Panelen är en
 bekvämlighet för demon och syns för alla som slår på växeln i sin webbläsare.
 
-**Stegraden** är sticky: ① Krav · ② Granska · ③ Lämna in. Valt steg har accentfylld siffra och accentlinje.
-På telefon står de tre korta etiketterna utan siffror i lika breda celler. Frågorna till AI-stödet, förut steg 2,
-ställs i panelen "Fråga AI" ([beslut 0014](decisions/0014-fraga-ai-panel.md)), se [Fråga AI](#fråga-ai). När raden har fastnat visas sista
-anbudsdag längst till höger på bredare skärmar. Steg 3 får en varningsikon när granskningen hittade luckor och en bock
-när allt ser bra ut.
+**Stegraden** är sticky: ① Krav · ② Granska. Valt steg har accentfylld siffra och accentlinje. På telefon står de
+två korta etiketterna utan siffror i lika breda celler. Frågorna till AI-stödet, förut steg 2, ställs i panelen
+"Fråga AI" ([beslut 0014](decisions/0014-fraga-ai-panel.md)), se [Fråga AI](#fråga-ai), och det tidigare sista steget
+Lämna in är borttaget: anbudet lämnas i e-Avrop från kortet sist i Granska
+([beslut 0024](decisions/0024-granska-ar-sista-steget.md)). När raden har fastnat visas sista anbudsdag längst till
+höger på bredare skärmar. Steg 2 får en varningsikon när granskningen hittade luckor och en bock när allt ser bra ut.
 
 | Steg | Innehåll | Högerspalt |
 |---|---|---|
 | 1 Krav | Ursprungsraden, till exempel "Granskad och publicerad av inköp, Sundsvalls kommun, 5 okt 2026 · Alla 86 källhänvisningar hittades i underlaget" (på telefon "Granskad av inköp 5 okt"). "Det här behöver du göra" med fyra statistikrutor som leder till sina avsnitt och på telefon bara visar siffra och ord, sedan sammanfattningen och grupperna med antal. Skallkrav, Kvalificeringskrav och Viktiga datum (med "Före anbudet") är öppna. Bilagor att lämna in, Så utvärderas anbuden, Krav på uppdraget, Avtalsvillkor, Ord och begrepp, Oklart i underlaget och "Efter anbudet och under uppdraget" är stängda. Oklart i underlaget pekar först på inköps svar när det finns några. Efter grupperna "Frågor och svar från inköp" med antal i rubriken, öppen från start, med i "På den här sidan" och bara när det finns svar: varje post med "Fråga 1 · Besvarad 6 okt", frågan i dämpad text och svaret på en egen yta med accentkant och rubriken "Svar från inköp", från sex poster ett sökfält, och sist att listan hämtas från e-Avrop en gång om dygnet med länken dit ([beslut 0013](decisions/0013-fragor-och-svar-fran-eavrop.md) och [0018](decisions/0018-publicerade-svar-i-ai-uppgifterna.md)). Ett krav som ett svar ändrar har svaret i sin rad (`PublishedAnswerQuote`). Slutar med "Nästa steg" och knappen "Granska utkastet", som leder till steg 2; frågor ställs via knappen Fråga AI, som följer med på varje sida | "På den här sidan", en innehållsförteckning som följer med och öppnar en stängd grupp, och "Något som inte stämmer?". Under 1 024 px har steget ingen högerspalt |
-| 2 Granska | Ytan för utkastet ("Släpp filen här eller välj fil"), med "Utkastet sparas inte" och "Ladda inte upp riktiga anbud eller personuppgifter i demon" vid ytan. Granskningen börjar så fort filen är vald. Under tiden står ett kort i ytans ställe med filnamnet, en rörlig stapel "Läser utkastet och jämför med 24 krav" och "Tar oftast under en minut"; efter 45 sekunder säger kortet att det tar längre än vanligt. Resultatets rubrik får fokus när det kommer. Misslyckas granskningen står felet med "Försök igen" ovanför ytan. Efter granskningen en rad med filnamnet och "Granska en ny version", utlåtandet med framstegsstapel och filter, och grupperna Bör åtgärdas (öppen), Kontrollera själv, Ser bra ut, Krav på uppdraget och Avtalsvillkor. Rader att åtgärda eller kontrollera säger hur kravet visas ("Så visar du det") och har "Fråga om kravet", som öppnar Fråga AI med frågan ifylld | "Så läser du resultatet", och efter granskningen även "Utkastet sparas inte", som ytan säger innan dess |
-| 3 Lämna in | Skall- och kvalificeringskrav och bilagor att bocka av. Det som granskningen bedömde som "Ser bra ut" är förbockat och märkt "Granskat". Kortet "Lämna anbudet" med länken till e-Avrop, eller för en påhittad upphandling att den inte finns där. I ett selektivt förfarande säger kortet först att man lämnar en anbudsansökan senast annonsens datum, och sista anbudsdag tas från checklistan. Bockarna sparas bara i webbläsaren | "Ditt framsteg", till exempel "12 av 21 klara", som står före listan på smala skärmar |
+| 2 Granska | Ytan för utkastet ("Släpp filen här eller välj fil"), med "Utkastet sparas inte" och "Ladda inte upp riktiga anbud eller personuppgifter i demon" vid ytan. Granskningen börjar så fort filen är vald. Under tiden står ett kort i ytans ställe med filnamnet, en rörlig stapel "Läser utkastet och jämför med 24 krav" och "Tar oftast under en minut"; efter 45 sekunder säger kortet att det tar längre än vanligt. Resultatets rubrik får fokus när det kommer. Misslyckas granskningen står felet med "Försök igen" ovanför ytan. Efter granskningen en rad med filnamnet och "Granska en ny version", utlåtandet med framstegsstapel och filter, och grupperna Bör åtgärdas (öppen), Kontrollera själv, Ser bra ut, Krav på uppdraget och Avtalsvillkor. Rader att åtgärda eller kontrollera säger hur kravet visas ("Så visar du det") och har "Fråga om kravet", som öppnar Fråga AI med frågan ifylld. Sist kortet "Lämna anbudet" med sista anbudsdag och länken till e-Avrop, eller för en påhittad upphandling att den inte finns där; i ett selektivt förfarande säger kortet först att man lämnar en anbudsansökan senast annonsens datum, och sista anbudsdag tas från checklistan. Länken är primärknapp bara efter en granskning utan något att åtgärda | "Så läser du resultatet", och efter granskningen även "Utkastet sparas inte", som ytan säger innan dess |
 
 **Utan checklista**, som de flesta annonserna från TED, har sidan inga steg. Under sidhuvudet står kortet "Ingen
 granskad checklista ännu" med skälet, knappen till annonsen, knappen till underlaget där det finns när det inte är
@@ -365,7 +366,7 @@ Byggstenarna som omgörningen lade till ligger i `frontend/src/components/ui/`. 
 | `PublishedAnswerQuote` | Ett citat ur inköps publicerade svar ([beslut 0018](decisions/0018-publicerade-svar-i-ai-uppgifterna.md)): frågan det besvarar i dämpad text, svaret på en egen yta med accentkant (`AnswerText`, som också listan "Frågor och svar från inköp" använder) och "Källa: Frågor och svar från inköp, fråga 3", som leder till posten (`#svar-…`). Ett citat som inte hittades bland svaren säger "Hittades inte bland inköps svar" |
 | `ResultSummary` | Ett utlåtande: rubrik med siffran, framstegsstapel och statistikrutor som filtrerar raderna under |
 | `StatTile` | En siffra att agera på, med etikett och stödrad. Antingen en länk (ett ankare som öppnar sitt avsnitt) eller ett filter |
-| `StepNav` | Upphandlingens tre steg som en sticky flikrad, med steget i adressen (`?flik=`). Ett steg monteras första gången det öppnas och behålls sedan. `useStepNav().goTo` byter steg och flyttar fokus till steget |
+| `StepNav` | Upphandlingens två steg som en sticky flikrad, med steget i adressen (`?flik=`). Ett steg monteras första gången det öppnas och behålls sedan. `useStepNav().goTo` byter steg och flyttar fokus till steget |
 | `icons.tsx` | Appens egna ikoner där Astryx semantiska ikoner saknar en: dokument, papperskorg, pil framåt, `DownloadIcon` ("Ladda ned"), `UploadIcon` ("Granska en ny version" och "Ladda upp") och `ExpandIcon` och `CollapseIcon` (förstora och förminska Fråga AI). De ritas med `Icon` som alla andra |
 | `source/SourceLink` | Källan till ett påstående: "6.1 Upphandlingsföreskrifter.pdf, s. 5" som en diskret länk, med filnamnet där sidan känner till upphandlingens dokument (`SourceDocumentsProvider`, upphandlingens sida) och annars bara "s. 5" (Start). På upphandlingens sida står källan på en egen rad under texten, "Källa: …", i checklistans rader och under varje citat i ett svar. Bara avvikelser får en token: "…, s. 9 (AI angav 7)" i blått och "Hittades inte i underlaget" i gult. Namnet säger vad källan belägger: "Visa källan för ”Anbudet är skrivet på svenska”, 6.1 Upphandlingsföreskrifter.pdf, s. 5" |
 | `source/SourceDialog` och `SourceDialogProvider` | Appens enda källdialog, se [Källdialogen](#källdialogen). Den öppnas med `useSourceDialog()`, och `useSourceDeepLink` öppnar den från adressen |
@@ -421,7 +422,7 @@ Orden till statusarna och motorerna står på ett ställe, `frontend/src/lib/lab
 | Sista anbudsdag 9 nov kl. 23:59 · Mejlas fredag 7 november kl. 08:00 | Sista anbudsdag: 7 november 2026 kl. 08:00 (påminnelsen) |
 | om 33 dagar · Skickad 7 nov | Väntar · Skickad |
 | Klart! Du får ett mejl 7 november kl. 08:00, två dagar före sista anbudsdag. | Påminnelse skapad till 7 november 2026 kl. 08:00 |
-| Stegen 1 Krav · 2 Fråga · 3 Granska · 4 Lämna in | Flikarna Checklista, Fråga underlaget, Granska utkast, Underlag och Inför inlämning |
+| Stegen 1 Krav · 2 Granska, med Fråga AI som panel och "Lämna anbudet" sist | Flikarna Checklista, Fråga underlaget, Granska utkast, Underlag och Inför inlämning |
 | Är något oklart? Ställ frågan i e-Avrop senast 30 oktober, så får alla leverantörer samma svar. | Frågor som rör ditt eget anbud ställer du formellt i e-Avrop. |
 | Automatiskt framtaget · inte granskat av inköp | AI-genererat svar (regelbaserad sammanställning utan språkmodell) |
 | Regelbaserat · AI via Eneo | Heuristisk motor · Språkmodell |
@@ -466,7 +467,7 @@ hålla i standardläget, med demodatan:
 | Stegraden | Börjar senast vid y = 600 på desktop och inom de första 844 px på telefon |
 | Demobandet | Högst 36 px högt på desktop och 52 px på telefon |
 | Listan Upphandlingar | Minst 7 rader på första skärmen vid 1440 × 900 |
-| Granskningsresultatet i steg 3 | Högst 1 800 px |
+| Granskningsresultatet i steg 2 | Högst 1 800 px |
 | Panelens test | Anna kan på under en minut säga vilka två bilagor hon saknar och när sista dag för frågor är |
 
 Gaten mäter inte de här måtten. De kontrolleras i webbläsaren vid 1440 × 900 och 390 × 844, och längre texter i
