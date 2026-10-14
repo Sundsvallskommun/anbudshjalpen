@@ -49,3 +49,4 @@ När en fråga är avgjord flyttas svaret till ett beslut i [decisions/](decisio
 | Blir profiler, frågor och anbudsutkast allmänna handlingar? | Jurist |
 | Hur ser DPIA och personuppgiftsbiträdesfrågan ut? | Dataskydd |
 | Vad får inköp se av företagens frågor under anbudstiden? | Jurist och inköp |
+| Får inköp i produktion se företagens profiler (namn, CPV-koder, kommuner, storlek) som underlag för marknadsanalys, som fliken Möjliga anbudsgivare visar i PoC:n ([beslut 0023](decisions/0023-mojliga-anbudsgivare-for-inkop.md))? Behöver företaget samtycka när det skapar profilen? | Jurist och näringslivsenheten |

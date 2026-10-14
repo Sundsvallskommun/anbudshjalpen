@@ -54,9 +54,11 @@ För den som visar demon finns växeln "Visa hur underlaget lästes" under "Om d
 knappen "Så lästes underlaget", som visar vad som hände med varje fil från hämtningen till checklistan, se
 [Design](design.md#upphandlingens-sida). Valet sparas i webbläsaren och ändrar inget för andra.
 
-Inköparens vy (demopersonen Lars Holm) har två flikar: Att granska, där inköparen granskar, rättar, godkänner och
-publicerar checklistan innan företagen ser den, och Företagens frågor med de sammanställda frågorna. Jobben finns på
-sidan Drift i kontomenyn.
+Inköparens vy (demopersonen Lars Holm) har tre flikar: Att granska, där inköparen granskar, rättar, godkänner och
+publicerar checklistan innan företagen ser den, Företagens frågor med de sammanställda frågorna, och Möjliga
+anbudsgivare, där inköparen beskriver ett tänkt uppdrag eller utgår från ett avtal som snart ska upphandlas igen och
+ser vilka företag som verkar kunna svara ([beslut 0023](decisions/0023-mojliga-anbudsgivare-for-inkop.md)). Jobben
+finns på sidan Drift i kontomenyn.
 
 ## Plan
 

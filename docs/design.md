@@ -72,7 +72,7 @@ sidhuvudet rullar bort med sidan.
 | `/profil` och `/paminnelser` | Företagsprofil och Påminnelser. Påminnelsemejlen länkar till `/paminnelser` |
 | `/logga-in?till=…` | Val av demoperson ([beslut 0007](decisions/0007-poc-login-persona-picker.md)), och med labbläget på ett eget företag ([beslut 0010](decisions/0010-labblage-egna-foretag.md)) |
 | Alla adresser, med `ACCESS_CODE` satt | Sidan "Ange accesskoden" ([beslut 0010](decisions/0010-labblage-egna-foretag.md)) i ramen, tills koden är inskriven: ett fält, "Fortsätt" och raden "Ingen riktig inloggning: koden är en enkel spärr för testmiljön." |
-| `/inkop?flik=granska\|insikter` | Inköp med flikarna Att granska och Företagens frågor. `?flik=ny` öppnar "Ny upphandling", och `?flik=jobb` leder till Drift |
+| `/inkop?flik=granska\|insikter\|anbudsgivare` | Inköp med flikarna Att granska, Företagens frågor och Möjliga anbudsgivare. `?flik=ny` öppnar "Ny upphandling", och `?flik=jobb` leder till Drift |
 | `/inkop/checklistor/:id` | Granska checklista |
 | `/inkop/drift` | Drift |
 | `/inkop/installningar` | Inställningar ([beslut 0011](decisions/0011-installningar-granskning-valfri.md)) |
@@ -315,6 +315,15 @@ tillbaka till länken när dialogen stängs.
 - **Företagens frågor** är en tabell per upphandling: antal frågor, hur många underlaget inte svarade på och hur många
   som hänvisades till e-Avrop. Frågorna själva visas först efter sista anbudsdag, och inget företag namnges. Under
   760 px står fristen och de andra antalen under rubriken, och bara antalet frågor har en egen kolumn.
+- **Möjliga anbudsgivare** ([beslut 0023](decisions/0023-mojliga-anbudsgivare-for-inkop.md)) börjar med två stycken
+  om vad listan är till för och att den inte ger någon förtur. Sedan ett formulär på ett kort: "Utgå från en kommande
+  upphandling", en väljare med avtalen ur katalogen som fyller i fälten, Rubrik, Beskrivning och CPV-koder (som i "Ny
+  upphandling"), och knappen "Visa möjliga anbudsgivare". Utan ord och koder säger rubrikfältet "Beskriv uppdraget
+  eller ange minst en CPV-kod." Svaret är rubriken "3 företag verkar kunna svara" och en tabell: Företag (namn, Fiktiv
+  eller Testföretag, "Sundsvall, Timrå · 5 anställda"), Verksamhet (CPV-kodernas benämningar) och Därför (en grön
+  token "Samma kod" eller "Samma kategori", grå "Samma grupp", med kodens benämning, och "Beskrivningen nämner fasader
+  och förskolor"). Under 900 px står allt under namnet. Inga träffar ger "Inga företag verkar kunna svara" med vad som
+  kan prövas. Inget sparas.
 - **Granska checklista** har raden "Granska checklista" över h1 med upphandlingens namn, stegen Utkast → Godkänd →
   Publicerad och fakta att jämföra med. Från 1 200 px är sidan en arbetsyta på upp till 1 344 px: de automatiska
   kontrollerna, som länkar till sina rader, och listan står i en kolumn bredvid "Källan i underlaget", och båda rullar

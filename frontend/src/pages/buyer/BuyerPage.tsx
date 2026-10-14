@@ -8,6 +8,7 @@ import { Page } from "../../shell/Page";
 import { RequireRole } from "../../shell/RequireRole";
 import { CompanyQuestions } from "./CompanyQuestions";
 import { NewNoticeDialog } from "./NewNoticeDialog";
+import { PossibleBidders } from "./PossibleBidders";
 import { ReviewQueue } from "./ReviewQueue";
 
 /** Addresses from before the redesign: `?flik=ny` opens "Ny upphandling", `?flik=jobb` moved to Drift. */
@@ -40,7 +41,7 @@ function Buyer() {
   return (
     <Page
       title="Inköp"
-      intro="Granska checklistor innan företagen ser dem, och följ vad företagen frågar om."
+      intro="Granska checklistor innan företagen ser dem, följ vad företagen frågar om, och se vilka företag som kan svara på ett tänkt uppdrag."
       actions={<Button label="Ny upphandling" onClick={() => setIsCreating(true)} />}
     >
       <UrlTabs
@@ -52,6 +53,7 @@ function Buyer() {
             render: () => <ReviewQueue />,
           },
           { value: "insikter", label: "Företagens frågor", render: () => <CompanyQuestions /> },
+          { value: "anbudsgivare", label: "Möjliga anbudsgivare", render: () => <PossibleBidders /> },
         ]}
       />
       <NewNoticeDialog isOpen={isCreating} onClose={closeNewNotice} />
@@ -60,8 +62,9 @@ function Buyer() {
 }
 
 /**
- * Inköp (direction.md, section 3 and 4): the checklists to review and what companies ask about, with "Ny upphandling"
- * in the header. The scheduled jobs are on Drift, reached from the account menu.
+ * Inköp (direction.md, section 3 and 4): the checklists to review, what companies ask about and which companies could
+ * answer a job inköp is considering (decision 0023), with "Ny upphandling" in the header. The scheduled jobs are on
+ * Drift, reached from the account menu.
  */
 export default function BuyerPage() {
   return <RequireRole role="inkopare" title="Inköp">{() => <Buyer />}</RequireRole>;

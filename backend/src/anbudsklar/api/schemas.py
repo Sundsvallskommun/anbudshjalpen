@@ -12,7 +12,7 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from anbudsklar.contracts import (
     Answer,
@@ -597,6 +597,51 @@ class InsightItem(ApiModel):
     formal_question_suggestions: int
     sample_questions: list[str]  # empty until the tender deadline has passed
     visible: bool  # False while the tender period is running
+
+
+class SupplierSearch(ApiModel):
+    """A job inköp is considering (decision 0023), described as a notice would be: words and CPV codes."""
+
+    title: str = Field(default="", max_length=500)
+    description: str = Field(default="", max_length=8000)
+    cpv_codes: list[CpvCodeIn] = Field(default_factory=list, max_length=30)
+
+    @model_validator(mode="after")
+    def _something_to_match_on(self) -> SupplierSearch:
+        if not self.cpv_codes and len(f"{self.title} {self.description}".strip()) < 3:
+            raise ValueError("Beskriv uppdraget eller ange minst en CPV-kod.")
+        return self
+
+
+# How close the company's nearest CPV code is to the job's: the same code, a code in the same
+# category (five significant digits) or one in the same group (three), the level matching starts at.
+SupplierCpvKind = Literal["same_code", "same_category", "same_group"]
+
+
+class SupplierCpvMatch(ApiModel):
+    company_code: str
+    label: str | None  # the company code's Swedish label, when the code is in the CPV list
+    kind: SupplierCpvKind
+
+
+class SupplierMatch(ApiModel):
+    """A company that seems able to answer the job (`services.suppliers`).
+
+    Only what the matching itself reads is shown: never the description, the turnover, the
+    insurance or the references.
+    """
+
+    company_id: uuid.UUID
+    name: str
+    is_fictitious: bool
+    is_lab: bool  # a workshop participant's own company (decision 0010)
+    municipalities: list[str]
+    employees: int | None
+    cpv_codes: list[str]
+    cpv_labels: dict[str, str] = Field(default_factory=dict)
+    cpv_match: SupplierCpvMatch | None  # None when the company got in on its words alone
+    # Words of the company's own description that the job's text also has, in the company's order.
+    shared_words: list[str]
 
 
 class JobRunView(ApiModel):

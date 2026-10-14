@@ -39,7 +39,8 @@ const TITLE_MIN = 3;
 const TITLE_MAX = 500;
 const REFERENCE_MAX = 100;
 const CPV_MAX = 30;
-const CPV_CODE = /^\d{8}(?:-\d)?$/u;
+/** A CPV code as typed: eight digits, with or without the check digit. Shared with "Möjliga anbudsgivare". */
+export const CPV_CODE = /^\d{8}(?:-\d)?$/u;
 
 export interface NoticeDraft {
   title: string;

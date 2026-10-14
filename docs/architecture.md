@@ -143,6 +143,7 @@ Indata, kontrakt och kontroller för varje uppgift står i [AI-uppgifterna](ai-t
 | Citat | Vår egen kontroll mot sidtexten | Modellen kan inte själv markera ett citat som kontrollerat |
 | Matchning (företagarens Start) | Först fasta regler (CPV-prefix och nyckelord), sedan bedömer modellen mot kraven som plockats ut | Går att förklara och testa |
 | Prediktion | Datumräkning på avtalskatalogen. Modellen sammanfattar bara förra gångens krav | Mest unikt värde, minst AI |
+| Möjliga anbudsgivare (inköps vy) | Matchningens fasta regler lästa åt andra hållet: CPV-grupp eller ord ur företagets beskrivning, utan modell ([beslut 0023](decisions/0023-mojliga-anbudsgivare-for-inkop.md)) | Svarar på "finns det företag som kan svara" utan ett anrop per företag, och går att förklara |
 | Regelfrågor | En assistent i Eneo. Vägledningar ligger som kunskap, och LOU och kommunens styrdokument hämtas paragraf för paragraf respektive avsnitt för avsnitt via egna MCP-verktyg, så att modellen väljer källa efter frågan ([beslut 0022](decisions/0022-kommunens-styrdokument-som-kalla.md)) | Hänvisningen blir kapitel och paragraf, eller dokument och avsnitt, inte ett helt dokument |
 | Sökning | Fulltext på svenska och trigram i Postgres | Filter, exakta termer och sidträffar utan en extra tjänst |
 
@@ -153,6 +154,10 @@ publicerade.
 ## Dataskydd i designen
 
 - Ett företag kommer bara åt sina egna profiler, träffar, påminnelser och svar.
+- Inköp ser av företagens profiler bara det matchningen läser, och bara som svar på ett tänkt uppdrag under Möjliga
+  anbudsgivare: namn, CPV-koder, kommuner, antal anställda och de ord i beskrivningen som uppdraget delar. Aldrig
+  beskrivningen i sin helhet, omsättningen, försäkringen eller referenserna, och aldrig företagens träffar, frågor eller
+  avfärdanden ([beslut 0023](decisions/0023-mojliga-anbudsgivare-for-inkop.md)).
 - Anbudsutkast sparas inte. Utkastet hanteras i minnet, skickas till motorn och slängs efter granskningen.
 - Frågor om ett underlag sparas för inköparens sammanställning, som aldrig visar vilket företag som frågade. Exempel på
   frågor visas först efter sista anbudsdag. Frågor som ställs efter sista anbudsdag sparas inte, och inte heller
